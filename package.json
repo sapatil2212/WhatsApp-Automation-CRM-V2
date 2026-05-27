@@ -69,7 +69,7 @@
     "prettier-plugin-tailwindcss": "^0.8.0",
     "tailwindcss": "^4",
     "typescript": "^6",
-    "vitest": "^4.1.6"
+    "vitest": "^4.1.7"
   },
   "overrides": {
     "postcss": "^8.5.10",
