@@ -54,6 +54,25 @@ const SECURITY_HEADERS = [
 ] as const;
 
 const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      {
+        source: "/terms-of-service",
+        destination: "/terms-and-conditions",
+        permanent: true,
+      },
+      {
+        source: "/about",
+        destination: "/about-us",
+        permanent: true,
+      },
+      {
+        source: "/contact",
+        destination: "/contact-us",
+        permanent: true,
+      },
+    ];
+  },
   /**
    * Cache-Control policy.
    *

@@ -44,7 +44,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
           <Link href="/admin-panel" className="flex items-center gap-2.5">
             <img
               src="/images/logo/chatnexgen-logo.png"
-              alt="ChatNexGen Ai Logo"
+              alt="ChatNexGen Logo"
               className="h-8 w-auto object-contain"
             />
             <div>

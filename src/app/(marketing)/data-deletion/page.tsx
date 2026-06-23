@@ -13,18 +13,18 @@ export default function DataDeletionPage() {
         <h1 className="text-3xl sm:text-5xl font-extrabold text-[var(--m-text-heading)] tracking-tight">
           User Data Deletion Instructions
         </h1>
-        <p className="text-xs text-[var(--m-text-muted)]">ChatNexGen Ai Platform Guidelines</p>
+        <p className="text-xs text-[var(--m-text-muted)]">ChatNexGen Platform Guidelines</p>
       </div>
 
       <div className="space-y-8 text-xs sm:text-sm text-[var(--m-text-secondary)] leading-relaxed">
         <p>
-          If you want to delete your personal data from the ChatNexGen Ai platform, you can request data deletion using the steps below.
+          If you want to delete your personal data from the ChatNexGen platform, you can request data deletion using the steps below.
         </p>
 
         <section className="space-y-3">
           <h3 className="text-lg font-bold text-[var(--m-text-heading)]">How to request data deletion</h3>
           <ol className="list-decimal pl-5 space-y-2 text-[var(--m-text-tertiary)]">
-            <li>Log in to your account on the ChatNexGen Ai platform.</li>
+            <li>Log in to your account on the ChatNexGen platform.</li>
             <li>Go to your Account Settings.</li>
             <li>Click on Delete Account or request account deletion.</li>
             <li>You can also contact our support team to request deletion of your data.</li>
@@ -37,15 +37,15 @@ export default function DataDeletionPage() {
             <div className="bg-[var(--m-bg-secondary)] border border-[var(--m-border-primary)] rounded-xl p-4 text-center space-y-2">
               <span className="text-[10px] uppercase font-bold text-[var(--m-text-muted)]">Support Email</span>
               <p className="font-semibold text-[var(--m-text-primary)]">
-                <a href="mailto:chatnexgenai@gmail.com" className="text-emerald-400 hover:underline">
-                  chatnexgenai@gmail.com
+                <a href="mailto:chatnexgen@gmail.com" className="text-emerald-400 hover:underline">
+                  chatnexgen@gmail.com
                 </a>
               </p>
             </div>
             <div className="bg-[var(--m-bg-secondary)] border border-[var(--m-border-primary)] rounded-xl p-4 text-center space-y-2">
               <span className="text-[10px] uppercase font-bold text-[var(--m-text-muted)]">WhatsApp Support</span>
               <p className="font-semibold text-emerald-400">
-                +91 9326268231
+                +91 77458 68073 / +91 88305 53868
               </p>
             </div>
           </div>

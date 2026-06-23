@@ -70,7 +70,7 @@ export function GlassNavbar() {
     { name: "Enterprise SaaS", href: "/enterprise" },
     { name: "Security & GDPR", href: "/security" },
     { name: "Customer Stories", href: "/customer-stories" },
-    { name: "About Us", href: "/about" },
+    { name: "About Us", href: "/about-us" },
     { name: "Careers", href: "/careers" },
     { name: "Blog Hacks", href: "/blog" },
   ];
@@ -119,7 +119,7 @@ export function GlassNavbar() {
           <Link href="/" className="flex items-center gap-2 group shrink-0">
             <img
               src={isLight ? "/images/logo/chatnexgen-logo-light.png" : "/images/logo/chatnexgen-logo.png"}
-              alt="ChatNexGen Ai Logo"
+              alt="ChatNexGen Logo"
               className="h-8 w-auto object-contain group-hover:scale-110 transition-transform"
             />
           </Link>

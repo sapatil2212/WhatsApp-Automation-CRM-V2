@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Super Admin — ChatNexGen Ai",
+  title: "Super Admin — ChatNexGen",
   robots: { index: false, follow: false },
 };
 

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Bot, ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft, Sparkles, Eye, EyeOff, Loader2 } from "lucide-react";
 import { InteractiveGrid } from "@/components/marketing/interactive-grid";
 import { useTheme } from "@/hooks/use-theme";
 
@@ -17,6 +17,7 @@ export default function LoginPage() {
   const isLight = mode === "light";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -56,13 +57,8 @@ export default function LoginPage() {
         <ArrowLeft className="size-3.5" /> Back Home
       </Link>
 
-      <Card className="w-full max-w-md border-[var(--m-border-primary)] bg-[var(--m-bg-glass)] shadow-[var(--m-shadow-card)] backdrop-blur-xl relative z-10 p-2">
-        <CardHeader className="items-center text-center pb-4">
-          <img
-            src={isLight ? "/images/logo/chatnexgen-logo-light.png" : "/images/logo/chatnexgen-logo.png"}
-            alt="ChatNexGen Ai Logo"
-            className="mb-2 h-10 w-auto object-contain"
-          />
+      <Card className="w-full max-w-md border-[var(--m-border-primary)] bg-[var(--m-bg-glass)] shadow-[var(--m-shadow-card)] backdrop-blur-xl relative z-10 p-2 overflow-hidden transition-all duration-300">
+        <CardHeader className="items-center text-center pb-3 pt-6">
           <CardTitle className="text-xl font-bold tracking-tight text-[var(--m-text-heading)] flex items-center gap-1.5 justify-center">
             Sign In <Sparkles className="size-4 text-emerald-400" />
           </CardTitle>
@@ -70,15 +66,15 @@ export default function LoginPage() {
             Access your AI WhatsApp Automation Dashboard
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-6 pb-6 pt-2">
           <form onSubmit={handleLogin} className="flex flex-col gap-4">
             {error && (
-              <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-xs text-red-400">
+              <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-xs text-red-400">
                 {error}
               </div>
             )}
 
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1.5">
               <Label htmlFor="email" className="text-xs font-bold text-[var(--m-text-secondary)]">
                 Email Address
               </Label>
@@ -89,43 +85,58 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="h-10 border-[var(--m-input-border)] bg-[var(--m-input-bg)] text-xs text-[var(--m-text-primary)] placeholder:text-[var(--m-text-muted)] focus-visible:border-emerald-500 focus-visible:ring-emerald-500/20"
+                className="h-9.5 border-[var(--m-input-border)] bg-[var(--m-input-bg)] text-xs text-[var(--m-text-primary)] placeholder:text-[var(--m-text-muted)] focus-visible:border-emerald-500 focus-visible:ring-emerald-500/20 px-3 rounded-lg"
               />
             </div>
 
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password" className="text-xs font-bold text-[var(--m-text-secondary)]">
                   Password
                 </Label>
                 <Link
                   href="/forgot-password"
-                  className="text-[11px] text-emerald-500 hover:text-emerald-400 font-medium"
+                  className="text-[11px] text-emerald-500 hover:text-emerald-400 font-semibold"
                 >
                   Forgot password?
                 </Link>
               </div>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="h-10 border-[var(--m-input-border)] bg-[var(--m-input-bg)] text-xs text-[var(--m-text-primary)] placeholder:text-[var(--m-text-muted)] focus-visible:border-emerald-500 focus-visible:ring-emerald-500/20"
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="h-9.5 border-[var(--m-input-border)] bg-[var(--m-input-bg)] text-xs text-[var(--m-text-primary)] placeholder:text-[var(--m-text-muted)] focus-visible:border-emerald-500 focus-visible:ring-emerald-500/20 pr-10 px-3 rounded-lg"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-400"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
 
             <Button
               type="submit"
               disabled={loading}
-              className="mt-2 h-10 w-full bg-emerald-500 text-slate-950 hover:bg-emerald-400 hover:scale-[1.01] active:scale-[0.99] font-bold text-xs transition-all shadow-[0_0_12px_rgba(16,185,129,0.2)]"
+              className="mt-2 h-10 w-full bg-emerald-500 text-slate-950 hover:bg-emerald-400 hover:scale-[1.005] active:scale-[0.995] font-bold text-xs transition-all shadow-[0_0_12px_rgba(16,185,129,0.18)] disabled:opacity-50"
             >
-              {loading ? "Authenticating..." : "Sign In"}
+              {loading ? (
+                <span className="flex items-center gap-2 justify-center">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Authenticating...
+                </span>
+              ) : (
+                "Sign In"
+              )}
             </Button>
           </form>
 
-          <p className="mt-6 text-center text-xs text-[var(--m-text-muted)]">
+          <p className="mt-5 text-center text-xs text-[var(--m-text-muted)]">
             Don&apos;t have an account?{" "}
             <Link
               href="/signup"

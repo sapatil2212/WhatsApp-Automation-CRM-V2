@@ -29,7 +29,7 @@ export function ReferenceDashboard() {
           <div className="flex items-center gap-2">
             <img
               src={isLight ? "/images/logo/chatnexgen-logo-light.png" : "/images/logo/chatnexgen-logo.png"}
-              alt="ChatNexGen Ai Logo"
+              alt="ChatNexGen Logo"
               className="h-6 w-auto object-contain"
             />
           </div>

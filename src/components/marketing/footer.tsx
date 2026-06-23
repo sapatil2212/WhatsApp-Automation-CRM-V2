@@ -2,7 +2,6 @@
 
 import React from "react";
 import Link from "next/link";
-import { Sparkles } from "lucide-react";
 import { useMarketingTheme } from "@/components/marketing/marketing-theme-provider";
 
 export function Footer() {
@@ -12,16 +11,16 @@ export function Footer() {
   const productLinks = [
     { name: "Features", href: "/features" },
     { name: "Pricing", href: "/pricing" },
-    { name: "Services", href: "/pricing" },
-    { name: "How It Works", href: "/features" },
+    { name: "AI Automation", href: "/ai-automation" },
     { name: "Use Cases", href: "/" },
   ];
 
-  const legalLinks = [
+  const quickLinks = [
+    { name: "About Us", href: "/about-us" },
+    { name: "Contact Us", href: "/contact-us" },
     { name: "Privacy Policy", href: "/privacy-policy" },
-    { name: "Terms of Service", href: "/terms-of-service" },
+    { name: "Terms & Conditions", href: "/terms-and-conditions" },
     { name: "Refund Policy", href: "/refund-policy" },
-    { name: "Data Deletion", href: "/data-deletion" },
   ];
 
   return (
@@ -35,12 +34,12 @@ export function Footer() {
           <Link href="/" className="inline-block">
             <img
               src={isLight ? "/images/logo/chatnexgen-logo-light.png" : "/images/logo/chatnexgen-logo.png"}
-              alt="ChatNexGen Ai Logo"
+              alt="ChatNexGen Logo"
               className="h-8 w-auto object-contain"
             />
           </Link>
           <p className="text-xs text-[var(--m-text-tertiary)] leading-relaxed max-w-sm">
-            ChatNexGen Ai is the WhatsApp automation platform built for growing businesses. Automate customer conversations, run broadcast campaigns, build no-code chatbot workflows, and connect your existing tools — all powered by the official WhatsApp Business API.
+            ChatNexGen is a premium AI-powered WhatsApp CRM and customer support automation platform. Automate business communication, configure smart chatbots, organize leads, and sync calendar reminders using the official WhatsApp Business API.
           </p>
           <div className="pt-2">
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border border-emerald-500/25 bg-[var(--m-badge-bg)] text-emerald-500 text-[10px] font-extrabold uppercase tracking-wider">
@@ -51,7 +50,7 @@ export function Footer() {
 
         {/* Product Column */}
         <div className="col-span-1 space-y-4">
-          <h6 className="text-[10px] uppercase font-bold tracking-wider text-[var(--m-text-tertiary)]">Product</h6>
+          <h6 className="text-[10px] uppercase font-bold tracking-wider text-[var(--m-text-tertiary)]">Solutions</h6>
           <ul className="space-y-2.5">
             {productLinks.map((link) => (
               <li key={link.name}>
@@ -63,11 +62,11 @@ export function Footer() {
           </ul>
         </div>
 
-        {/* Legal Column */}
+        {/* Legal & Quick Links Column */}
         <div className="col-span-1 space-y-4">
-          <h6 className="text-[10px] uppercase font-bold tracking-wider text-[var(--m-text-tertiary)]">Legal</h6>
+          <h6 className="text-[10px] uppercase font-bold tracking-wider text-[var(--m-text-tertiary)]">Quick Links</h6>
           <ul className="space-y-2.5">
-            {legalLinks.map((link) => (
+            {quickLinks.map((link) => (
               <li key={link.name}>
                 <Link href={link.href} className="text-xs text-[var(--m-text-muted)] hover:text-[var(--m-text-heading)] transition-colors">
                   {link.name}
@@ -80,29 +79,38 @@ export function Footer() {
         {/* Contact Us Column */}
         <div className="col-span-1 space-y-4">
           <h6 className="text-[10px] uppercase font-bold tracking-wider text-[var(--m-text-tertiary)]">Contact Us</h6>
-          <ul className="space-y-2.5">
-            <li>
-              <a href="mailto:chatnexgenai@gmail.com" className="text-xs text-[var(--m-text-muted)] hover:text-[var(--m-text-heading)] transition-colors">
-                Email Us
+          <ul className="space-y-2.5 text-xs text-[var(--m-text-muted)]">
+            <li>ChatNexGen Technologies</li>
+            <li>Pune, Maharashtra, India</li>
+            <li className="pt-1">
+              <a href="mailto:chatnexgen@gmail.com" className="text-emerald-400 hover:underline">
+                chatnexgen@gmail.com
               </a>
             </li>
           </ul>
         </div>
 
-        {/* Located At Column */}
+        {/* Trust signals Column */}
         <div className="col-span-1 space-y-4">
-          <h6 className="text-[10px] uppercase font-bold tracking-wider text-[var(--m-text-tertiary)]">Located At</h6>
-          <p className="text-xs text-[var(--m-text-muted)] leading-relaxed">
-            Pune, Maharashtra 401107
-          </p>
+          <h6 className="text-[10px] uppercase font-bold tracking-wider text-[var(--m-text-tertiary)]">Trust Signals</h6>
+          <ul className="space-y-2 text-[10px] text-[var(--m-text-muted)] font-semibold">
+            <li className="text-emerald-400">✓ Secure Platform</li>
+            <li className="text-emerald-400">✓ Data Encryption</li>
+            <li className="text-emerald-400">✓ Meta-Compliant</li>
+            <li className="text-emerald-400">✓ Role-Based Access</li>
+            <li className="text-emerald-400">✓ Business Support</li>
+          </ul>
         </div>
       </div>
 
-      {/* Clean bottom Copyright line */}
-      <div className="max-w-6xl mx-auto mt-16 pt-8 border-t border-[var(--m-border-primary)]/50 text-center relative z-10">
-        <span className="text-[10px] text-[var(--m-text-muted)]">
-          © {new Date().getFullYear()} ChatNexGen Ai. All rights reserved.
-        </span>
+      {/* Meta API disclaimer & Copyright footer */}
+      <div className="max-w-6xl mx-auto mt-12 pt-8 border-t border-[var(--m-border-primary)]/50 space-y-4 relative z-10 text-center">
+        <p className="text-[10px] leading-relaxed text-[var(--m-text-muted)] max-w-3xl mx-auto">
+          "ChatNexGen uses WhatsApp Business API solutions in accordance with Meta and WhatsApp Business policies. Businesses are responsible for obtaining user consent before initiating communication."
+        </p>
+        <div className="text-[10px] text-[var(--m-text-muted)] pt-2">
+          © 2026 ChatNexGen Technologies. All rights reserved.
+        </div>
       </div>
     </footer>
   );

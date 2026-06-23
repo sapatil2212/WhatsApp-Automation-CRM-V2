@@ -12,13 +12,35 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: "ChatNexGen Ai",
-    template: "%s — ChatNexGen Ai",
+    default: "ChatNexGen - AI Powered WhatsApp CRM & Automation Platform",
+    template: "%s — ChatNexGen",
   },
-  description: "Self-hostable WhatsApp CRM & Automation Platform.",
+  description: "Manage leads, automate customer communication, and grow your business with ChatNexGen's AI-powered WhatsApp CRM platform.",
   robots: {
-    index: false,
-    follow: false,
+    index: true,
+    follow: true,
+  },
+  openGraph: {
+    title: "ChatNexGen - AI Powered WhatsApp CRM & Automation Platform",
+    description: "Manage leads, automate customer communication, and grow your business with ChatNexGen's AI-powered WhatsApp CRM platform.",
+    url: "https://chatnexgen.online",
+    siteName: "ChatNexGen",
+    images: [
+      {
+        url: "https://chatnexgen.online/images/logo/chatnexgen-logo.png",
+        width: 1200,
+        height: 630,
+        alt: "ChatNexGen CRM Logo",
+      },
+    ],
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ChatNexGen - AI Powered WhatsApp CRM & Automation Platform",
+    description: "Manage leads, automate customer communication, and grow your business with ChatNexGen's AI-powered WhatsApp CRM platform.",
+    images: ["https://chatnexgen.online/images/logo/chatnexgen-logo.png"],
   },
   icons: {
     icon: [{ url: "/favicon.png", type: "image/png" }],
@@ -100,6 +122,33 @@ export default function RootLayout({
           // eslint-disable-next-line react/no-danger
           dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }}
           suppressHydrationWarning
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Organization",
+              "name": "ChatNexGen Technologies",
+              "alternateName": "ChatNexGen",
+              "url": "https://chatnexgen.online",
+              "logo": "https://chatnexgen.online/images/logo/chatnexgen-logo.png",
+              "contactPoint": {
+                "@type": "ContactPoint",
+                "telephone": "+91-7745868073",
+                "contactType": "customer service",
+                "areaServed": "IN",
+                "availableLanguage": ["en", "hi"]
+              },
+              "address": {
+                "@type": "PostalAddress",
+                "addressLocality": "Pune",
+                "addressRegion": "Maharashtra",
+                "addressCountry": "India"
+              },
+              "description": "AI-Powered WhatsApp CRM & Business Automation Platform helping businesses manage leads and automate customer support."
+            })
+          }}
         />
       </head>
       <body className="min-h-full bg-background text-foreground font-sans" suppressHydrationWarning>

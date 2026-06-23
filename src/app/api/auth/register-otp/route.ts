@@ -3,11 +3,17 @@ import { createClient } from "@supabase/supabase-js";
 import nodemailer from "nodemailer";
 import crypto from "crypto";
 
-// Server-side client to bypass RLS and update user passwords using service role
+// Server-side admin client to bypass RLS and create users
 function adminClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
   );
 }
 
@@ -15,18 +21,11 @@ interface OtpEntry {
   code: string;
   expires: number;
 }
-interface VerifiedEntry {
-  verified: boolean;
-  expires: number;
-}
 
-// Development-safe in-memory stores that persist across hot reloads in Next.js dev server
+// Development-safe in-memory store that persists across hot reloads in Next.js dev server
 const globalStore = globalThis as any;
-globalStore.otpStore = globalStore.otpStore || new Map<string, OtpEntry>();
-globalStore.verifiedStore = globalStore.verifiedStore || new Map<string, VerifiedEntry>();
-
-const otpStore: Map<string, OtpEntry> = globalStore.otpStore;
-const verifiedStore: Map<string, VerifiedEntry> = globalStore.verifiedStore;
+globalStore.signupOtpStore = globalStore.signupOtpStore || new Map<string, OtpEntry>();
+const signupOtpStore: Map<string, OtpEntry> = globalStore.signupOtpStore;
 
 export async function POST(req: NextRequest) {
   try {
@@ -37,17 +36,41 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
+    const db = adminClient();
+
     if (action === "send") {
-      // 1. Generate 6-digit OTP code
+      // 1. Check if email is already registered in the profiles table
+      const { data: profile, error: profileErr } = await db
+        .from("profiles")
+        .select("id")
+        .eq("email", email)
+        .maybeSingle();
+
+      if (profile) {
+        return NextResponse.json({ error: "Email is already registered" }, { status: 400 });
+      }
+
+      // 2. Fallback / double-check in auth.users via admin.listUsers
+      const { data: usersData, error: listErr } = await db.auth.admin.listUsers();
+      if (!listErr && usersData?.users) {
+        const matchedUser = usersData.users.find(
+          (u) => u.email?.toLowerCase() === email.toLowerCase()
+        );
+        if (matchedUser) {
+          return NextResponse.json({ error: "Email is already registered" }, { status: 400 });
+        }
+      }
+
+      // 3. Generate 6-digit OTP code
       const code = crypto.randomInt(100000, 999999).toString();
-      
-      // 2. Save code in our store with 10-minute validity
-      otpStore.set(email, {
+
+      // 4. Save code in store (10 minutes validity)
+      signupOtpStore.set(email, {
         code,
         expires: Date.now() + 10 * 60 * 1000,
       });
 
-      // 3. Prepare SMTP Configuration
+      // 5. Prepare SMTP Configuration
       const cleanEnv = (val: string | undefined): string => {
         if (!val) return "";
         return val.replace(/^["']|["']$/g, "");
@@ -61,7 +84,7 @@ export async function POST(req: NextRequest) {
       const smtpFrom = cleanEnv(process.env.SMTP_FROM) || smtpUser || "chatnexgenai@gmail.com";
 
       // Developer Fallback: Log the verification code to the console
-      console.log(`\n--- [AUTH OTP] Verification code for ${email} is: ${code} ---\n`);
+      console.log(`\n--- [SIGNUP OTP] Verification code for ${email} is: ${code} ---\n`);
 
       if (smtpHost && smtpUser && smtpPass) {
         const transporter = nodemailer.createTransport({
@@ -78,7 +101,7 @@ export async function POST(req: NextRequest) {
         const mailOptions = {
           from: formattedFrom,
           to: email,
-          subject: "Password Reset Verification Code",
+          subject: "Email Verification Code for Registration",
           text: `Your 6-digit verification code is: ${code}. It is valid for 10 minutes.`,
           html: `
             <div style="background-color: #f8fafc; padding: 40px 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; min-height: 100%;">
@@ -87,10 +110,10 @@ export async function POST(req: NextRequest) {
                   <span style="font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px;">Chat<span style="color: #10b981;">NexGen</span></span>
                 </div>
                 
-                <h2 style="font-size: 20px; font-weight: 700; color: #0f172a; margin-top: 0; margin-bottom: 12px;">Password Reset</h2>
+                <h2 style="font-size: 20px; font-weight: 700; color: #0f172a; margin-top: 0; margin-bottom: 12px;">Email Verification</h2>
                 
                 <p style="font-size: 14px; line-height: 1.6; color: #475569; margin-top: 0; margin-bottom: 24px;">
-                  You requested to reset your password. Use the verification code below to proceed:
+                  Thank you for registering. Use the verification code below to complete your registration:
                 </p>
                 
                 <div style="font-size: 36px; font-weight: 800; font-family: 'Courier New', Courier, monospace; background-color: #f8fafc; padding: 14px 28px; border-radius: 12px; display: inline-block; letter-spacing: 8px; margin-bottom: 24px; color: #0f172a; border: 1px solid #e2e8f0; text-indent: 8px;">
@@ -108,15 +131,18 @@ export async function POST(req: NextRequest) {
         try {
           await transporter.sendMail(mailOptions);
         } catch (mailErr: any) {
-          console.error("Failed to send SMTP email:", mailErr);
+          console.error("Failed to send SMTP registration email:", mailErr);
           // In development mode, don't block the user if SMTP fails (since code is printed in terminal)
           if (process.env.NODE_ENV === "development") {
-            return NextResponse.json({ 
-              success: true, 
-              note: "SMTP sending failed, but OTP logged in terminal for development." 
+            return NextResponse.json({
+              success: true,
+              note: "SMTP sending failed, but OTP logged in terminal for development.",
             });
           }
-          return NextResponse.json({ error: `Failed to send email: ${mailErr.message || mailErr}` }, { status: 500 });
+          return NextResponse.json(
+            { error: `Failed to send email: ${mailErr.message || mailErr}` },
+            { status: 500 }
+          );
         }
       } else {
         // If SMTP credentials aren't configured, let development environment succeed using logged OTP
@@ -128,88 +154,75 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
-    if (action === "verify") {
-      const { code } = body;
-      if (!code) {
-        return NextResponse.json({ error: "Code is required" }, { status: 400 });
+    if (action === "register") {
+      const { code, fullName, password, businessName, businessType } = body;
+
+      if (!code || !fullName || !password || !businessName || !businessType) {
+        return NextResponse.json({ error: "Missing required registration parameters" }, { status: 400 });
       }
 
-      const stored = otpStore.get(email);
+      // 1. Verify OTP code
+      const stored = signupOtpStore.get(email);
       if (!stored) {
-        return NextResponse.json({ error: "Verification code not found or expired. Please request a new one." }, { status: 400 });
+        return NextResponse.json(
+          { error: "Verification code not found or expired. Please request a new one." },
+          { status: 400 }
+        );
       }
 
       if (stored.expires < Date.now()) {
-        otpStore.delete(email);
-        return NextResponse.json({ error: "Verification code expired. Please request a new one." }, { status: 400 });
+        signupOtpStore.delete(email);
+        return NextResponse.json(
+          { error: "Verification code expired. Please request a new one." },
+          { status: 400 }
+        );
       }
 
       if (stored.code !== code) {
         return NextResponse.json({ error: "Invalid verification code. Please try again." }, { status: 400 });
       }
 
-      // Mark the email as verified for password resets
-      otpStore.delete(email);
-      verifiedStore.set(email, {
-        verified: true,
-        expires: Date.now() + 10 * 60 * 1000, // Valid for 10 minutes to reset
-      });
-
-      return NextResponse.json({ success: true });
-    }
-
-    if (action === "reset") {
-      const { password } = body;
-      if (!password) {
-        return NextResponse.json({ error: "Password is required" }, { status: 400 });
-      }
-
-      const verifiedEntry = verifiedStore.get(email);
-      if (!verifiedEntry || !verifiedEntry.verified || verifiedEntry.expires < Date.now()) {
-        return NextResponse.json({ error: "Session expired. Please verify your email again." }, { status: 400 });
-      }
-
-      const db = adminClient();
-
-      // Find user id by querying the profiles table
-      const { data: profile, error: profileErr } = await db
+      // 2. Double-check if email is already registered in the profiles table (prevents race conditions)
+      const { data: profileExists } = await db
         .from("profiles")
-        .select("user_id")
+        .select("id")
         .eq("email", email)
-        .single();
+        .maybeSingle();
 
-      let targetUserId = profile?.user_id;
-
-      // Fallback: If profile table is missing or doesn't match, search users via listUsers
-      if (profileErr || !targetUserId) {
-        const { data: usersData, error: listErr } = await db.auth.admin.listUsers();
-        if (listErr) {
-          return NextResponse.json({ error: `User listing failed: ${listErr.message}` }, { status: 500 });
-        }
-        const matchedUser = usersData?.users?.find(u => u.email === email);
-        if (!matchedUser) {
-          return NextResponse.json({ error: "User with this email not found." }, { status: 404 });
-        }
-        targetUserId = matchedUser.id;
+      if (profileExists) {
+        signupOtpStore.delete(email);
+        return NextResponse.json({ error: "Email is already registered" }, { status: 400 });
       }
 
-      // Reset the password via admin auth SDK (bypasses tokens)
-      const { error: resetErr } = await db.auth.admin.updateUserById(targetUserId, {
+      // 3. Create the user using admin client (auto-confirm email!)
+      const { data: newUser, error: createErr } = await db.auth.admin.createUser({
+        email,
         password,
+        email_confirm: true,
+        user_metadata: {
+          full_name: fullName,
+          business_name: businessName,
+          business_type: businessType,
+        },
       });
 
-      if (resetErr) {
-        return NextResponse.json({ error: `Password update failed: ${resetErr.message}` }, { status: 500 });
+      if (createErr) {
+        console.error("Supabase user creation failed via Admin SDK:", createErr);
+        return NextResponse.json(
+          { error: `Registration failed: ${createErr.message}` },
+          { status: 500 }
+        );
       }
 
-      // Clear verification record
-      verifiedStore.delete(email);
-      return NextResponse.json({ success: true });
+      // 4. Clear the OTP code
+      signupOtpStore.delete(email);
+
+      return NextResponse.json({ success: true, user: newUser.user });
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   } catch (err: any) {
-    console.error("OTP password reset error:", err);
+    console.error("Signup OTP route error:", err);
     return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 });
   }
 }

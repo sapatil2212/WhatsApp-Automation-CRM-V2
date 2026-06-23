@@ -13,54 +13,75 @@ export default function RefundPolicyPage() {
         <h1 className="text-3xl sm:text-5xl font-extrabold text-[var(--m-text-heading)] tracking-tight">
           Subscription & Refund Policy
         </h1>
-        <p className="text-xs text-[var(--m-text-muted)]">Last updated: March 10, 2026</p>
+        <p className="text-xs text-[var(--m-text-muted)]">Last updated: June 23, 2026</p>
       </div>
 
       <div className="space-y-8 text-xs sm:text-sm text-[var(--m-text-secondary)] leading-relaxed">
         <p>
-          At ChatNexGen Ai, we provide WhatsApp automation services through a subscription-based model. Our policy reflects the unique nature of automation services and the resources required to maintain them.
+          At ChatNexGen, we deliver professional WhatsApp CRM and communication automation services. This policy clarifies terms regarding recurring subscriptions, setup configurations, custom developments, consulting sessions, and billing queries.
         </p>
 
         <section className="space-y-3">
-          <h3 className="text-lg font-bold text-[var(--m-text-heading)]">Non-Refundable Subscriptions</h3>
-          <ul className="list-disc pl-5 space-y-2 text-[var(--m-text-tertiary)]">
-            <li>Once a subscription period has started, it cannot be refunded.</li>
-            <li>Subscription services are provided on an as-is basis.</li>
-            <li>All subscription payments are non-refundable.</li>
-          </ul>
-        </section>
-
-        <section className="space-y-3">
-          <h3 className="text-lg font-bold text-[var(--m-text-heading)]">Service Understanding</h3>
-          <ul className="list-disc pl-5 space-y-2 text-[var(--m-text-tertiary)]">
-            <li>Results may vary based on your use case and WhatsApp&#39;s terms.</li>
-            <li>Service performance may be affected by third-party platform changes (e.g., WhatsApp policies).</li>
-            <li>By purchasing a subscription, you acknowledge that automation technology has inherent limitations.</li>
-          </ul>
-        </section>
-
-        <section className="space-y-3">
-          <h3 className="text-lg font-bold text-[var(--m-text-heading)]">Policy Overview</h3>
-          <ul className="list-disc pl-5 space-y-2 text-[var(--m-text-tertiary)]">
-            <li>You may cancel your subscription at any time to prevent future billing.</li>
-            <li>Users are advised to carefully consider their needs before subscribing.</li>
-            <li>Unused subscription time cannot be exchanged for cash.</li>
-            <li>Subscriptions are final sale and cannot be partially refunded.</li>
-          </ul>
-        </section>
-
-        <section className="space-y-3">
-          <h3 className="text-lg font-bold text-[var(--m-text-heading)]">Cancellation</h3>
+          <h3 className="text-lg font-bold text-[var(--m-text-heading)]">1. SaaS Subscriptions</h3>
           <p>
-            You may cancel your subscription at any time through your account dashboard. Cancellation will stop future billing but will not generate any refund for the current billing period. Your service will remain active until the end of the current billing period.
+            Our software platform is provided on a subscription basis (monthly or annually).
           </p>
+          <ul className="list-disc pl-5 space-y-1 text-[var(--m-text-tertiary)]">
+            <li>Subscribing plans carry a flat rate pass-through for Meta Business Platform usage fees without markups.</li>
+            <li>All subscription payments are non-refundable once the billing cycle begins.</li>
+            <li>You can cancel your subscription at any time to avoid future renewals; your dashboard access will remain active until the end of your prepaid period.</li>
+          </ul>
+        </section>
+
+        <section className="space-y-3">
+          <h3 className="text-lg font-bold text-[var(--m-text-heading)]">2. Account Onboarding & Setup Fees</h3>
+          <p>
+            Setup and integration fees cover the direct labor involved in configuring your Meta Business Manager, applying for WhatsApp Business Account status, and mapping numbers.
+          </p>
+          <ul className="list-disc pl-5 space-y-1 text-[var(--m-text-tertiary)]">
+            <li>These onboarding fees are non-refundable once configuration or account consultation has commenced.</li>
+          </ul>
+        </section>
+
+        <section className="space-y-3">
+          <h3 className="text-lg font-bold text-[var(--m-text-heading)]">3. Custom Development Workflows</h3>
+          <p>
+            Fees collected for custom chatbot integrations, dedicated API plugins, webhook configurations, and customized flow building are governed by project-specific service level agreements (SLAs).
+          </p>
+          <ul className="list-disc pl-5 space-y-1 text-[var(--m-text-tertiary)]">
+            <li>Since custom engineering involves dedicated development resources, these items are non-refundable once development milestones begin.</li>
+          </ul>
+        </section>
+
+        <section className="space-y-3">
+          <h3 className="text-lg font-bold text-[var(--m-text-heading)]">4. Consultation Services</h3>
+          <p>
+            Fees for professional consultation sessions, strategy planning calls, and Meta compliance audits are earned upon booking. If you need to reschedule a consulting slot, you must contact your representative at least 24 hours in advance. No-shows or cancellations inside 24 hours are non-refundable.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h3 className="text-lg font-bold text-[var(--m-text-heading)]">5. Billing Disputes & Resolution</h3>
+          <p>
+            If you identify a duplicate charge or billing error on your statement, you agree to raise an inquiry with our support department within 14 days of the invoice date.
+          </p>
+          <ul className="list-disc pl-5 space-y-1 text-[var(--m-text-tertiary)]">
+            <li>We investigate all queries in good faith and correct verified platform glitches or billing errors immediately.</li>
+            <li>Initiating unauthorized chargebacks without contacting our billing desk will result in immediate workspace lockouts and possible collection procedures.</li>
+          </ul>
         </section>
 
         <section className="space-y-3 text-center pt-8 border-t border-[var(--m-border-primary)]/50">
-          <h3 className="text-lg font-bold text-[var(--m-text-heading)]">Contact</h3>
+          <h3 className="text-lg font-bold text-[var(--m-text-heading)]">6. Contact Support</h3>
           <p>
-            For any questions about our policy, please contact us at <a href="mailto:chatnexgenai@gmail.com" className="text-emerald-400 hover:underline">chatnexgenai@gmail.com</a>.
+            For any queries regarding billing, invoice breakdowns, or cancellations, please contact our support desk:
           </p>
+          <div className="text-xs text-[var(--m-text-tertiary)] mt-3">
+            <p className="font-bold text-[var(--m-text-primary)]">ChatNexGen Technologies</p>
+            <p>
+              Email: <a href="mailto:chatnexgen@gmail.com" className="text-emerald-400 hover:underline">chatnexgen@gmail.com</a>
+            </p>
+          </div>
         </section>
       </div>
     </div>

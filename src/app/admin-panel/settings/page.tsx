@@ -13,8 +13,8 @@ export default function AdminSettingsPage() {
   const [form, setForm] = useState({
     adminEmail: "admin@agency.com",
     adminPassword: "",
-    agencyName: "ChatNexGen Ai Agency",
-    supportEmail: "support@agency.com",
+    agencyName: "ChatNexGen Technologies",
+    supportEmail: "chatnexgen@gmail.com",
     notifyNewClient: true,
     notifyChurn: true,
     notifyTrial: false,
