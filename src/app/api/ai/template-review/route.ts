@@ -49,22 +49,34 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
-  const varCount = (body.body_text.match(/\{\{\d+\}\}/g) ?? []).length;
-  const uniqueVarNums = [...new Set((body.body_text.match(/\{\{(\d+)\}\}/g) ?? []).map(m => m.replace(/[{}]/g, '').trim()))];
-  const missingExamples = varCount > 0 && body.body_example.filter(Boolean).length < uniqueVarNums.length;
+  // Safe fallbacks to prevent TypeErrors
+  const name = body.name || '';
+  const category = body.category || 'Marketing';
+  const language = body.language || 'en_US';
+  const headerType = body.header_type || 'none';
+  const headerText = body.header_text || '';
+  const bodyText = body.body_text || '';
+  const footerText = body.footer_text || '';
+  const buttons = body.buttons || [];
+  const bodyExample = body.body_example || [];
+  const headerTextExample = body.header_text_example || '';
+
+  const varCount = (bodyText.match(/\{\{\d+\}\}/g) ?? []).length;
+  const uniqueVarNums = [...new Set((bodyText.match(/\{\{(\d+)\}\}/g) ?? []).map(m => m.replace(/[{}]/g, '').trim()))];
+  const missingExamples = varCount > 0 && bodyExample.filter(Boolean).length < uniqueVarNums.length;
 
   const prompt = `You are a WhatsApp Business API expert who reviews message templates before Meta submission.
 
 Analyze this template and return ONLY valid JSON (no markdown fences, no explanation text):
 
 ## Template
-- Name: ${body.name}
-- Category: ${body.category}
-- Language: ${body.language}
-- Header Type: ${body.header_type}${body.header_text ? `\n- Header Text: ${body.header_text}` : ''}
-- Body: ${body.body_text}${body.footer_text ? `\n- Footer: ${body.footer_text}` : ''}
-- Buttons: ${body.buttons.length > 0 ? body.buttons.map(b => b.type + ': "' + b.text + '"').join(', ') : 'None'}
-- Variable Examples: ${body.body_example.filter(Boolean).join(', ') || 'None'}${body.header_text_example ? `\n- Header Variable Example: ${body.header_text_example}` : ''}
+- Name: ${name}
+- Category: ${category}
+- Language: ${language}
+- Header Type: ${headerType}${headerText ? `\n- Header Text: ${headerText}` : ''}
+- Body: ${bodyText}${footerText ? `\n- Footer: ${footerText}` : ''}
+- Buttons: ${buttons.length > 0 ? buttons.map(b => (b.type || '') + ': "' + (b.text || '') + '"').join(', ') : 'None'}
+- Variable Examples: ${bodyExample.filter(Boolean).join(', ') || 'None'}${headerTextExample ? `\n- Header Variable Example: ${headerTextExample}` : ''}
 
 ## Checks to perform (use exact IDs):
 1. NAME_FORMAT - snake_case only (lowercase, numbers, underscores)
