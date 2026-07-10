@@ -143,11 +143,10 @@ Score: start 100, deduct 15 per error, 5 per warning. passed=true only if zero e
     // Try OpenRouter fallback — try multiple models in priority order
     if (!success && orKey) {
       const orModels = [
-        'google/gemini-2.5-flash',
-        'google/gemini-2.5-pro',
-        'meta-llama/llama-3-8b-instruct',
-        'mistralai/mistral-7b-instruct',
         'meta-llama/llama-3.3-70b-instruct:free',
+        'google/gemini-2.5-flash',
+        'mistralai/mistral-7b-instruct',
+        'meta-llama/llama-3-8b-instruct',
       ];
 
       for (const orModel of orModels) {
@@ -205,7 +204,7 @@ Score: start 100, deduct 15 per error, 5 per warning. passed=true only if zero e
             ? 'https://openrouter.ai/api/v1/chat/completions'
             : 'https://api.openai.com/v1/chat/completions';
           const modelName = isOrToken
-            ? 'google/gemini-2.5-flash'
+            ? 'meta-llama/llama-3.3-70b-instruct:free'
             : 'gpt-4o-mini';
 
           console.log(`Attempting OpenAI API Key fallback targeting: ${isOrToken ? 'OpenRouter' : 'OpenAI'} with model ${modelName}`);
@@ -226,6 +225,7 @@ Score: start 100, deduct 15 per error, 5 per warning. passed=true only if zero e
               model: modelName,
               messages: [{ role: 'user', content: prompt }],
               temperature: 0.1,
+              max_tokens: 1500,
             }),
           });
 
