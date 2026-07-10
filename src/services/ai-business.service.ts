@@ -93,6 +93,26 @@ export async function processBusinessAIMessage(options: {
     }
   }
 
+  // Get current date & time info in India (IST)
+  const nowTime = new Date()
+  const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const currentDay = daysOfWeek[nowTime.getDay()]
+  const currentDateStr = nowTime.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'full' })
+  const currentTimeStr = nowTime.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', timeStyle: 'short' })
+  
+  // Format next 7 days calendar window for resolving relative days
+  const calendarWindow = []
+  for (let i = 0; i < 7; i++) {
+    const d = new Date()
+    d.setDate(d.getDate() + i)
+    const dayName = daysOfWeek[d.getDay()]
+    const yyyy = d.getFullYear()
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+    calendarWindow.push(`- ${dayName}: ${yyyy}-${mm}-${dd}${i === 0 ? ' (Today)' : i === 1 ? ' (Tomorrow)' : ''}`)
+  }
+  const calendarContext = calendarWindow.join('\n')
+
   // Build prompts contexts
   const servicesContext = services
     .map((s) => `- ${s.name}: ${s.description || ''} (Price: ₹${s.price || 0}, duration ${s.durationMinutes || 30} mins)`)
@@ -120,6 +140,12 @@ Location Map: ${business.googleMapLink || ''}
 
 ### BUSINESS HOURS:
 ${workingHoursText}
+
+### CURRENT DATE, TIME & CALENDAR WINDOW (Use this to resolve relative dates like "tomorrow" or "next Monday" to YYYY-MM-DD):
+Current Time: ${currentDay}, ${currentDateStr} at ${currentTimeStr}
+
+7-Day Calendar Reference:
+${calendarContext}
 
 ### SERVICES OFFERED:
 ${servicesContext || 'No specific services listed. General bookings.'}
@@ -280,13 +306,21 @@ ${faqsContext || 'Answer customer queries politely according to business guideli
     // Handle Auto booking
     if (result.detected_intent === 'book_appointment' && result.booking_details) {
       const details = result.booking_details
+      const parsedDate = (() => {
+        if (details.preferred_date) {
+          const d = new Date(details.preferred_date)
+          if (!isNaN(d.getTime())) return d
+        }
+        return new Date()
+      })()
+
       await prisma.businessEnquiry.create({
         data: {
           businessId: business.id,
           contactId: contactId,
           contactName: details.contact_name || profile.fullName || 'WhatsApp Guest',
           contactPhone: senderPhone,
-          preferredDate: details.preferred_date ? new Date(details.preferred_date) : new Date(),
+          preferredDate: parsedDate,
           preferredTime: details.preferred_time || '10:00',
           notes: details.notes || 'Automated WhatsApp booking request',
           status: 'pending',
