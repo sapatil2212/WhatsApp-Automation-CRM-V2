@@ -100,6 +100,7 @@ Score: start 100, deduct 15 per error, 5 per warning. passed=true only if zero e
   try {
     let rawText = '';
     let success = false;
+    const debugLogs: string[] = [];
 
     // Try direct Gemini first with multiple model fallbacks
     if (apiKey) {
@@ -125,12 +126,18 @@ Score: start 100, deduct 15 per error, 5 per warning. passed=true only if zero e
             }
           } else {
             const errText = await geminiRes.text();
-            console.warn(`Direct Gemini model ${model} returned non-OK status:`, geminiRes.status, errText);
+            const logMsg = `Direct Gemini model ${model} returned non-OK status: ${geminiRes.status} -> ${errText}`;
+            console.warn(logMsg);
+            debugLogs.push(logMsg);
           }
-        } catch (e) {
-          console.warn(`Direct Gemini model ${model} call failed:`, e);
+        } catch (e: any) {
+          const logMsg = `Direct Gemini model ${model} call failed: ${e.message || e}`;
+          console.warn(logMsg);
+          debugLogs.push(logMsg);
         }
       }
+    } else {
+      debugLogs.push('Direct Gemini skipped: process.env.GEMINI_API_KEY is empty.');
     }
 
     // Try OpenRouter fallback — try multiple models in priority order
@@ -172,12 +179,18 @@ Score: start 100, deduct 15 per error, 5 per warning. passed=true only if zero e
             }
           } else {
             const errText = await orRes.text();
-            console.warn(`OpenRouter model ${orModel} returned: ${orRes.status}`, errText);
+            const logMsg = `OpenRouter model ${orModel} returned non-OK status: ${orRes.status} -> ${errText}`;
+            console.warn(logMsg);
+            debugLogs.push(logMsg);
           }
-        } catch (e) {
-          console.warn(`OpenRouter model ${orModel} failed:`, e);
+        } catch (e: any) {
+          const logMsg = `OpenRouter model ${orModel} call failed: ${e.message || e}`;
+          console.warn(logMsg);
+          debugLogs.push(logMsg);
         }
       }
+    } else if (!success) {
+      debugLogs.push('OpenRouter fallback skipped: process.env.OPENROUTER_API_KEY is empty.');
     }
 
     // Try OpenAI/OpenRouter fallback (using OPENAI_API_KEY)
@@ -225,16 +238,25 @@ Score: start 100, deduct 15 per error, 5 per warning. passed=true only if zero e
             }
           } else {
             const errText = await res.text();
-            console.warn(`OpenAI/OpenRouter fallback returned non-OK status: ${res.status}`, errText);
+            const logMsg = `OpenAI/OpenRouter fallback returned non-OK status: ${res.status} -> ${errText}`;
+            console.warn(logMsg);
+            debugLogs.push(logMsg);
           }
-        } catch (e) {
-          console.warn('OpenAI/OpenRouter fallback failed:', e);
+        } catch (e: any) {
+          const logMsg = `OpenAI/OpenRouter fallback call failed: ${e.message || e}`;
+          console.warn(logMsg);
+          debugLogs.push(logMsg);
         }
+      } else {
+        debugLogs.push('OpenAI fallback skipped: process.env.OPENAI_API_KEY is empty.');
       }
     }
 
     if (!success) {
-      return NextResponse.json({ error: 'AI review service currently rate limited or unavailable. Please try again in a few seconds.' }, { status: 502 });
+      return NextResponse.json({
+        error: 'AI review service currently rate limited or unavailable. Please try again in a few seconds.',
+        debugLogs
+      }, { status: 502 });
     }
 
   const jsonText = rawText.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
