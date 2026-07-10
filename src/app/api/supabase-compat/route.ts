@@ -187,7 +187,7 @@ export async function POST(req: NextRequest) {
             if (isolatedModels.includes(modelName)) {
               item.tenantId = tenantId
             }
-            if (modelName === 'contact' || modelName === 'conversation') {
+            if (modelName === 'contact' || modelName === 'conversation' || modelName === 'businessProfile') {
               item.userId = payload.userId
             }
             
@@ -230,7 +230,7 @@ export async function POST(req: NextRequest) {
           if (isolatedModels.includes(modelName)) {
             camelData.tenantId = tenantId
           }
-          if (modelName === 'contact' || modelName === 'conversation') {
+          if (modelName === 'contact' || modelName === 'conversation' || modelName === 'businessProfile') {
             camelData.userId = payload.userId
           }
 
@@ -272,7 +272,7 @@ export async function POST(req: NextRequest) {
             if (isolatedModels.includes(modelName)) {
               item.tenantId = tenantId
             }
-            if (modelName === 'contact' || modelName === 'conversation') {
+            if (modelName === 'contact' || modelName === 'conversation' || modelName === 'businessProfile') {
               item.userId = payload.userId
             }
           }
@@ -282,7 +282,7 @@ export async function POST(req: NextRequest) {
           if (isolatedModels.includes(modelName)) {
             camelData.tenantId = tenantId
           }
-          if (modelName === 'contact' || modelName === 'conversation') {
+          if (modelName === 'contact' || modelName === 'conversation' || modelName === 'businessProfile') {
             camelData.userId = payload.userId
           }
           result = await client.create({ data: camelData })
