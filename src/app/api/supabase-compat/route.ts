@@ -264,6 +264,18 @@ export async function POST(req: NextRequest) {
           if (!result) {
             result = await client.create({ data: camelData })
           }
+
+          if (modelName === 'businessProfile' && camelData.businessName !== undefined) {
+            await prisma.profile.update({
+              where: { userId: payload.userId },
+              data: { businessName: camelData.businessName }
+            }).catch(() => {})
+
+            await prisma.tenant.updateMany({
+              where: { ownerUserId: payload.userId },
+              data: { name: camelData.businessName || 'My Organization' }
+            }).catch(() => {})
+          }
         }
       } else {
         // Standard insert
@@ -286,6 +298,18 @@ export async function POST(req: NextRequest) {
             camelData.userId = payload.userId
           }
           result = await client.create({ data: camelData })
+
+          if (modelName === 'businessProfile' && camelData.businessName !== undefined) {
+            await prisma.profile.update({
+              where: { userId: payload.userId },
+              data: { businessName: camelData.businessName }
+            }).catch(() => {})
+
+            await prisma.tenant.updateMany({
+              where: { ownerUserId: payload.userId },
+              data: { name: camelData.businessName || 'My Organization' }
+            }).catch(() => {})
+          }
         }
       }
     } else if (method === 'update') {
@@ -299,6 +323,19 @@ export async function POST(req: NextRequest) {
         where,
         data: updateData
       })
+
+      if (modelName === 'businessProfile' && updateData.businessName !== undefined) {
+        await prisma.profile.update({
+          where: { userId: payload.userId },
+          data: { businessName: updateData.businessName }
+        }).catch(() => {})
+
+        await prisma.tenant.updateMany({
+          where: { ownerUserId: payload.userId },
+          data: { name: updateData.businessName || 'My Organization' }
+        }).catch(() => {})
+      }
+
       result = [updateData]
     } else if (method === 'delete') {
       await client.deleteMany({

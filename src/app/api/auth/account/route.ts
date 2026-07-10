@@ -107,7 +107,27 @@ export async function PATCH(req: NextRequest) {
 
     const profileData: Record<string, any> = {}
     if (fullName !== undefined) profileData.fullName = fullName.trim()
-    if (businessName !== undefined) profileData.businessName = businessName.trim() || null
+    if (businessName !== undefined) {
+      const trimmed = businessName.trim()
+      profileData.businessName = trimmed || null
+
+      // Sync to Tenant
+      await prisma.tenant.updateMany({
+        where: { ownerUserId: payload.userId },
+        data: { name: trimmed || 'My Organization' }
+      }).catch(() => {})
+
+      // Sync to BusinessProfile if exists
+      const hasBusiness = await prisma.businessProfile.findUnique({
+        where: { userId: payload.userId }
+      })
+      if (hasBusiness) {
+        await prisma.businessProfile.update({
+          where: { userId: payload.userId },
+          data: { businessName: trimmed || null }
+        }).catch(() => {})
+      }
+    }
     if (businessType !== undefined) profileData.businessType = businessType.trim() || null
     if (phoneNumber !== undefined) profileData.phoneNumber = phoneNumber.trim() || null
     if (avatarUrl !== undefined) profileData.avatarUrl = avatarUrl
