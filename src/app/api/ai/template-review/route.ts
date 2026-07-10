@@ -32,8 +32,13 @@ export interface ReviewResult {
 }
 
 export async function POST(req: NextRequest) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
+  let apiKey = process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY_SECONDARY || '';
+  apiKey = apiKey.replace(/^["']|["']$/g, '');
+
+  let orKey = process.env.OPENROUTER_API_KEY || '';
+  orKey = orKey.replace(/^["']|["']$/g, '');
+
+  if (!apiKey && !orKey) {
     return NextResponse.json({ error: 'AI service not configured' }, { status: 500 });
   }
 
@@ -84,78 +89,88 @@ Score: start 100, deduct 15 per error, 5 per warning. passed=true only if zero e
     let rawText = '';
     let success = false;
 
-  // Try direct Gemini first
-  if (apiKey) {
-    try {
-      const geminiRes = await fetch(GEMINI_API_URL + '?key=' + apiKey, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 2048 },
-        }),
-      });
+    // Try direct Gemini first with multiple model fallbacks
+    if (apiKey) {
+      const directModels = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+      for (const model of directModels) {
+        if (success) break;
+        try {
+          const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.1, maxOutputTokens: 2048 },
+            }),
+          });
 
-      if (geminiRes.ok) {
-        const geminiData = await geminiRes.json();
-        rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-        if (rawText) success = true;
-      } else {
-        const errText = await geminiRes.text();
-        console.warn('Direct Gemini API returned non-OK status:', geminiRes.status, errText);
-      }
-    } catch (e) {
-      console.warn('Direct Gemini API call failed:', e);
-    }
-  }
-
-  // Try OpenRouter fallback — try multiple models in priority order
-  if (!success && process.env.OPENROUTER_API_KEY) {
-    const orModels = [
-      'google/gemini-2.5-flash',
-      'google/gemini-2.5-pro',
-      'meta-llama/llama-3-8b-instruct',
-      'mistralai/mistral-7b-instruct',
-      'meta-llama/llama-3.3-70b-instruct:free',
-    ];
-
-    for (const orModel of orModels) {
-      if (success) break;
-      try {
-        console.log(`Attempting OpenRouter fallback with model: ${orModel}`);
-        const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-            'HTTP-Referer': 'http://localhost:3000',
-            'X-Title': 'WhatsApp CRM',
-          },
-          body: JSON.stringify({
-            model: orModel,
-            messages: [{ role: 'user', content: prompt }],
-            temperature: 0.1,
-            max_tokens: 1500,
-          }),
-        });
-
-        if (orRes.ok) {
-          const orData = await orRes.json();
-          rawText = orData?.choices?.[0]?.message?.content ?? '';
-          if (rawText) { success = true; console.log(`OpenRouter success with: ${orModel}`); }
-        } else {
-          const errText = await orRes.text();
-          console.warn(`OpenRouter model ${orModel} returned: ${orRes.status}`, errText);
+          if (geminiRes.ok) {
+            const geminiData = await geminiRes.json();
+            rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+            if (rawText) {
+              success = true;
+              break;
+            }
+          } else {
+            const errText = await geminiRes.text();
+            console.warn(`Direct Gemini model ${model} returned non-OK status:`, geminiRes.status, errText);
+          }
+        } catch (e) {
+          console.warn(`Direct Gemini model ${model} call failed:`, e);
         }
-      } catch (e) {
-        console.warn(`OpenRouter model ${orModel} failed:`, e);
       }
     }
-  }
 
-  if (!success) {
-    return NextResponse.json({ error: 'AI review service currently rate limited or unavailable. Please try again in a few seconds.' }, { status: 502 });
-  }
+    // Try OpenRouter fallback — try multiple models in priority order
+    if (!success && orKey) {
+      const orModels = [
+        'google/gemini-2.5-flash',
+        'google/gemini-2.5-pro',
+        'meta-llama/llama-3-8b-instruct',
+        'mistralai/mistral-7b-instruct',
+        'meta-llama/llama-3.3-70b-instruct:free',
+      ];
+
+      for (const orModel of orModels) {
+        if (success) break;
+        try {
+          console.log(`Attempting OpenRouter fallback with model: ${orModel}`);
+          const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${orKey}`,
+              'HTTP-Referer': 'http://localhost:3000',
+              'X-Title': 'WhatsApp CRM',
+            },
+            body: JSON.stringify({
+              model: orModel,
+              messages: [{ role: 'user', content: prompt }],
+              temperature: 0.1,
+              max_tokens: 1500,
+            }),
+          });
+
+          if (orRes.ok) {
+            const orData = await orRes.json();
+            rawText = orData?.choices?.[0]?.message?.content ?? '';
+            if (rawText) {
+              success = true;
+              console.log(`OpenRouter success with: ${orModel}`);
+            }
+          } else {
+            const errText = await orRes.text();
+            console.warn(`OpenRouter model ${orModel} returned: ${orRes.status}`, errText);
+          }
+        } catch (e) {
+          console.warn(`OpenRouter model ${orModel} failed:`, e);
+        }
+      }
+    }
+
+    if (!success) {
+      return NextResponse.json({ error: 'AI review service currently rate limited or unavailable. Please try again in a few seconds.' }, { status: 502 });
+    }
 
   const jsonText = rawText.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
 
