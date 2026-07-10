@@ -142,7 +142,7 @@ model WorkspaceMember {
   userId       String
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   roleId       String
-  role         Role      @relation(fields: [roleId], references: [id])
+  role         Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
   invitedBy    String?
   inviter      User?     @relation("Inviter", fields: [invitedBy], references: [id], onDelete: SetNull)
   status       String    @default("active") // active, invited, suspended
