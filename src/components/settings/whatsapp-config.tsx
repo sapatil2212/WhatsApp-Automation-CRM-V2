@@ -576,7 +576,7 @@ export function WhatsAppConfig() {
           </CardHeader>
           <CardContent>
             <Accordion>
-              <AccordionItem className="border-slate-800">
+              <AccordionItem className="border-slate-800" value="step-1">
                 <AccordionTrigger className="text-slate-200 hover:text-white hover:no-underline">
                   <span className="flex items-center gap-2">
                     <span className="flex size-5 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">1</span>
@@ -593,7 +593,7 @@ export function WhatsAppConfig() {
                 </AccordionContent>
               </AccordionItem>
 
-              <AccordionItem className="border-slate-800">
+              <AccordionItem className="border-slate-800" value="step-2">
                 <AccordionTrigger className="text-slate-200 hover:text-white hover:no-underline">
                   <span className="flex items-center gap-2">
                     <span className="flex size-5 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">2</span>
@@ -609,7 +609,7 @@ export function WhatsAppConfig() {
                 </AccordionContent>
               </AccordionItem>
 
-              <AccordionItem className="border-slate-800">
+              <AccordionItem className="border-slate-800" value="step-3">
                 <AccordionTrigger className="text-slate-200 hover:text-white hover:no-underline">
                   <span className="flex items-center gap-2">
                     <span className="flex size-5 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">3</span>
@@ -626,7 +626,7 @@ export function WhatsAppConfig() {
                 </AccordionContent>
               </AccordionItem>
 
-              <AccordionItem className="border-slate-800">
+              <AccordionItem className="border-slate-800" value="step-4">
                 <AccordionTrigger className="text-slate-200 hover:text-white hover:no-underline">
                   <span className="flex items-center gap-2">
                     <span className="flex size-5 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">4</span>

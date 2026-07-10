@@ -267,14 +267,32 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    let decryptedAccessToken: string | null = null
+    if (config.accessToken) {
+      try {
+        decryptedAccessToken = decrypt(config.accessToken)
+      } catch (err) {
+        console.error('Failed to decrypt accessToken:', err)
+      }
+    }
+
+    let decryptedMetaAppSecret: string | null = null
+    if (config.metaAppSecret) {
+      try {
+        decryptedMetaAppSecret = decrypt(config.metaAppSecret)
+      } catch (err) {
+        console.error('Failed to decrypt metaAppSecret:', err)
+      }
+    }
+
     return NextResponse.json({
       data: {
         id: config.id,
         phone_number_id: config.phoneNumberId,
         waba_id: config.wabaId,
-        access_token: config.accessToken ? MASKED_TOKEN : '',   // Mask it
+        access_token: decryptedAccessToken || '',
         verify_token: decryptedVerifyToken || '',
-        meta_app_secret: config.metaAppSecret ? MASKED_TOKEN : '', // Mask it
+        meta_app_secret: decryptedMetaAppSecret || '',
         status: config.status,
         connected_at: config.connectedAt,
       },
