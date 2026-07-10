@@ -57,7 +57,8 @@ export async function POST(req: NextRequest) {
     const accessToken = generateAccessToken(payload)
     const refreshToken = generateRefreshToken(payload)
 
-    // 4. Save Refresh Token in DB
+    // 4. Clean up old refresh tokens for this user, then save new one
+    await prisma.refreshToken.deleteMany({ where: { userId: user.id } })
     await prisma.refreshToken.create({
       data: {
         token: refreshToken,

@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
+import crypto from 'crypto'
 import { cookies } from 'next/headers'
 import { prisma } from './prisma'
 
@@ -38,7 +39,7 @@ export function generateAccessToken(payload: TokenPayload): string {
  * Generate Refresh Token (long-lived: 7 days)
  */
 export function generateRefreshToken(payload: TokenPayload): string {
-  return jwt.sign(payload, JWT_REFRESH_SECRET, { expiresIn: '7d' })
+  return jwt.sign({ ...payload, jti: crypto.randomUUID() }, JWT_REFRESH_SECRET, { expiresIn: '7d' })
 }
 
 /**
