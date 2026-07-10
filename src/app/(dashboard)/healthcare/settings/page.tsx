@@ -138,9 +138,9 @@ export default function AISettingsPage() {
       <Card className="border-slate-800 bg-slate-900/60 max-w-lg mx-auto mt-12 text-center p-6">
         <CardHeader className="flex flex-col items-center justify-center">
           <AlertCircle className="h-12 w-12 text-amber-500 mb-4 animate-bounce" />
-          <CardTitle className="text-white">Clinic Onboarding Required</CardTitle>
+          <CardTitle className="text-white">Business Onboarding Required</CardTitle>
           <CardDescription className="text-slate-400 mt-2">
-            You must set up your clinic information before customizing AI settings.
+            You must set up your business information before customizing AI settings.
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-2">
@@ -148,7 +148,7 @@ export default function AISettingsPage() {
             href="/healthcare/setup"
             className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
           >
-            Launch Clinic Setup Wizard
+            Launch Business Setup Wizard
           </Link>
         </CardContent>
       </Card>
@@ -176,7 +176,7 @@ export default function AISettingsPage() {
               <div className="space-y-0.5">
                 <Label className="text-sm font-semibold text-white">Enable AI Automated Replies</Label>
                 <p className="text-xs text-slate-500">
-                  When enabled, patient queries received via WhatsApp will be answered by AI.
+                  When enabled, client queries received via WhatsApp will be answered by AI.
                 </p>
               </div>
               <Switch

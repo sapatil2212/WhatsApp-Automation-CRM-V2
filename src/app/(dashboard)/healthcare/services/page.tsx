@@ -183,9 +183,9 @@ export default function ServicesManagement() {
       <Card className="border-slate-800 bg-slate-900/60 max-w-lg mx-auto mt-12 text-center p-6">
         <CardHeader className="flex flex-col items-center justify-center">
           <AlertCircle className="h-12 w-12 text-amber-500 mb-4 animate-bounce" />
-          <CardTitle className="text-white">Clinic Onboarding Required</CardTitle>
+          <CardTitle className="text-white">Business Onboarding Required</CardTitle>
           <CardDescription className="text-slate-400 mt-2">
-            You must set up your clinic information before managing clinical services.
+            You must set up your business information before managing services.
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-2">
@@ -193,7 +193,7 @@ export default function ServicesManagement() {
             href="/healthcare/setup"
             className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
           >
-            Launch Clinic Setup Wizard
+            Launch Business Setup Wizard
           </Link>
         </CardContent>
       </Card>
@@ -210,7 +210,7 @@ export default function ServicesManagement() {
             Manage Services
           </h1>
           <p className="text-slate-400 text-sm mt-1">
-            Configure clinic healthcare services, session durations, and baseline pricing.
+            Configure business services, session durations, and baseline pricing.
           </p>
         </div>
         <Button onClick={handleOpenAdd} className="bg-primary text-primary-foreground hover:bg-primary/95">
@@ -357,7 +357,7 @@ export default function ServicesManagement() {
               <div className="flex items-center justify-between p-3 bg-slate-950/40 rounded-lg border border-slate-850">
                 <div className="space-y-0.5">
                   <Label className="text-xs text-slate-300">Set Service as Active</Label>
-                  <p className="text-[10px] text-slate-500">Allow patients to view and inquire about this service.</p>
+                  <p className="text-[10px] text-slate-500">Allow clients to view and inquire about this service.</p>
                 </div>
                 <Switch
                   checked={form.is_active}

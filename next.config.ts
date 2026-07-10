@@ -111,6 +111,14 @@ const nextConfig: NextConfig = {
    * matched.
    */
   async headers() {
+    if (process.env.NODE_ENV === "development") {
+      return [
+        {
+          source: "/:path*",
+          headers: [...SECURITY_HEADERS],
+        },
+      ];
+    }
     return [
       {
         source: "/_next/static/:path*",

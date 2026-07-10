@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useTotalUnread } from "@/hooks/use-total-unread";
 import { useTheme } from "@/hooks/use-theme";
+import { getBusinessSegment, getTerminology } from "@/lib/business/terminology";
 import {
   LayoutDashboard,
   MessageSquare,
@@ -19,15 +20,17 @@ import {
   User,
   X,
   Activity,
-  Stethoscope,
-  HeartPulse,
-  BriefcaseMedical,
-  FileQuestion,
   Brain,
   History,
   Calendar,
   Shield,
   Briefcase,
+  LayoutTemplate,
+  Megaphone,
+  Building,
+  Bot,
+  Package,
+  HelpCircle,
 } from "lucide-react";
 import {
   Avatar,
@@ -56,19 +59,20 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/inbox", label: "Inbox", icon: MessageSquare },
+  { href: "/campaigns", label: "Campaigns", icon: Megaphone },
   { href: "/contacts", label: "Contacts", icon: Users },
   { href: "/pipelines", label: "Pipelines", icon: GitBranch },
   { href: "/automations", label: "Automations", icon: Zap },
-  { href: "/flows", label: "Flows", icon: Workflow },
+  { href: "/templates", label: "Templates", icon: LayoutTemplate },
 ];
 
 const healthcareNavItems: NavItem[] = [
   { href: "/healthcare/dashboard", label: "Dashboard", icon: Activity },
-  { href: "/healthcare/appointments", label: "Appointments", icon: Calendar },
-  { href: "/healthcare/setup", label: "Clinic Setup", icon: Stethoscope },
-  { href: "/healthcare/doctors", label: "Doctors", icon: HeartPulse },
-  { href: "/healthcare/services", label: "Services", icon: BriefcaseMedical },
-  { href: "/healthcare/faqs", label: "FAQs", icon: FileQuestion },
+  { href: "/healthcare/appointments", label: "Bookings", icon: Calendar },
+  { href: "/healthcare/setup", label: "Business Setup", icon: Building },
+  { href: "/healthcare/doctors", label: "AI Agents & Staff", icon: Bot },
+  { href: "/healthcare/services", label: "Services Offered", icon: Package },
+  { href: "/healthcare/faqs", label: "AI Knowledge Base", icon: HelpCircle },
   { href: "/healthcare/settings", label: "AI Settings", icon: Brain },
   { href: "/healthcare/logs", label: "WhatsApp AI Logs", icon: History },
 ];
@@ -89,6 +93,21 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
   const totalUnread = useTotalUnread();
   const { mode } = useTheme();
   const isLight = mode === "light";
+
+  const segment = getBusinessSegment(profile?.business_type);
+  const term = getTerminology(segment);
+  const isHealthcare = segment === "healthcare";
+
+  const dynamicNavItems: NavItem[] = [
+    { href: `/${segment}/dashboard`, label: "Dashboard", icon: isHealthcare ? Activity : LayoutDashboard },
+    { href: `/${segment}/appointments`, label: isHealthcare ? "Bookings" : (term.bookingPluralLabel.length > 20 ? "Bookings" : term.bookingPluralLabel), icon: Calendar },
+    { href: `/${segment}/setup`, label: term.businessSetupLabel, icon: Building },
+    { href: `/${segment}/doctors`, label: term.staffPluralLabel, icon: Bot },
+    { href: `/${segment}/services`, label: term.servicePluralLabel, icon: Package },
+    { href: `/${segment}/faqs`, label: "AI Knowledge Base", icon: HelpCircle },
+    { href: `/${segment}/settings`, label: "AI Settings", icon: Brain },
+    { href: `/${segment}/logs`, label: "WhatsApp AI Logs", icon: History },
+  ];
 
   // Close the drawer when route changes — users opened it to navigate,
   // so once they pick a destination the drawer should get out of the way.
@@ -213,11 +232,11 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
           <div className="my-4 border-t border-sidebar-border" />
 
           <div className="px-3 mb-2 text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider">
-            AI Healthcare
+            AI Booking & Agent
           </div>
 
           <ul className="flex flex-col gap-1 mb-4">
-            {healthcareNavItems.map((item) => {
+            {dynamicNavItems.map((item) => {
               const isActive = pathname.startsWith(item.href);
 
               return (

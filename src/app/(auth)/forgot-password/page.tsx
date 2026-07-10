@@ -15,21 +15,20 @@ import {
 import { MessageSquare, CheckCircle, ArrowLeft, KeyRound, Eye, EyeOff, Loader2, Mail } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { InteractiveGrid } from "@/components/marketing/interactive-grid";
 
 type ResetStep = "email" | "otp" | "password" | "success";
 
 const containerVariants = {
-  hidden: { opacity: 0, y: 12 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } },
-  exit: { opacity: 0, y: -12, transition: { duration: 0.2, ease: "easeIn" } }
-} as const;
+  hidden: { opacity: 0, y: 15 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" as any } },
+  exit: { opacity: 0, y: -15, transition: { duration: 0.25, ease: "easeIn" as any } }
+};
 
 const shakeVariants = {
   idle: { x: 0 },
   shake: {
-    x: [-6, 6, -5, 5, -3, 3, -1, 1, 0],
-    transition: { duration: 0.35, ease: "easeInOut" as const }
+    x: [-8, 8, -6, 6, -4, 4, -2, 2, 0],
+    transition: { duration: 0.4, ease: "easeInOut" as any }
   }
 };
 
@@ -39,11 +38,11 @@ const checkmarkPathVariants = {
     pathLength: 1, 
     opacity: 1, 
     transition: { 
-      pathLength: { type: "spring", stiffness: 90, damping: 13, delay: 0.25 },
-      opacity: { duration: 0.1, delay: 0.25 } 
+      pathLength: { type: "spring" as any, stiffness: 80, damping: 12, delay: 0.3 },
+      opacity: { duration: 0.1, delay: 0.3 } 
     } 
   }
-} as const;
+};
 
 const stepsList = [
   { step: "email", label: "Email" },
@@ -252,37 +251,28 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="relative min-h-screen w-full flex items-center justify-center bg-[var(--m-bg-primary)] px-4 overflow-hidden select-none">
+    <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4 relative overflow-hidden">
       {/* Decorative Radial Glow Backdrops */}
-      <InteractiveGrid gridSize={40} className="opacity-20" />
-      <div className="absolute top-[20%] left-[20%] w-[50%] h-[50%] rounded-full bg-emerald-500/5 blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[20%] right-[20%] w-[50%] h-[50%] rounded-full bg-teal-500/5 blur-[120px] pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-teal-500/5 rounded-full blur-[80px] pointer-events-none" />
 
-      {/* Floating Home Link */}
-      <Link
-        href="/"
-        className="absolute top-6 left-6 inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--m-text-tertiary)] hover:text-[var(--m-text-primary)] transition-colors bg-[var(--m-bg-secondary)]/60 border border-[var(--m-border-glass)] px-3 py-1.5 rounded-lg backdrop-blur z-10"
-      >
-        <ArrowLeft className="size-3.5" /> Back Home
-      </Link>
-
-      <Card className="w-full max-w-md border-[var(--m-border-primary)] bg-[var(--m-bg-glass)] shadow-[var(--m-shadow-card)] backdrop-blur-xl relative z-10 p-2 overflow-hidden transition-all duration-300">
+      <Card className="w-full max-w-md border-slate-800 bg-slate-900 shadow-2xl overflow-hidden relative transition-all duration-300">
         
         {/* Step Progress Bar */}
-        <div className="px-6 pt-4 pb-2 border-b border-[var(--m-border-primary)]/40 bg-[var(--m-bg-primary)]/50 rounded-t-xl">
-          <div className="flex justify-between items-start relative max-w-xs mx-auto">
-            {/* Background Track Line */}
-            <div className="absolute left-3 right-3 top-3 h-[2px] bg-slate-800/80 z-0" />
+        <div className="px-6 pt-6 pb-2 border-b border-slate-800/40 bg-slate-900/50">
+          <div className="flex justify-between items-center relative">
+            {/* Background Track Line - Aligned at top-3 (12px) to run through center of circle */}
+            <div className="absolute left-0 right-0 top-3 h-[2px] bg-slate-800 z-0" />
             
-            {/* Animated Active Progress Line */}
+            {/* Animated Active Progress Line - Aligned at top-3 */}
             <motion.div 
-              className="absolute left-3 top-3 h-[2px] bg-emerald-500 z-0"
+              className="absolute left-0 top-3 h-[2px] bg-primary z-0"
               initial={{ width: "0%" }}
               animate={{ 
                 width: 
                   step === "email" ? "0%" : 
-                  step === "otp" ? "33.3%" : 
-                  step === "password" ? "66.6%" : "100%" 
+                  step === "otp" ? "33%" : 
+                  step === "password" ? "66%" : "100%" 
               }}
               transition={{ duration: 0.4, ease: "easeInOut" }}
             />
@@ -301,12 +291,12 @@ export default function ForgotPasswordPage() {
                     className={cn(
                       "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border transition-all duration-300",
                       isCurrent 
-                        ? "bg-slate-900 border-emerald-500 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.3)]"
+                        ? "bg-slate-900 border-primary text-primary shadow-[0_0_10px_rgba(139,92,246,0.3)]"
                         : isActive
-                        ? "bg-emerald-500 border-emerald-500 text-slate-950"
+                        ? "bg-primary border-primary text-primary-foreground"
                         : "bg-slate-900 border-slate-800 text-slate-500"
                     )}
-                    animate={{ scale: isCurrent ? 1.1 : 1 }}
+                    animate={{ scale: isCurrent ? 1.15 : 1 }}
                     transition={{ type: "spring", stiffness: 300, damping: 20 }}
                   >
                     {isActive && item.step !== step ? "✓" : index + 1}
@@ -333,26 +323,26 @@ export default function ForgotPasswordPage() {
               exit="exit"
               className="w-full"
             >
-              <div className="flex flex-col items-center text-center pb-3 pt-5 px-6">
-                <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                  <MessageSquare className="h-6 w-6" />
+              <CardHeader className="justify-items-center text-center">
+                <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+                  <MessageSquare className="h-6 w-6 text-primary" />
                 </div>
-                <CardTitle className="text-xl font-bold tracking-tight text-[var(--m-text-heading)]">Reset password</CardTitle>
-                <CardDescription className="text-xs text-[var(--m-text-tertiary)] mt-1">
+                <CardTitle className="text-xl text-white">Reset password</CardTitle>
+                <CardDescription className="text-slate-400">
                   Enter your email and we&apos;ll send you a 6-digit OTP code to verify your identity.
                 </CardDescription>
-              </div>
-              <CardContent className="px-6 pb-6 pt-2">
+              </CardHeader>
+              <CardContent>
                 <form onSubmit={handleRequestOtp} className="flex flex-col gap-4">
                   {error && (
-                    <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-xs text-red-400">
+                    <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
                       {error}
                     </div>
                   )}
 
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="email" className="text-xs font-bold text-[var(--m-text-secondary)]">
-                      Email Address
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="email" className="text-slate-300">
+                      Email
                     </Label>
                     <div className="relative">
                       <Input
@@ -362,7 +352,8 @@ export default function ForgotPasswordPage() {
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
-                        className="h-9.5 border-[var(--m-input-border)] bg-[var(--m-input-bg)] text-xs text-[var(--m-text-primary)] placeholder:text-[var(--m-text-muted)] focus-visible:border-emerald-500 focus-visible:ring-emerald-500/20 pl-10 rounded-lg"
+                        className="border-slate-700 bg-slate-800 text-white placeholder:text-slate-500 focus-visible:border-primary focus-visible:ring-primary/20"
+                        style={{ paddingLeft: "2.75rem" }}
                       />
                       <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
                     </div>
@@ -371,11 +362,11 @@ export default function ForgotPasswordPage() {
                   <Button
                     type="submit"
                     disabled={loading}
-                    className="mt-2 h-10 w-full bg-emerald-500 text-slate-950 hover:bg-emerald-400 hover:scale-[1.005] active:scale-[0.995] font-bold text-xs transition-all shadow-[0_0_12px_rgba(16,185,129,0.18)] disabled:opacity-50"
+                    className="mt-2 h-10 w-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                   >
                     {loading ? (
-                      <span className="flex items-center gap-2 justify-center">
-                        <Loader2 className="h-4 w-4 animate-spin text-emerald-400" /> Sending...
+                      <span className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Sending...
                       </span>
                     ) : (
                       "Send OTP code"
@@ -385,9 +376,9 @@ export default function ForgotPasswordPage() {
 
                 <Link
                   href="/login"
-                  className="mt-5 flex items-center justify-center gap-1.5 text-xs text-slate-400 hover:text-slate-300 transition-colors font-semibold"
+                  className="mt-6 flex items-center justify-center gap-2 text-sm text-slate-400 hover:text-slate-300 transition-colors"
                 >
-                  <ArrowLeft className="h-3.5 w-3.5" />
+                  <ArrowLeft className="h-4 w-4" />
                   Back to sign in
                 </Link>
               </CardContent>
@@ -403,18 +394,18 @@ export default function ForgotPasswordPage() {
               exit="exit"
               className="w-full"
             >
-              <div className="flex flex-col items-center text-center pb-3 pt-5 px-6">
-                <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                  <KeyRound className="h-6 w-6" />
+              <CardHeader className="justify-items-center text-center">
+                <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+                  <KeyRound className="h-6 w-6 text-primary" />
                 </div>
-                <CardTitle className="text-xl font-bold tracking-tight text-[var(--m-text-heading)]">Enter OTP Code</CardTitle>
-                <CardDescription className="text-xs text-[var(--m-text-tertiary)] mt-1">
+                <CardTitle className="text-xl text-white">Enter OTP Code</CardTitle>
+                <CardDescription className="text-slate-400">
                   We&apos;ve sent a 6-digit verification code to <span className="text-white font-medium">{email}</span>.
                 </CardDescription>
-              </div>
-              <CardContent className="flex flex-col items-center px-6 pb-6">
+              </CardHeader>
+              <CardContent className="flex flex-col items-center">
                 {error && (
-                  <div className="w-full mb-4 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-xs text-red-400">
+                  <div className="w-full mb-4 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
                     {error}
                   </div>
                 )}
@@ -443,18 +434,17 @@ export default function ForgotPasswordPage() {
                         onKeyDown={(e) => handleOtpKeyDown(e, idx)}
                         onPaste={idx === 0 ? handleOtpPaste : undefined}
                         className={cn(
-                          "h-11 w-11 flex-shrink-0 rounded-xl border text-center text-xl font-bold transition-all focus:outline-none focus:ring-2",
+                          "h-12 w-12 rounded-xl border text-center text-xl font-bold transition-all focus:outline-none focus:ring-2",
                           error
                             ? "border-red-500 focus:border-red-500 focus:ring-red-500/20 text-red-400"
                             : isBoxFocused
-                            ? "border-emerald-500 bg-slate-800 text-white ring-2 ring-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.25)] scale-105"
+                            ? "border-primary bg-slate-800 text-white ring-2 ring-primary/20 shadow-[0_0_15px_rgba(139,92,246,0.25)] scale-105"
                             : val
-                            ? "border-emerald-500/80 bg-slate-800 text-white focus:border-emerald-500 focus:ring-emerald-500/20"
-                            : "border-slate-700 bg-slate-800 text-slate-400 focus:border-emerald-500 focus:ring-emerald-500/20"
+                            ? "border-primary/80 bg-slate-800 text-white focus:border-primary focus:ring-primary/20"
+                            : "border-slate-700 bg-slate-800 text-slate-400 focus:border-primary focus:ring-primary/20"
                         )}
-                        style={{ width: "44px", height: "44px" }}
                         whileFocus={{ scale: 1.05 }}
-                        transition={{ duration: 0.12 }}
+                        transition={{ duration: 0.15 }}
                         disabled={loading}
                       />
                     );
@@ -462,13 +452,13 @@ export default function ForgotPasswordPage() {
                 </motion.div>
 
                 {loading && (
-                  <div className="flex items-center gap-2 text-xs text-slate-400 my-2">
-                    <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
+                  <div className="flex items-center gap-2 text-sm text-slate-400 my-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
                     Verifying code...
                   </div>
                 )}
 
-                <div className="mt-5 flex flex-col gap-3 items-center w-full">
+                <div className="mt-6 flex flex-col gap-3 items-center w-full">
                   <button
                     onClick={handleResendOtp}
                     disabled={resendTimer > 0}
@@ -476,7 +466,7 @@ export default function ForgotPasswordPage() {
                       "text-xs font-semibold uppercase tracking-wider transition-colors",
                       resendTimer > 0
                         ? "text-slate-500 cursor-not-allowed"
-                        : "text-emerald-500 hover:text-emerald-400 cursor-pointer"
+                        : "text-primary hover:text-primary/80 cursor-pointer"
                     )}
                   >
                     {resendTimer > 0 ? `Resend Code in ${resendTimer}s` : "Resend OTP Code"}
@@ -487,7 +477,7 @@ export default function ForgotPasswordPage() {
                       setError(null);
                       setStep("email");
                     }}
-                    className="flex items-center gap-2 text-xs text-slate-400 hover:text-slate-300 transition-colors mt-1 font-semibold"
+                    className="flex items-center gap-2 text-sm text-slate-400 hover:text-slate-300 transition-colors mt-2"
                   >
                     <ArrowLeft className="h-4 w-4" /> Change Email
                   </button>
@@ -505,25 +495,25 @@ export default function ForgotPasswordPage() {
               exit="exit"
               className="w-full"
             >
-              <div className="flex flex-col items-center text-center pb-3 pt-5 px-6">
-                <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                  <KeyRound className="h-6 w-6" />
+              <CardHeader className="justify-items-center text-center">
+                <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+                  <KeyRound className="h-6 w-6 text-primary" />
                 </div>
-                <CardTitle className="text-xl font-bold tracking-tight text-[var(--m-text-heading)]">Create new password</CardTitle>
-                <CardDescription className="text-xs text-[var(--m-text-tertiary)] mt-1">
+                <CardTitle className="text-xl text-white">Create new password</CardTitle>
+                <CardDescription className="text-slate-400">
                   Your identity has been verified. Enter your new password below.
                 </CardDescription>
-              </div>
-              <CardContent className="px-6 pb-6 pt-2">
+              </CardHeader>
+              <CardContent>
                 <form onSubmit={handleResetPassword} className="flex flex-col gap-4">
                   {error && (
-                    <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-xs text-red-400">
+                    <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
                       {error}
                     </div>
                   )}
 
-                  <div className="flex flex-col gap-1.5 relative">
-                    <Label htmlFor="password" className="text-xs font-bold text-[var(--m-text-secondary)]">
+                  <div className="flex flex-col gap-2 relative">
+                    <Label htmlFor="password" className="text-slate-300">
                       New Password
                     </Label>
                     <div className="relative">
@@ -534,20 +524,20 @@ export default function ForgotPasswordPage() {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
-                        className="h-9.5 border-[var(--m-input-border)] bg-[var(--m-input-bg)] text-xs text-[var(--m-text-primary)] placeholder:text-[var(--m-text-muted)] focus-visible:border-emerald-500 focus-visible:ring-emerald-500/20 pr-10 px-3 rounded-lg"
+                        className="border-slate-700 bg-slate-800 text-white placeholder:text-slate-500 focus-visible:border-primary focus-visible:ring-primary/20 pr-10"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-400"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300"
                       >
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-1.5 relative">
-                    <Label htmlFor="confirmPassword" className="text-xs font-bold text-[var(--m-text-secondary)]">
+                  <div className="flex flex-col gap-2 relative">
+                    <Label htmlFor="confirmPassword" className="text-slate-300">
                       Confirm New Password
                     </Label>
                     <div className="relative">
@@ -558,12 +548,12 @@ export default function ForgotPasswordPage() {
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         required
-                        className="h-9.5 border-[var(--m-input-border)] bg-[var(--m-input-bg)] text-xs text-[var(--m-text-primary)] placeholder:text-[var(--m-text-muted)] focus-visible:border-emerald-500 focus-visible:ring-emerald-500/20 pr-10 px-3 rounded-lg"
+                        className="border-slate-700 bg-slate-800 text-white placeholder:text-slate-500 focus-visible:border-primary focus-visible:ring-primary/20 pr-10"
                       />
                       <button
                         type="button"
                         onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-400"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300"
                       >
                         {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
@@ -571,12 +561,12 @@ export default function ForgotPasswordPage() {
                   </div>
 
                   {/* Live Validation Indicators */}
-                  <div className="flex flex-col gap-2 mt-1 px-3 bg-slate-800/15 border border-[var(--m-border-primary)]/20 rounded-lg py-2.5">
+                  <div className="flex flex-col gap-2.5 mt-1 px-1 bg-slate-800/20 border border-slate-800/40 rounded-xl p-3">
                     <div className="flex items-center gap-2 text-xs">
                       <div className={cn(
                         "h-4 w-4 rounded-full flex items-center justify-center border text-[9px] font-bold transition-all",
                         isLengthValid 
-                          ? "bg-emerald-500/10 border-emerald-500 text-emerald-400" 
+                          ? "bg-primary/10 border-primary text-primary" 
                           : "bg-slate-800/50 border-slate-700 text-slate-500"
                       )}>
                         ✓
@@ -590,7 +580,7 @@ export default function ForgotPasswordPage() {
                       <div className={cn(
                         "h-4 w-4 rounded-full flex items-center justify-center border text-[9px] font-bold transition-all",
                         isMatchValid 
-                          ? "bg-emerald-500/10 border-emerald-500 text-emerald-400" 
+                          ? "bg-primary/10 border-primary text-primary" 
                           : "bg-slate-800/50 border-slate-700 text-slate-500"
                       )}>
                         ✓
@@ -604,11 +594,11 @@ export default function ForgotPasswordPage() {
                   <Button
                     type="submit"
                     disabled={loading || !isPasswordFormValid}
-                    className="mt-2 h-10 w-full bg-emerald-500 text-slate-950 hover:bg-emerald-400 hover:scale-[1.005] active:scale-[0.995] font-bold text-xs transition-all shadow-[0_0_12px_rgba(16,185,129,0.18)] disabled:opacity-50"
+                    className="mt-2 h-10 w-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                   >
                     {loading ? (
-                      <span className="flex items-center gap-2 justify-center">
-                        <Loader2 className="h-4 w-4 animate-spin text-emerald-400" /> Updating...
+                      <span className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Updating...
                       </span>
                     ) : (
                       "Reset Password"
@@ -626,19 +616,19 @@ export default function ForgotPasswordPage() {
               initial="hidden"
               animate="visible"
               exit="exit"
-              className="w-full flex flex-col items-center text-center px-6 py-6"
+              className="w-full flex flex-col items-center text-center px-6 py-8"
             >
               {/* Checkmark Circle */}
-              <div className="relative mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/10 border border-emerald-500/20 shadow-lg shadow-emerald-500/10">
+              <div className="relative mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 border border-primary/20 shadow-lg shadow-primary/10">
                 {/* Glowing backdrop */}
-                <div className="absolute inset-0 rounded-full bg-emerald-500/5 blur-xl animate-pulse" />
+                <div className="absolute inset-0 rounded-full bg-primary/5 blur-xl animate-pulse" />
                 
                 {/* Ripple animation */}
                 <motion.div 
-                  className="absolute h-24 w-24 rounded-full border border-emerald-500/10"
+                  className="absolute h-24 w-24 rounded-full border border-primary/10"
                   initial={{ scale: 0.8, opacity: 0.8 }}
-                  animate={{ scale: 1.25, opacity: 0 }}
-                  transition={{ delay: 0.25, duration: 1.1, repeat: Infinity, ease: "easeOut" }}
+                  animate={{ scale: 1.3, opacity: 0 }}
+                  transition={{ delay: 0.3, duration: 1.2, repeat: Infinity, ease: "easeOut" }}
                 />
 
                 {/* Confetti Sparks */}
@@ -650,7 +640,7 @@ export default function ForgotPasswordPage() {
                   return (
                     <motion.div
                       key={i}
-                      className="absolute h-1.5 w-1.5 rounded-full bg-emerald-500/80"
+                      className="absolute h-1.5 w-1.5 rounded-full bg-primary/80"
                       initial={{ x: 0, y: 0, scale: 0, opacity: 1 }}
                       animate={{ 
                         x, 
@@ -659,8 +649,8 @@ export default function ForgotPasswordPage() {
                         opacity: [1, 1, 0.4, 0] 
                       }}
                       transition={{ 
-                        delay: 0.35, 
-                        duration: 0.7 + Math.random() * 0.35, 
+                        delay: 0.4, 
+                        duration: 0.8 + Math.random() * 0.4, 
                         ease: "easeOut" 
                       }}
                     />
@@ -668,7 +658,7 @@ export default function ForgotPasswordPage() {
                 })}
 
                 <svg
-                  className="h-9 w-9 text-emerald-500"
+                  className="h-9 w-9 text-primary"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -687,10 +677,10 @@ export default function ForgotPasswordPage() {
               </div>
 
               {/* Title & Description */}
-              <h2 className="text-2xl font-extrabold text-[var(--m-text-heading)] tracking-tight mb-2">
+              <h2 className="text-2xl font-extrabold text-white tracking-tight mb-2">
                 Password reset complete
               </h2>
-              <p className="text-xs text-[var(--m-text-tertiary)] max-w-sm mb-6 leading-relaxed">
+              <p className="text-slate-400 max-w-sm mb-8 text-sm leading-relaxed">
                 Your password has been successfully updated. You can now sign in with your new credentials.
               </p>
 
@@ -703,7 +693,7 @@ export default function ForgotPasswordPage() {
                 >
                   <Link href="/login" className="w-full block">
                     <Button
-                      className="w-full h-10 bg-emerald-500 text-slate-950 hover:bg-emerald-400 font-bold rounded-xl shadow-lg transition-all duration-300 border-none text-xs"
+                      className="w-full h-11 bg-primary text-primary-foreground hover:bg-primary/95 font-semibold rounded-xl shadow-lg transition-all duration-300 border-none"
                     >
                       Back to sign in
                     </Button>

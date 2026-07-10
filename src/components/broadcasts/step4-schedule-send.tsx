@@ -66,7 +66,7 @@ export function Step4ScheduleSend({
             .select('contact_id')
             .in('tag_id', audience.tagIds);
 
-          const uniqueIds = new Set((contactTags ?? []).map((ct) => ct.contact_id));
+          const uniqueIds = new Set((contactTags ?? []).map((ct: any) => ct.contact_id));
           setEstimatedReach(uniqueIds.size);
         } else if (audience.type === 'csv' && audience.csvContacts) {
           setEstimatedReach(audience.csvContacts.length);

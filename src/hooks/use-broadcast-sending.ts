@@ -259,7 +259,7 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
 
       if (contactTags && contactTags.length > 0) {
         const uniqueContactIds = [
-          ...new Set(contactTags.map((ct) => ct.contact_id)),
+          ...new Set(contactTags.map((ct: any) => ct.contact_id)),
         ];
         const { data, error } = await supabase
           .from('contacts')
@@ -281,7 +281,7 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
         .from('contact_tags')
         .select('contact_id')
         .in('tag_id', audience.excludeTagIds);
-      const excludedIds = new Set((excludeRows ?? []).map((r) => r.contact_id));
+      const excludedIds = new Set((excludeRows ?? []).map((r: any) => r.contact_id));
       contacts = contacts.filter((c) => !excludedIds.has(c.id));
     }
 
@@ -388,7 +388,7 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
     if (matchErr)
       throw new Error(`Custom-field filter failed: ${matchErr.message}`);
 
-    const contactIds = [...new Set((matches ?? []).map((m) => m.contact_id))];
+    const contactIds = [...new Set((matches ?? []).map((m: any) => m.contact_id))];
     if (contactIds.length === 0) return [];
 
     const { data, error } = await supabase
@@ -506,8 +506,8 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
       // One bulk fetch of custom values for every contact in this
       // broadcast, avoiding N+1 during the send loop.
       const contactIds = recipients
-        .map((r) => r.contact?.id)
-        .filter((id): id is string => Boolean(id));
+        .map((r: any) => r.contact?.id)
+        .filter((id: any): id is string => Boolean(id));
       const customValueIndex = await fetchCustomValueIndex(
         supabase,
         contactIds,
@@ -520,8 +520,8 @@ export function useBroadcastSending(): UseBroadcastSendingReturn {
         const batch = recipients.slice(i, i + SEND_BATCH_SIZE);
 
         const apiRecipients = batch
-          .filter((r) => r.contact?.phone)
-          .map((r) => ({
+          .filter((r: any) => r.contact?.phone)
+          .map((r: any) => ({
             phone: r.contact!.phone as string,
             components: r.contact
               ? resolveTemplateComponents(

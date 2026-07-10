@@ -41,11 +41,7 @@ export function Footer() {
           <p className="text-xs text-[var(--m-text-tertiary)] leading-relaxed max-w-sm">
             ChatNexGen is a premium AI-powered WhatsApp CRM and customer support automation platform. Automate business communication, configure smart chatbots, organize leads, and sync calendar reminders using the official WhatsApp Business API.
           </p>
-          <div className="pt-2">
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border border-emerald-500/25 bg-[var(--m-badge-bg)] text-emerald-500 text-[10px] font-extrabold uppercase tracking-wider">
-              Official Meta Business Partner
-            </span>
-          </div>
+
         </div>
 
         {/* Product Column */}

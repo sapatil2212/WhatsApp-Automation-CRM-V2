@@ -121,23 +121,18 @@ export function ProfileForm() {
 
       // Upload a newly-staged image, if any.
       if (pendingAvatar) {
-        const ext =
-          pendingAvatar.name.split('.').pop()?.toLowerCase() || 'png';
-        const path = `${user.id}/avatar-${Date.now()}.${ext}`;
-        const { error: uploadError } = await supabase.storage
-          .from('avatars')
-          .upload(path, pendingAvatar, {
-            cacheControl: '3600',
-            upsert: true,
-            contentType: pendingAvatar.type,
-          });
-        if (uploadError) {
-          throw new Error(`Upload failed: ${uploadError.message}`);
+        const uploadFormData = new FormData();
+        uploadFormData.append('file', pendingAvatar);
+        const uploadRes = await fetch('/api/avatar/upload', {
+          method: 'POST',
+          body: uploadFormData,
+        });
+        if (!uploadRes.ok) {
+          const errData = await uploadRes.json();
+          throw new Error(errData.error || 'Upload failed');
         }
-        const {
-          data: { publicUrl },
-        } = supabase.storage.from('avatars').getPublicUrl(path);
-        nextAvatarUrl = publicUrl;
+        const uploadData = await uploadRes.json();
+        nextAvatarUrl = uploadData.url;
       } else if (removeAvatar) {
         nextAvatarUrl = null;
       }

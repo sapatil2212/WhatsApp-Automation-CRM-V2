@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+
 import { toast } from "sonner";
 import {
   Building2,
@@ -32,7 +32,6 @@ import { Textarea } from "@/components/ui/textarea";
 const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 export default function ClinicSetupWizard() {
-  const db = createClient();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -163,88 +162,59 @@ export default function ClinicSetupWizard() {
   useEffect(() => {
     async function loadClinicData() {
       try {
-        const { data: clinicRow } = await db.from("clinics").select("*").maybeSingle();
+        const res = await fetch('/api/healthcare/setup');
+        if (!res.ok) {
+          console.error('Failed to load clinic data:', await res.json());
+          return;
+        }
+        const json = await res.json();
+        const { clinic, timings: timingRows, doctors: doctorRows, services: serviceRows, faqs: faqRows, ai_settings: aiSettingsRow } = json;
 
-        if (clinicRow) {
-          setClinicId(clinicRow.id);
+        if (clinic) {
+          setClinicId(clinic.id);
           setClinicInfo({
-            clinic_name: clinicRow.clinic_name || "",
-            clinic_type: clinicRow.clinic_type || "",
-            clinic_description: clinicRow.clinic_description || "",
-            phone: clinicRow.phone || "",
-            whatsapp_number: clinicRow.whatsapp_number || "",
-            email: clinicRow.email || "",
-            website: clinicRow.website || "",
-            address: clinicRow.address || "",
-            city: clinicRow.city || "",
-            state: clinicRow.state || "",
-            pincode: clinicRow.pincode || "",
-            google_map_link: clinicRow.google_map_link || "",
+            clinic_name: clinic.clinic_name || "",
+            clinic_type: clinic.clinic_type || "",
+            clinic_description: clinic.clinic_description || "",
+            phone: clinic.phone || "",
+            whatsapp_number: clinic.whatsapp_number || "",
+            email: clinic.email || "",
+            website: clinic.website || "",
+            address: clinic.address || "",
+            city: clinic.city || "",
+            state: clinic.state || "",
+            pincode: clinic.pincode || "",
+            google_map_link: clinic.google_map_link || "",
           });
-          setClinicExceptions(clinicRow.date_exceptions || []);
+          setClinicExceptions(clinic.date_exceptions || []);
 
-          // Fetch Timings
-          const { data: timingRows } = await db
-            .from("clinic_timings")
-            .select("*")
-            .eq("clinic_id", clinicRow.id);
           if (timingRows && timingRows.length > 0) {
             setTimings(
               DAYS_OF_WEEK.map((day) => {
-                const match = timingRows.find((t) => t.day_name === day);
-                return (
-                  match || {
-                    day_name: day,
-                    opening_time: "09:00",
-                    closing_time: "18:00",
-                    is_closed: day === "Sunday",
-                    lunch_break_start: "13:00",
-                    lunch_break_end: "14:00",
-                  }
-                );
+                const match = timingRows.find((t: any) => t.day_name === day);
+                return match || {
+                  day_name: day,
+                  opening_time: "09:00",
+                  closing_time: "18:00",
+                  is_closed: day === "Sunday",
+                  lunch_break_start: "13:00",
+                  lunch_break_end: "14:00",
+                };
               })
             );
           }
 
-          // Fetch Doctors
-          const { data: doctorRows } = await db
-            .from("doctors")
-            .select("*")
-            .eq("clinic_id", clinicRow.id);
           if (doctorRows && doctorRows.length > 0) {
-            setDoctors(
-              doctorRows.map((d) => ({
-                ...d,
-                weekly_slots: d.weekly_slots || {},
-                date_exceptions: d.date_exceptions || [],
-              }))
-            );
+            setDoctors(doctorRows.map((d: any) => ({
+              ...d,
+              weekly_slots: d.weekly_slots || {},
+              date_exceptions: d.date_exceptions || [],
+            })));
           }
 
-          // Fetch Services
-          const { data: serviceRows } = await db
-            .from("clinic_services")
-            .select("*")
-            .eq("clinic_id", clinicRow.id);
-          if (serviceRows && serviceRows.length > 0) {
-            setServices(serviceRows);
-          }
+          if (serviceRows && serviceRows.length > 0) setServices(serviceRows);
+          if (faqRows && faqRows.length > 0) setFaqs(faqRows);
 
-          // Fetch FAQs
-          const { data: faqRows } = await db
-            .from("clinic_faqs")
-            .select("*")
-            .eq("clinic_id", clinicRow.id);
-          if (faqRows && faqRows.length > 0) {
-            setFaqs(faqRows);
-          }
-
-          // Fetch AI Settings
-          const { data: aiSettingsRow } = await db
-            .from("ai_settings")
-            .select("*")
-            .eq("clinic_id", clinicRow.id)
-            .maybeSingle();
           if (aiSettingsRow) {
             setAiSettings({
               ai_enabled: aiSettingsRow.ai_enabled ?? true,
@@ -252,8 +222,8 @@ export default function ClinicSetupWizard() {
               supported_languages: aiSettingsRow.supported_languages || ["English"],
               greeting_message: aiSettingsRow.greeting_message || "",
               after_hours_message: aiSettingsRow.after_hours_message || "",
-              escalation_keywords: aiSettingsRow.escalation_keywords?.join(", ") || "",
-              emergency_keywords: aiSettingsRow.emergency_keywords?.join(", ") || "",
+              escalation_keywords: aiSettingsRow.escalation_keywords || "",
+              emergency_keywords: aiSettingsRow.emergency_keywords || "",
               human_handover_enabled: aiSettingsRow.human_handover_enabled ?? true,
             });
           }
@@ -590,194 +560,61 @@ export default function ClinicSetupWizard() {
   const handleSaveStep = async () => {
     setSaving(true);
     try {
-      const {
-        data: { user },
-      } = await db.auth.getUser();
+      const successMessages: Record<number, string> = {
+        1: 'Clinic Information saved successfully!',
+        2: 'Working hours and holidays saved successfully!',
+        3: 'Doctors and schedules saved successfully!',
+        4: 'Services registered successfully!',
+        5: 'FAQs saved successfully!',
+        6: 'AI Healthcare Automation onboarding setup complete!',
+      };
 
-      if (!user) {
-        toast.error("User session not found.");
+      let body: any = { step: currentStep };
+
+      if (currentStep === 1) {
+        if (!clinicInfo.clinic_name) {
+          toast.error('Clinic Name is required.');
+          setSaving(false);
+          return;
+        }
+        body.data = { ...clinicInfo };
+      } else if (currentStep === 2) {
+        if (!clinicId) { setSaving(false); return; }
+        body.data = { clinic_id: clinicId, timings, date_exceptions: clinicExceptions };
+      } else if (currentStep === 3) {
+        if (!clinicId) { setSaving(false); return; }
+        body.data = { clinic_id: clinicId, doctors };
+      } else if (currentStep === 4) {
+        if (!clinicId) { setSaving(false); return; }
+        body.data = { clinic_id: clinicId, services };
+      } else if (currentStep === 5) {
+        if (!clinicId) { setSaving(false); return; }
+        body.data = { clinic_id: clinicId, faqs };
+      } else if (currentStep === 6) {
+        if (!clinicId) { setSaving(false); return; }
+        body.data = { clinic_id: clinicId, ai_settings: aiSettings };
+      }
+
+      const res = await fetch('/api/healthcare/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        toast.error(json.error || 'Failed to save. Please try again.');
         return;
       }
 
-      if (currentStep === 1) {
-        // Validation
-        if (!clinicInfo.clinic_name) {
-          toast.error("Clinic Name is required.");
-          setSaving(false);
-          return;
-        }
-
-        // Upsert Clinic
-        const { data: updatedClinic, error } = await db
-          .from("clinics")
-          .upsert(
-            {
-              id: clinicId || undefined,
-              user_id: user.id,
-              ...clinicInfo,
-            },
-            { onConflict: "user_id" }
-          )
-          .select()
-          .single();
-
-        if (error) throw error;
-        setClinicId(updatedClinic.id);
-        toast.success("Clinic Information saved successfully!");
-        setCurrentStep(2);
-      } else if (currentStep === 2) {
-        if (!clinicId) return;
-
-        // Map clinic_id into timings
-        const payload = timings.map((t) => {
-          const item: any = {
-            clinic_id: clinicId,
-            day_name: t.day_name,
-            opening_time: t.opening_time,
-            closing_time: t.closing_time,
-            is_closed: t.is_closed,
-            lunch_break_start: t.lunch_break_start,
-            lunch_break_end: t.lunch_break_end,
-          };
-          if (t.id) item.id = t.id;
-          return item;
-        });
-
-        const { error } = await db.from("clinic_timings").upsert(payload);
-        if (error) throw error;
-
-        // Update clinic exceptions in the clinics table
-        const { error: clinicUpdateErr } = await db
-          .from("clinics")
-          .update({ date_exceptions: clinicExceptions })
-          .eq("id", clinicId);
-        if (clinicUpdateErr) throw clinicUpdateErr;
-
-        toast.success("Working hours and holidays saved successfully!");
-        setCurrentStep(3);
-      } else if (currentStep === 3) {
-        if (!clinicId) return;
-
-        // Validate doctor names
-        if (doctors.some((d) => !d.doctor_name)) {
-          toast.error("All registered doctors must have a name.");
-          setSaving(false);
-          return;
-        }
-
-        // Map clinic_id into doctors
-        const payload = doctors.map((d) => {
-          const item: any = {
-            clinic_id: clinicId,
-            doctor_name: d.doctor_name,
-            specialization: d.specialization,
-            qualification: d.qualification,
-            experience: d.experience,
-            available_days: d.available_days,
-            available_start_time: d.available_start_time,
-            available_end_time: d.available_end_time,
-            consultation_fee: d.consultation_fee,
-            languages_spoken: d.languages_spoken,
-            profile_photo: d.profile_photo || null,
-            weekly_slots: d.weekly_slots || {},
-            date_exceptions: d.date_exceptions || [],
-          };
-          if (d.id) item.id = d.id;
-          return item;
-        });
-
-        const { error } = await db.from("doctors").upsert(payload);
-        if (error) throw error;
-
-        toast.success("Doctors and schedules saved successfully!");
-        setCurrentStep(4);
-      } else if (currentStep === 4) {
-        if (!clinicId) return;
-
-        if (services.some((s) => !s.service_name)) {
-          toast.error("All services must have a name.");
-          setSaving(false);
-          return;
-        }
-
-        const payload = services.map((s) => {
-          const item: any = {
-            clinic_id: clinicId,
-            service_name: s.service_name,
-            description: s.description,
-            starting_price: s.starting_price,
-            duration: s.duration,
-            is_active: s.is_active,
-          };
-          if (s.id) item.id = s.id;
-          return item;
-        });
-
-        const { error } = await db.from("clinic_services").upsert(payload);
-        if (error) throw error;
-
-        toast.success("Services registered successfully!");
-        setCurrentStep(5);
-      } else if (currentStep === 5) {
-        if (!clinicId) return;
-
-        if (faqs.some((f) => !f.question || !f.answer)) {
-          toast.error("FAQs must have both a question and answer.");
-          setSaving(false);
-          return;
-        }
-
-        const payload = faqs.map((f) => {
-          const item: any = {
-            clinic_id: clinicId,
-            question: f.question,
-            answer: f.answer,
-            keywords: f.keywords,
-          };
-          if (f.id) item.id = f.id;
-          return item;
-        });
-
-        const { error } = await db.from("clinic_faqs").upsert(payload);
-        if (error) throw error;
-
-        toast.success("FAQs saved successfully!");
-        setCurrentStep(6);
-      } else if (currentStep === 6) {
-        if (!clinicId) return;
-
-        // Process arrays
-        const escalationKws = aiSettings.escalation_keywords
-          .split(",")
-          .map((kw) => kw.trim())
-          .filter(Boolean);
-        const emergencyKws = aiSettings.emergency_keywords
-          .split(",")
-          .map((kw) => kw.trim())
-          .filter(Boolean);
-
-        const payload = {
-          clinic_id: clinicId,
-          ai_enabled: aiSettings.ai_enabled,
-          ai_tone: aiSettings.ai_tone,
-          supported_languages: aiSettings.supported_languages,
-          greeting_message: aiSettings.greeting_message,
-          after_hours_message: aiSettings.after_hours_message,
-          escalation_keywords: escalationKws,
-          emergency_keywords: emergencyKws,
-          human_handover_enabled: aiSettings.human_handover_enabled,
-        };
-
-        const { error } = await db.from("ai_settings").upsert(payload, {
-          onConflict: "clinic_id",
-        });
-        if (error) throw error;
-
-        // Invalidate server-side AI cache so changes take effect immediately
-        await fetch("/api/healthcare/invalidate-cache", { method: "POST" }).catch(() => {});
-
-        toast.success("AI Healthcare Automation onboarding setup complete!");
+      // For step 1, capture the returned clinic_id
+      if (currentStep === 1 && json.clinic_id) {
+        setClinicId(json.clinic_id);
       }
+
+      toast.success(successMessages[currentStep]);
+      if (currentStep < 6) setCurrentStep((s) => s + 1);
     } catch (err: any) {
       toast.error(`Error saving setup: ${err.message}`);
       console.error(err);
@@ -798,9 +635,9 @@ export default function ClinicSetupWizard() {
   }
 
   const stepsList = [
-    { num: 1, label: "Clinic Info", icon: Building2 },
+    { num: 1, label: "Business Info", icon: Building2 },
     { num: 2, label: "Hours", icon: Clock },
-    { num: 3, label: "Doctors", icon: UserRound },
+    { num: 3, label: "Staff & AI Agents", icon: UserRound },
     { num: 4, label: "Services", icon: Stethoscope },
     { num: 5, label: "FAQs", icon: HelpCircle },
     { num: 6, label: "AI Settings", icon: Brain },
@@ -810,9 +647,9 @@ export default function ClinicSetupWizard() {
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Page Title */}
       <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-white">Clinic Onboarding Setup</h1>
+        <h1 className="text-3xl font-extrabold tracking-tight text-white">Business Onboarding Setup</h1>
         <p className="text-slate-400 text-sm mt-1">
-          Configure clinic information once, and let the AI handle WhatsApp inquiries and bookings.
+          Configure business information once, and let the AI handle WhatsApp inquiries and bookings.
         </p>
       </div>
 
@@ -827,7 +664,7 @@ export default function ClinicSetupWizard() {
               key={step.num}
               onClick={() => {
                 if (clinicId || step.num === 1) setCurrentStep(step.num);
-                else toast.error("Please complete the first step (Clinic Information) first.");
+                else toast.error("Please complete the first step (Business Information) first.");
               }}
               className={`flex items-center gap-2.5 p-3 rounded-xl border text-left cursor-pointer transition-all duration-300 ${
                 isActive
@@ -873,10 +710,10 @@ export default function ClinicSetupWizard() {
               <CardDescription className="text-slate-400">
                 {currentStep === 1 && "Basic details regarding location, name, and contact details."}
                 {currentStep === 2 && "Weekly opening times, lunch breaks, and holidays."}
-                {currentStep === 3 && "Register doctors, available times, specialization, and fees."}
-                {currentStep === 4 && "Define treatment services, starting prices, and standard durations."}
-                {currentStep === 5 && "Configure general FAQs to answer patient WhatsApp questions instantly."}
-                {currentStep === 6 && "Instruct AI how to respond to patients, emergencies, or escalate conversations."}
+                {currentStep === 3 && "Register staff and AI agents, available times, roles, and fees."}
+                {currentStep === 4 && "Define business services, starting prices, and standard durations."}
+                {currentStep === 5 && "Configure general FAQs to answer client WhatsApp questions instantly."}
+                {currentStep === 6 && "Instruct AI how to respond to clients, emergencies, or escalate conversations."}
               </CardDescription>
             </div>
           </div>
@@ -886,36 +723,36 @@ export default function ClinicSetupWizard() {
           {currentStep === 1 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="clinic_name" className="text-slate-300">Clinic Name *</Label>
+                <Label htmlFor="clinic_name" className="text-slate-300">Business Name *</Label>
                 <Input
                   id="clinic_name"
                   name="clinic_name"
                   value={clinicInfo.clinic_name}
                   onChange={handleClinicInfoChange}
                   className="bg-slate-950 border-slate-800 text-white"
-                  placeholder="E.g. Dr Masal Dental Clinic"
+                  placeholder="E.g. ChatNexGen Support Agency"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="clinic_type" className="text-slate-300">Clinic Specialty / Type</Label>
+                <Label htmlFor="clinic_type" className="text-slate-300">Business Category / Industry</Label>
                 <Input
                   id="clinic_type"
                   name="clinic_type"
                   value={clinicInfo.clinic_type}
                   onChange={handleClinicInfoChange}
                   className="bg-slate-950 border-slate-800 text-white"
-                  placeholder="E.g. Dental Care, General Medicine"
+                  placeholder="E.g. Real Estate, Digital Marketing, Retail"
                 />
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="clinic_description" className="text-slate-300">Clinic Description</Label>
+                <Label htmlFor="clinic_description" className="text-slate-300">Business Description</Label>
                 <Textarea
                   id="clinic_description"
                   name="clinic_description"
                   value={clinicInfo.clinic_description}
                   onChange={handleClinicInfoChange}
                   className="bg-slate-950 border-slate-800 text-white min-h-[80px]"
-                  placeholder="A short snippet explaining the clinic focus for AI prompt building..."
+                  placeholder="A short snippet explaining the business focus for AI prompt building..."
                 />
               </div>
               <div className="space-y-2">

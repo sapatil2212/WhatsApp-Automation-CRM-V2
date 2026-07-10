@@ -14,7 +14,7 @@ import {
   AlertTriangle,
   RotateCcw,
 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,7 +35,6 @@ type ConnectionStatus = 'connected' | 'disconnected' | 'unknown';
 type ResetReason = 'token_corrupted' | 'meta_api_error' | null;
 
 export function WhatsAppConfig() {
-  const supabase = createClient();
   const { user, loading: authLoading } = useAuth();
 
   const [loading, setLoading] = useState(true);
@@ -43,6 +42,7 @@ export function WhatsAppConfig() {
   const [testing, setTesting] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [showToken, setShowToken] = useState(false);
+  const [subscribing, setSubscribing] = useState(false);
   const [config, setConfig] = useState<WhatsAppConfigType | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('unknown');
   const [resetReason, setResetReason] = useState<ResetReason>(null);
@@ -53,40 +53,46 @@ export function WhatsAppConfig() {
   const [accessToken, setAccessToken] = useState('');
   const [verifyToken, setVerifyToken] = useState('');
   const [tokenEdited, setTokenEdited] = useState(false);
+  const [metaAppSecret, setMetaAppSecret] = useState('');
+  const [metaAppSecretEdited, setMetaAppSecretEdited] = useState(false);
+  const [showSecret, setShowSecret] = useState(false);
 
   const webhookUrl =
     typeof window !== 'undefined'
       ? `${window.location.origin}/api/whatsapp/webhook`
       : '';
 
-  const fetchConfig = useCallback(async (userId: string) => {
+  const fetchConfig = useCallback(async () => {
     setLoading(true);
     try {
-      // Load form values from Supabase (shows what's in DB)
-      const { data, error } = await supabase
-        .from('whatsapp_config')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
+      // Load form values via our JWT-authenticated API (PUT = read config row)
+      const rowRes = await fetch('/api/whatsapp/config', { method: 'PUT' });
+      const rowJson = await rowRes.json();
 
-      if (error) {
-        console.error('Failed to load config row:', error);
+      if (!rowRes.ok) {
+        console.error('Failed to load config row:', rowJson);
       }
+
+      const data = rowJson.data ?? null;
 
       if (data) {
         setConfig(data);
         setPhoneNumberId(data.phone_number_id || '');
         setWabaId(data.waba_id || '');
         setAccessToken(MASKED_TOKEN);
-        setVerifyToken('');
+        setVerifyToken(data.verify_token || '');
+        setMetaAppSecret(data.meta_app_secret || '');
         setTokenEdited(false);
+        setMetaAppSecretEdited(false);
       } else {
         setConfig(null);
         setPhoneNumberId('');
         setWabaId('');
         setAccessToken('');
         setVerifyToken('');
+        setMetaAppSecret('');
         setTokenEdited(false);
+        setMetaAppSecretEdited(false);
       }
 
       // Then verify health via the API (decrypts token + pings Meta)
@@ -119,7 +125,7 @@ export function WhatsAppConfig() {
     } finally {
       setLoading(false);
     }
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     if (authLoading) return;
@@ -127,7 +133,7 @@ export function WhatsAppConfig() {
       setLoading(false);
       return;
     }
-    fetchConfig(user.id);
+    fetchConfig();
   }, [authLoading, user, fetchConfig]);
 
   async function handleSave() {
@@ -144,9 +150,7 @@ export function WhatsAppConfig() {
       setSaving(true);
 
       // Always POST through the API — it verifies with Meta and encrypts
-      // the access_token server-side with ENCRYPTION_KEY. Skipping this
-      // and writing direct to Supabase stores the token in plaintext,
-      // which then fails decryption on every subsequent health check.
+      // the access_token server-side with ENCRYPTION_KEY.
       const payload: Record<string, unknown> = {
         phone_number_id: phoneNumberId.trim(),
         waba_id: wabaId.trim() || null,
@@ -156,13 +160,13 @@ export function WhatsAppConfig() {
       if (tokenEdited && accessToken !== MASKED_TOKEN && accessToken.trim()) {
         payload.access_token = accessToken.trim();
       } else if (config) {
-        // Existing config — reuse stored encrypted token by decrypting on the
-        // server. But our POST handler requires an access_token to verify
-        // with Meta. If the user didn't change the token, we need to signal
-        // that. Simplest: require token re-entry if they're updating.
-        toast.error('Please re-enter the Access Token to save changes');
-        setSaving(false);
-        return;
+        payload.access_token = MASKED_TOKEN;
+      }
+
+      if (metaAppSecretEdited && metaAppSecret !== MASKED_TOKEN && metaAppSecret.trim()) {
+        payload.meta_app_secret = metaAppSecret.trim();
+      } else if (config) {
+        payload.meta_app_secret = MASKED_TOKEN;
       }
 
       const res = await fetch('/api/whatsapp/config', {
@@ -185,7 +189,7 @@ export function WhatsAppConfig() {
           : 'Configuration saved successfully'
       );
 
-      if (user) await fetchConfig(user.id);
+      await fetchConfig();
     } catch (err) {
       console.error('Save error:', err);
       toast.error('Failed to save configuration');
@@ -245,7 +249,9 @@ export function WhatsAppConfig() {
       setWabaId('');
       setAccessToken('');
       setVerifyToken('');
+      setMetaAppSecret('');
       setTokenEdited(false);
+      setMetaAppSecretEdited(false);
       setConnectionStatus('disconnected');
       setResetReason(null);
       setStatusMessage('');
@@ -260,6 +266,24 @@ export function WhatsAppConfig() {
   function handleCopyWebhookUrl() {
     navigator.clipboard.writeText(webhookUrl);
     toast.success('Webhook URL copied to clipboard');
+  }
+
+  async function handleSubscribeWaba() {
+    setSubscribing(true);
+    try {
+      const res = await fetch('/api/whatsapp/subscribe-waba', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to subscribe WABA to webhooks');
+        return;
+      }
+      toast.success('WABA subscribed! Meta will now deliver message webhooks to your URL.');
+    } catch (err) {
+      console.error('Subscribe WABA error:', err);
+      toast.error('Failed to subscribe WABA to webhooks');
+    } finally {
+      setSubscribing(false);
+    }
   }
 
   if (loading) {
@@ -385,9 +409,37 @@ export function WhatsAppConfig() {
                   {showToken ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 </button>
               </div>
-              {config && !tokenEdited && (
+            </div>
+            <div className="space-y-2">
+              <Label className="text-slate-200">Meta App Secret</Label>
+              <div className="relative">
+                <Input
+                  type={showSecret ? 'text' : 'password'}
+                  placeholder="Enter your Meta App Secret (optional fallback exists)"
+                  value={metaAppSecret}
+                  onChange={(e) => {
+                    setMetaAppSecret(e.target.value);
+                    setMetaAppSecretEdited(true);
+                  }}
+                  onFocus={() => {
+                    if (metaAppSecret === MASKED_TOKEN) {
+                      setMetaAppSecret('');
+                      setMetaAppSecretEdited(true);
+                    }
+                  }}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowSecret(!showSecret)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+                >
+                  {showSecret ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              </div>
+              {config && !metaAppSecretEdited && (
                 <p className="text-xs text-slate-400">
-                  Token is hidden for security. Re-enter it to update configuration.
+                  Secret is hidden for security. Re-enter it to update.
                 </p>
               )}
             </div>
@@ -470,6 +522,26 @@ export function WhatsAppConfig() {
               </>
             )}
           </Button>
+          {config && config.waba_id && (
+            <Button
+              variant="outline"
+              onClick={handleSubscribeWaba}
+              disabled={subscribing}
+              className="border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+            >
+              {subscribing ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Subscribing...
+                </>
+              ) : (
+                <>
+                  <Zap className="size-4" />
+                  Subscribe WABA to Webhooks
+                </>
+              )}
+            </Button>
+          )}
           {config && (
             <Button
               variant="outline"

@@ -1,10 +1,9 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Settings, MessageSquare, Tag, User, Palette } from 'lucide-react';
+import { Settings, Tag, User, Palette } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { WhatsAppConfig } from '@/components/settings/whatsapp-config';
-import { TemplateManager } from '@/components/settings/template-manager';
 import { TagManager } from '@/components/settings/tag-manager';
 import { ProfileForm } from '@/components/settings/profile-form';
 import { PasswordForm } from '@/components/settings/password-form';
@@ -14,7 +13,6 @@ import { AppearancePanel } from '@/components/settings/appearance-panel';
 const TAB_VALUES = [
   'profile',
   'whatsapp',
-  'templates',
   'tags',
   'appearance',
 ] as const;
@@ -46,8 +44,7 @@ export default function SettingsPage() {
       <div>
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Settings</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-          Manage your profile, WhatsApp® integration, message templates, and
-          tags.
+          Manage your profile, WhatsApp® integration, and tags.
         </p>
       </div>
 
@@ -66,13 +63,6 @@ export default function SettingsPage() {
           >
             <Settings className="size-4" />
             WhatsApp Config
-          </TabsTrigger>
-          <TabsTrigger
-            value="templates"
-            className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-slate-600 dark:text-slate-400 data-active:shadow-sm transition-all duration-200"
-          >
-            <MessageSquare className="size-4" />
-            Templates
           </TabsTrigger>
           <TabsTrigger
             value="tags"
@@ -98,10 +88,6 @@ export default function SettingsPage() {
 
         <TabsContent value="whatsapp">
           <WhatsAppConfig />
-        </TabsContent>
-
-        <TabsContent value="templates">
-          <TemplateManager />
         </TabsContent>
 
         <TabsContent value="tags">

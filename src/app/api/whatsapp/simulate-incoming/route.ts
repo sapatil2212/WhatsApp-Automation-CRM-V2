@@ -1,22 +1,25 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
+import { prisma } from '@/lib/prisma'
+import { verifyAccessToken, rotateRefreshToken } from '@/lib/auth'
 import { decrypt } from '@/lib/whatsapp/encryption'
 import { processHealthcareAIMessage } from '@/services/ai-healthcare.service'
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    // ── Auth ──────────────────────────────────────────────────────────────────
+    const cookieStore = await cookies()
+    const accessToken = cookieStore.get('accessToken')?.value
+    const refreshToken = cookieStore.get('refreshToken')?.value
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
+    let payload = accessToken ? verifyAccessToken(accessToken) : null
+    if (!payload && refreshToken) {
+      const rotation = await rotateRefreshToken(refreshToken)
+      if (rotation) payload = rotation.user
+    }
 
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+    if (!payload) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const body = await request.json()
@@ -29,83 +32,68 @@ export async function POST(request: Request) {
       )
     }
 
-    // Fetch conversation and contact
-    const { data: conversation, error: convError } = await supabase
-      .from('conversations')
-      .select('*, contact:contacts(*)')
-      .eq('id', conversationId)
-      .eq('user_id', user.id)
-      .single()
+    // ── Fetch conversation and contact via Prisma ─────────────────────────────
+    const profile = await prisma.profile.findUnique({ where: { userId: payload.userId } })
+    if (!profile?.tenantId) {
+      return NextResponse.json({ error: 'Tenant context not found' }, { status: 403 })
+    }
 
-    if (convError || !conversation) {
-      return NextResponse.json(
-        { error: 'Conversation not found' },
-        { status: 404 }
-      )
+    const conversation = await prisma.conversation.findFirst({
+      where: { id: conversationId, tenantId: profile.tenantId },
+      include: { contact: true },
+    })
+
+    if (!conversation) {
+      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
     }
 
     const contact = conversation.contact
     if (!contact) {
-      return NextResponse.json(
-        { error: 'Contact not found' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Contact not found' }, { status: 400 })
     }
 
-    // 1. Insert patient's simulated message into messages table
+    // ── 1. Insert patient's simulated message ─────────────────────────────────
     const simulatedMsgId = `sim-user-${Date.now()}`
-    const { data: messageRecord, error: msgError } = await supabase
-      .from('messages')
-      .insert({
-        conversation_id: conversationId,
-        sender_type: 'customer',
-        content_type: 'text',
-        content_text: messageText,
-        message_id: simulatedMsgId,
+    const messageRecord = await prisma.message.create({
+      data: {
+        conversationId,
+        senderType: 'customer',
+        contentType: 'text',
+        contentText: messageText,
+        messageId: simulatedMsgId,
         status: 'delivered',
-        created_at: new Date().toISOString(),
-      })
-      .select()
-      .single()
+        createdAt: new Date(),
+      },
+    })
 
-    if (msgError) {
-      console.error('[Simulate Incoming] Error inserting patient message:', msgError)
-      return NextResponse.json(
-        { error: `Failed to insert simulated message: ${msgError.message}` },
-        { status: 500 }
-      )
-    }
+    // ── 2. Update conversation last message stats ─────────────────────────────
+    await prisma.conversation.update({
+      where: { id: conversationId },
+      data: {
+        lastMessageText: messageText,
+        lastMessageAt: new Date(),
+        unreadCount: (conversation.unreadCount || 0) + 1,
+        updatedAt: new Date(),
+      },
+    })
 
-    // 2. Update conversation last message stats
-    await supabase
-      .from('conversations')
-      .update({
-        last_message_text: messageText,
-        last_message_at: new Date().toISOString(),
-        unread_count: (conversation.unread_count || 0) + 1,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', conversationId)
+    // ── 3. Fetch WhatsApp config ──────────────────────────────────────────────
+    const config = await prisma.whatsappConfig.findUnique({
+      where: { tenantId: profile.tenantId },
+    })
 
-    // 3. Fetch WhatsApp config if available
-    const { data: config } = await supabase
-      .from('whatsapp_config')
-      .select('*')
-      .eq('user_id', user.id)
-      .maybeSingle()
+    const whatsappAccessToken = config ? decrypt(config.accessToken) : 'dummy-token'
+    const phoneNumberId = config ? config.phoneNumberId : 'dummy-phone-id'
 
-    const accessToken = config ? decrypt(config.access_token) : 'dummy-token'
-    const phoneNumberId = config ? config.phone_number_id : 'dummy-phone-id'
-
-    // 4. Run AI healthcare auto-responder synchronously so we can await the result
+    // ── 4. Run AI healthcare auto-responder ───────────────────────────────────
     const aiHandled = await processHealthcareAIMessage({
       messageText,
-      senderPhone: contact.phone,
+      senderPhone: contact.phone ?? '',
       contactId: contact.id,
-      userId: user.id,
+      userId: payload.userId,
       conversationId,
       contextMessageId: simulatedMsgId,
-      accessToken,
+      accessToken: whatsappAccessToken,
       phoneNumberId,
     }).catch((err) => {
       console.error('[Simulate Incoming] processHealthcareAIMessage threw error:', err)

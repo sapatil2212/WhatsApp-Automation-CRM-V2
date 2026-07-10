@@ -171,7 +171,7 @@ export interface PipelineStage {
   created_at: string;
 }
 
-export type DealStatus = 'open' | 'won' | 'lost';
+export type DealStatus = 'open' | 'active' | 'won' | 'lost';
 
 export interface Deal {
   id: string;

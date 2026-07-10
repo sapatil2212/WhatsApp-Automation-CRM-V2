@@ -144,7 +144,7 @@ export function Step2SelectAudience({
           .from('contact_tags')
           .select('contact_id')
           .in('tag_id', audience.tagIds);
-        baseIds = new Set((data ?? []).map((r) => r.contact_id));
+        baseIds = new Set((data ?? []).map((r: any) => r.contact_id));
       } else if (
         audience.type === 'custom_field' &&
         audience.customField?.fieldId &&
@@ -159,7 +159,7 @@ export function Step2SelectAudience({
         else if (operator === 'is_not') q = q.neq('value', value);
         else q = q.ilike('value', `%${value}%`);
         const { data } = await q;
-        baseIds = new Set((data ?? []).map((r) => r.contact_id));
+        baseIds = new Set((data ?? []).map((r: any) => r.contact_id));
       } else if (
         audience.type === 'csv' &&
         audience.csvContacts &&
@@ -180,7 +180,7 @@ export function Step2SelectAudience({
           .from('contact_tags')
           .select('contact_id')
           .in('tag_id', audience.excludeTagIds);
-        excludeSet = new Set((excludeRows ?? []).map((r) => r.contact_id));
+        excludeSet = new Set((excludeRows ?? []).map((r: any) => r.contact_id));
       }
 
       if (baseIds) {

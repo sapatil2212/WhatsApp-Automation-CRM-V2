@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { createClient } from "@supabase/supabase-js";
+import { prisma } from "@/lib/prisma";
 
 async function isAuthed(): Promise<boolean> {
   const cookieStore = await cookies();
@@ -11,54 +11,57 @@ export async function GET() {
   if (!(await isAuthed()))
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const db = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
+  try {
+    const [users, conversations] = await Promise.all([
+      prisma.user.findMany({
+        include: {
+          whatsappConfigs: true,
+          contacts: { select: { id: true } }
+        }
+      }),
+      prisma.conversation.findMany({
+        select: { id: true, status: true }
+      })
+    ]);
 
-  const { data: authData } = await db.auth.admin.listUsers({ perPage: 500 });
-  const users = (authData?.users ?? []) as { id: string; created_at?: string; email_confirmed_at?: string }[];
-  const userIds = users.map(u => u.id);
+    const now = new Date();
+    const monthlySignups: { month: string; count: number }[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const year = d.getFullYear();
+      const monthIndex = d.getMonth();
+      const count = users.filter(u => {
+        const cDate = new Date(u.createdAt);
+        return cDate.getFullYear() === year && cDate.getMonth() === monthIndex;
+      }).length;
+      monthlySignups.push({ month: d.toLocaleString("en-US", { month: "short" }), count });
+    }
 
-  const now = new Date();
-  const monthlySignups: { month: string; count: number }[] = [];
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const key = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
-    const count = users.filter(u => (u.created_at ?? "").startsWith(key)).length;
-    monthlySignups.push({ month: d.toLocaleString("en-US", { month: "short" }), count });
-  }
+    if (users.length === 0) {
+      return NextResponse.json({
+        totalUsers: 0, activeUsers: 0, confirmedUsers: 0,
+        totalContacts: 0, totalConversations: 0, openConversations: 0,
+        monthlySignups,
+      });
+    }
 
-  if (userIds.length === 0) {
+    const totalContacts = users.reduce((sum, u) => sum + u.contacts.length, 0);
+    const totalConversations = conversations.length;
+    const openConversations = conversations.filter(c => c.status === "open").length;
+    const activeUsers = users.filter(u => u.whatsappConfigs[0]?.status === "connected").length;
+    const confirmedUsers = users.filter(u => u.isVerified).length;
+
     return NextResponse.json({
-      totalUsers: 0, activeUsers: 0, confirmedUsers: 0,
-      totalContacts: 0, totalConversations: 0, openConversations: 0,
+      totalUsers:         users.length,
+      activeUsers,
+      confirmedUsers,
+      totalContacts,
+      totalConversations,
+      openConversations,
       monthlySignups,
     });
+  } catch (err: any) {
+    console.error('[Admin Stats GET] Error:', err);
+    return NextResponse.json({ error: err.message || "Failed to fetch stats" }, { status: 500 });
   }
-
-  const [waConfigs, contacts, conversations] = await Promise.all([
-    db.from("whatsapp_config").select("user_id, status").in("user_id", userIds),
-    db.from("contacts").select("user_id").in("user_id", userIds),
-    db.from("conversations").select("user_id, status").in("user_id", userIds),
-  ]);
-
-  const waMap = new Map(
-    ((waConfigs.data ?? []) as { user_id: string; status: string }[])
-      .map(w => [w.user_id, w.status])
-  );
-
-  const activeCount    = users.filter(u => waMap.get(u.id) === "connected").length;
-  const confirmedCount = users.filter(u => !!u.email_confirmed_at).length;
-
-  return NextResponse.json({
-    totalUsers:         users.length,
-    activeUsers:        activeCount,
-    confirmedUsers:     confirmedCount,
-    totalContacts:      (contacts.data ?? []).length,
-    totalConversations: (conversations.data ?? []).length,
-    openConversations:  ((conversations.data ?? []) as { status: string }[])
-                          .filter(c => c.status === "open").length,
-    monthlySignups,
-  });
 }

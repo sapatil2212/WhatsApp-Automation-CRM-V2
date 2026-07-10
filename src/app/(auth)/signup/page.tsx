@@ -1,743 +1,549 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Sparkles, CheckCircle, KeyRound, Loader2, Eye, EyeOff, ChevronDown } from "lucide-react";
+import {
+  ArrowLeft, CheckCircle, Eye, EyeOff,
+  QrCode, Loader2, PartyPopper, Paperclip,
+  Zap, TrendingUp, Crown, Check,
+} from "lucide-react";
 import { InteractiveGrid } from "@/components/marketing/interactive-grid";
-import { useTheme } from "@/hooks/use-theme";
 import { motion, AnimatePresence } from "framer-motion";
-import { cn } from "@/lib/utils";
 
-type SignupStep = "details" | "otp" | "success";
+const WHATSAPP_CONTACT = "917745868073";
 
-const containerVariants = {
-  hidden: { opacity: 0, y: 12 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } },
-  exit: { opacity: 0, y: -12, transition: { duration: 0.2, ease: "easeIn" } },
-} as const;
-
-const shakeVariants = {
-  idle: { x: 0 },
-  shake: {
-    x: [-6, 6, -5, 5, -3, 3, -1, 1, 0],
-    transition: { duration: 0.35, ease: "easeInOut" as const },
+// ─── Pricing Plans ────────────────────────────────────────────────────────────
+const PLANS = [
+  {
+    id: "starter",
+    name: "Starter",
+    tagline: "Self-Managed Setup",
+    price: "₹799",
+    period: "/month",
+    renewal: null,
+    icon: Zap,
+    color: "emerald",
+    popular: false,
+    features: [
+      "Official WhatsApp Business API",
+      "Visual Flow & Chatbot Builder",
+      "Shared Collaborative Inbox",
+      "27+ Native Integrations",
+      "0% Markup on Meta API fees",
+    ],
   },
-};
-
-const checkmarkPathVariants = {
-  hidden: { pathLength: 0, opacity: 0 },
-  visible: {
-    pathLength: 1,
-    opacity: 1,
-    transition: {
-      pathLength: { type: "spring", stiffness: 90, damping: 13, delay: 0.25 },
-      opacity: { duration: 0.1, delay: 0.25 },
-    },
+  {
+    id: "growth",
+    name: "Growth",
+    tagline: "Done-With-You Setup",
+    price: "₹1,499",
+    period: " first month",
+    renewal: "₹799/month after",
+    icon: TrendingUp,
+    color: "violet",
+    popular: true,
+    features: [
+      "Everything in Starter plan",
+      "Meta Business Verification Assistance",
+      "WhatsApp Co-existence Configuration",
+      "Custom Integrations Wired In",
+      "Dedicated Account Setup Session",
+    ],
   },
-} as const;
-
-const stepsList = [
-  { step: "details", label: "Details" },
-  { step: "otp", label: "Verify" },
-  { step: "success", label: "Done" },
+  {
+    id: "managed",
+    name: "Managed",
+    tagline: "Done-For-You Strategy",
+    price: "₹2,999",
+    period: " pilot month",
+    renewal: "₹799/month after",
+    icon: Crown,
+    color: "amber",
+    popular: false,
+    features: [
+      "Everything in Growth plan",
+      "2–3 Custom Automations built for you",
+      "Message Templates written & approved",
+      "Dedicated Account Manager",
+      "Monthly 1-on-1 Strategy Calls",
+    ],
+  },
 ];
 
-const businessTypes = [
-  { value: "Healthcare/medical", label: "Healthcare / Medical" },
-  { value: "education", label: "Education" },
-  { value: "hotel/restaurants", label: "Hotel / Restaurants" },
-  { value: "other", label: "Other" },
-];
+type Step = "form" | "otp" | "payment" | "done";
 
 export default function SignupPage() {
-  const { mode } = useTheme();
-  const isLight = mode === "light";
-  const router = useRouter();
-
-  const [step, setStep] = useState<SignupStep>("details");
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [businessName, setBusinessName] = useState("");
-  const [businessType, setBusinessType] = useState("");
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
+  const [fullName, setFullName]                     = useState("");
+  const [email, setEmail]                           = useState("");
+  const [mobileNumber, setMobileNumber]             = useState("");
+  const [businessCategory, setBusinessCategory]     = useState("");
+  const [password, setPassword]                     = useState("");
+  const [confirmPassword, setConfirmPassword]       = useState("");
+  const [showPassword, setShowPassword]             = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [error, setError]                           = useState<string | null>(null);
+  const [loading, setLoading]                       = useState(false);
 
-  const [otp, setOtp] = useState<string[]>(Array(6).fill(""));
-  const [focusedOtpIndex, setFocusedOtpIndex] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [resendTimer, setResendTimer] = useState(0);
-  const [isShaking, setIsShaking] = useState(false);
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  // Flow steps: "form" -> "otp" -> "payment" -> "done"
+  const [step, setStep]                             = useState<Step>("form");
+  const [otp, setOtp]                               = useState("");
+  const [verifyLoading, setVerifyLoading]           = useState(false);
+  const [registeredUserId, setRegisteredUserId]     = useState<string | null>(null);
+
+  const [selectedPlan, setSelectedPlan]             = useState<(typeof PLANS)[0]>(PLANS[1]); // Default Growth
+  const [proofFile, setProofFile]                   = useState<File | null>(null);
+  const [sending, setSending]                       = useState(false);
+
+  const fileRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
 
-  // Password Validation
-  const isLengthValid = password.length >= 6;
-  const isMatchValid = password === confirmPassword && password.length > 0;
-  const isPasswordFormValid = isLengthValid && isMatchValid;
-
-  useEffect(() => {
-    if (resendTimer <= 0) return;
-    const interval = setInterval(() => {
-      setResendTimer((prev) => prev - 1);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [resendTimer]);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setDropdownOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
-
-  const handleRequestOtp = async (e: React.FormEvent) => {
+  const handleSignupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    if (!isPasswordFormValid) {
-      if (password !== confirmPassword) {
-        setError("Passwords do not match");
-      } else {
-        setError("Password must be at least 6 characters");
-      }
-      return;
-    }
-
-    if (!businessType) {
-      setError("Please select your business type");
-      return;
-    }
+    if (password !== confirmPassword) { setError("Passwords do not match"); return; }
+    if (password.length < 6)          { setError("Password must be at least 6 characters"); return; }
 
     setLoading(true);
 
-    try {
-      const res = await fetch("/api/auth/register-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "send", email }),
-      });
-      const data = await res.json();
+    const { data, error: signupError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+          business_category: businessCategory,
+          phone_number: mobileNumber,
+          selected_plan: selectedPlan.id,
+        },
+      },
+    });
 
-      if (!res.ok || data.error) {
-        setError(data.error || "Failed to send verification code.");
-        setLoading(false);
-        return;
-      }
+    setLoading(false);
 
-      setLoading(false);
-      setStep("otp");
-      setResendTimer(60);
-      setTimeout(() => {
-        inputRefs.current[0]?.focus();
-      }, 100);
-    } catch (err: any) {
-      setError(err.message || "An unexpected error occurred.");
-      setLoading(false);
+    if (signupError) {
+      setError(signupError.message);
+      return;
     }
+
+    // Save registered user info
+    if (data?.user) {
+      setRegisteredUserId(data.user.id);
+    }
+    setStep("otp");
   };
 
-  const handleResendOtp = async () => {
-    if (resendTimer > 0) return;
-    setError(null);
-    setResendTimer(60);
-
-    try {
-      const res = await fetch("/api/auth/register-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "send", email }),
-      });
-      const data = await res.json();
-      if (!res.ok || data.error) {
-        setError(data.error || "Failed to resend code.");
-      }
-    } catch (err: any) {
-      setError(err.message || "An unexpected error occurred.");
-    }
-  };
-
-  const handleOtpChange = (value: string, index: number) => {
-    if (value && !/^\d$/.test(value)) return;
-
-    const newOtp = [...otp];
-    newOtp[index] = value;
-    setOtp(newOtp);
-
-    if (value && index < 5) {
-      inputRefs.current[index + 1]?.focus();
-    }
-
-    const fullCode = newOtp.join("");
-    if (fullCode.length === 6 && /^\d{6}$/.test(fullCode)) {
-      handleRegister(fullCode);
-    }
-  };
-
-  const handleOtpKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
-    if (e.key === "Backspace") {
-      const newOtp = [...otp];
-
-      if (newOtp[index]) {
-        newOtp[index] = "";
-        setOtp(newOtp);
-      } else if (index > 0) {
-        newOtp[index - 1] = "";
-        setOtp(newOtp);
-        inputRefs.current[index - 1]?.focus();
-      }
-    }
-  };
-
-  const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+  const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    const pastedData = e.clipboardData.getData("text");
-    const digits = pastedData.replace(/\D/g, "").slice(0, 6);
+    setError(null);
+    setVerifyLoading(true);
 
-    if (digits.length > 0) {
-      const newOtp = [...otp];
-      for (let i = 0; i < 6; i++) {
-        newOtp[i] = digits[i] || "";
-      }
-      setOtp(newOtp);
+    const { data, error: verifyError } = await supabase.auth.verifyOtp({
+      email,
+      token: otp,
+      type: "signup"
+    });
 
-      const targetIndex = Math.min(digits.length - 1, 5);
-      inputRefs.current[targetIndex]?.focus();
+    setVerifyLoading(false);
 
-      if (digits.length === 6) {
-        handleRegister(digits);
-      }
+    if (verifyError) {
+      setError(verifyError.message);
+      return;
     }
+
+    // Save user ID if returned from verify
+    if (data?.user) {
+      setRegisteredUserId(data.user.id);
+    }
+    setStep("payment");
   };
 
-  const handleRegister = async (code: string) => {
-    setError(null);
-    setLoading(true);
-    setIsShaking(false);
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setProofFile(e.target.files?.[0] ?? null);
+  };
+
+  const handleSendProof = async () => {
+    if (!registeredUserId) {
+      setError("Session expired. Please sign up again.");
+      setStep("form");
+      return;
+    }
+    setSending(true);
 
     try {
-      const res = await fetch("/api/auth/register-otp", {
+      // Mark as payment proof attached in the database
+      const res = await fetch("/api/auth/payment-proof", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "register",
-          email,
-          fullName,
-          businessName,
-          businessType,
-          password,
-          code,
-        }),
-      });
-      const data = await res.json();
-
-      if (!res.ok || data.error) {
-        setError(data.error || "Registration failed.");
-        setLoading(false);
-        setIsShaking(true);
-        setTimeout(() => setIsShaking(false), 500);
-        return;
-      }
-
-      // Automatically sign in the user
-      const { error: loginErr } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+        body: JSON.stringify({ userId: registeredUserId }),
       });
 
-      if (loginErr) {
-        console.error("Auto-login failed:", loginErr);
-        setError("Account created, but automatic sign-in failed. Please login manually.");
-        setLoading(false);
-        setStep("success");
-        return;
-      }
+      if (!res.ok) throw new Error("Could not update payment proof status.");
 
-      setLoading(false);
-      setStep("success");
+      const message = encodeURIComponent(
+        `🧾 *Payment Confirmation*\n\n` +
+        `Hello! I have completed the payment for ChatNexGen CRM.\n\n` +
+        `*Name:* ${fullName}\n` +
+        `*Email:* ${email}\n` +
+        `*Plan Selected:* ${selectedPlan.name} (${selectedPlan.price}${selectedPlan.period})\n` +
+        `*Proof File:* ${proofFile?.name ?? "Attached"}\n\n` +
+        `Please activate my account. Thank you! 🙏`
+      );
+
+      await new Promise((r) => setTimeout(r, 600));
+      window.open(`https://wa.me/${WHATSAPP_CONTACT}?text=${message}`, "_blank");
+      setStep("done");
     } catch (err: any) {
-      setError(err.message || "An unexpected error occurred.");
-      setLoading(false);
+      setError(err.message || "Something went wrong. Please try again.");
+    } finally {
+      setSending(false);
     }
   };
 
   return (
-    <div className="relative min-h-screen w-full flex items-center justify-center bg-[var(--m-bg-primary)] px-4 overflow-hidden select-none">
+    <div className="relative min-h-screen w-full flex items-center justify-center bg-[var(--m-bg-primary)] py-12 px-4 overflow-y-auto select-none">
       <InteractiveGrid gridSize={40} className="opacity-20" />
       <div className="absolute top-[20%] left-[20%] w-[50%] h-[50%] rounded-full bg-emerald-500/5 blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[20%] right-[20%] w-[50%] h-[50%] rounded-full bg-teal-500/5 blur-[120px] pointer-events-none" />
 
+      {/* Back Home */}
       <Link
         href="/"
-        className="absolute top-6 left-6 inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--m-text-tertiary)] hover:text-[var(--m-text-primary)] transition-colors bg-[var(--m-bg-secondary)]/60 border border-[var(--m-border-glass)] px-3 py-1.5 rounded-lg backdrop-blur"
+        className="absolute top-6 left-6 inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--m-text-tertiary)] hover:text-[var(--m-text-primary)] transition-colors bg-[var(--m-bg-secondary)]/60 border border-[var(--m-border-glass)] px-3 py-1.5 rounded-lg backdrop-blur z-20"
       >
         <ArrowLeft className="size-3.5" /> Back Home
       </Link>
 
-      <Card className="w-full max-w-lg border-[var(--m-border-primary)] bg-[var(--m-bg-glass)] shadow-[var(--m-shadow-card)] backdrop-blur-xl relative z-10 p-2 overflow-hidden transition-all duration-300">
-        {/* Step Progress Bar */}
-        <div className="px-6 pt-4 pb-2 border-b border-[var(--m-border-primary)]/40 bg-[var(--m-bg-primary)]/50 rounded-t-xl">
-          <div className="flex justify-between items-start relative max-w-xs mx-auto">
-            <div className="absolute left-3 right-3 top-3 h-[2px] bg-slate-800/80 z-0" />
-            <motion.div
-              className="absolute left-3 top-3 h-[2px] bg-emerald-500 z-0"
-              initial={{ width: "0%" }}
-              animate={{
-                width: step === "details" ? "0%" : step === "otp" ? "50%" : "100%",
-              }}
-              transition={{ duration: 0.4, ease: "easeInOut" }}
-            />
-
-            {stepsList.map((item, index) => {
-              const isActive =
-                item.step === step ||
-                (step === "otp" && index < 1) ||
-                (step === "success" && index < 2);
-              const isCurrent = item.step === step;
-
-              return (
-                <div key={item.step} className="flex flex-col items-center z-10 relative">
-                  <motion.div
-                    className={cn(
-                      "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border transition-all duration-300",
-                      isCurrent
-                        ? "bg-slate-900 border-emerald-500 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.3)]"
-                        : isActive
-                        ? "bg-emerald-500 border-emerald-500 text-slate-950"
-                        : "bg-slate-900 border-slate-800 text-slate-500"
-                    )}
-                    animate={{ scale: isCurrent ? 1.1 : 1 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                  >
-                    {isActive && item.step !== step ? "✓" : index + 1}
-                  </motion.div>
-                  <span
-                    className={cn(
-                      "text-[10px] font-semibold mt-1 transition-colors duration-300",
-                      isCurrent ? "text-white" : isActive ? "text-slate-400" : "text-slate-600"
-                    )}
-                  >
-                    {item.label}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <AnimatePresence mode="wait">
-          {step === "details" && (
-            <motion.div
-              key="details"
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              className="w-full"
-            >
-              <div className="flex flex-col items-center text-center pb-3 pt-5 px-6">
-                <CardTitle className="text-xl font-bold tracking-tight text-[var(--m-text-heading)] flex items-center gap-1.5 justify-center">
-                  Create Account <Sparkles className="size-4 text-emerald-400" />
+      <AnimatePresence mode="wait">
+        {/* ─── STEP 1: Signup Form ────────────────────────────────────────── */}
+        {step === "form" && (
+          <motion.div
+            key="form"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.25 }}
+            className="w-full max-w-2xl z-10"
+          >
+            <Card className="border border-[var(--m-border-glass)]/40 bg-[var(--m-bg-glass)]/70 backdrop-blur-xl p-6 md:p-8 shadow-none">
+              <CardHeader className="items-center text-center p-0 pb-6">
+                <CardTitle className="text-xl font-bold tracking-tight text-[var(--m-text-heading)]">
+                  Create Account
                 </CardTitle>
                 <CardDescription className="text-xs text-[var(--m-text-tertiary)] mt-1">
                   Get started with CRM Template for WhatsApp
                 </CardDescription>
-              </div>
-              <CardContent className="px-6 pb-6 pt-2">
-                <form onSubmit={handleRequestOtp} className="flex flex-col gap-4">
+              </CardHeader>
+              <CardContent className="p-0">
+                <form onSubmit={handleSignupSubmit} className="flex flex-col gap-4">
                   {error && (
-                    <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-xs text-red-400">
+                    <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-[11px] text-red-400">
                       {error}
                     </div>
                   )}
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="fullName" className="text-xs font-bold text-[var(--m-text-secondary)]">
-                        Full Name
-                      </Label>
-                      <Input
-                        id="fullName"
-                        type="text"
-                        placeholder="John Doe"
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        required
-                        className="h-9.5 border-[var(--m-input-border)] bg-[var(--m-input-bg)] text-xs text-[var(--m-text-primary)] placeholder:text-[var(--m-text-muted)] focus-visible:border-emerald-500 focus-visible:ring-emerald-500/20 px-3 rounded-lg"
-                      />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3.5">
+                    {/* Full Name */}
+                    <div className="flex flex-col gap-1.2">
+                      <Label htmlFor="fullName" className="text-[11px] font-semibold text-[var(--m-text-secondary)]/90">Full Name</Label>
+                      <Input id="fullName" type="text" placeholder="Enter your name" value={fullName} onChange={(e) => setFullName(e.target.value)} required
+                        className="h-9 px-3 border-[var(--m-input-border)] bg-[var(--m-input-bg)] text-[11px] text-[var(--m-text-primary)] placeholder:text-[var(--m-text-muted)]/50 focus-visible:border-emerald-500/70 focus-visible:ring-emerald-500/10 transition-all duration-200" />
                     </div>
 
-                    <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="email" className="text-xs font-bold text-[var(--m-text-secondary)]">
-                        Email Address
-                      </Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="you@example.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                        className="h-9.5 border-[var(--m-input-border)] bg-[var(--m-input-bg)] text-xs text-[var(--m-text-primary)] placeholder:text-[var(--m-text-muted)] focus-visible:border-emerald-500 focus-visible:ring-emerald-500/20 px-3 rounded-lg"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="businessName" className="text-xs font-bold text-[var(--m-text-secondary)]">
-                        Business Name
-                      </Label>
-                      <Input
-                        id="businessName"
-                        type="text"
-                        placeholder="My Company"
-                        value={businessName}
-                        onChange={(e) => setBusinessName(e.target.value)}
-                        required
-                        className="h-9.5 border-[var(--m-input-border)] bg-[var(--m-input-bg)] text-xs text-[var(--m-text-primary)] placeholder:text-[var(--m-text-muted)] focus-visible:border-emerald-500 focus-visible:ring-emerald-500/20 px-3 rounded-lg"
-                      />
+                    {/* Email */}
+                    <div className="flex flex-col gap-1.2">
+                      <Label htmlFor="email" className="text-[11px] font-semibold text-[var(--m-text-secondary)]/90">Email Address</Label>
+                      <Input id="email" type="email" placeholder="Enter your email" value={email} onChange={(e) => setEmail(e.target.value)} required
+                        className="h-9 px-3 border-[var(--m-input-border)] bg-[var(--m-input-bg)] text-[11px] text-[var(--m-text-primary)] placeholder:text-[var(--m-text-muted)]/50 focus-visible:border-emerald-500/70 focus-visible:ring-emerald-500/10 transition-all duration-200" />
                     </div>
 
-                    <div className="flex flex-col gap-1.5">
-                      <Label className="text-xs font-bold text-[var(--m-text-secondary)]">
-                        Select Business Type
-                      </Label>
-                      <div className="relative w-full" ref={dropdownRef}>
-                        <button
-                          type="button"
-                          onClick={() => setDropdownOpen(!dropdownOpen)}
-                          className={cn(
-                            "h-9.5 w-full flex items-center justify-between border-[var(--m-input-border)] bg-[var(--m-input-bg)] text-xs rounded-lg px-3 outline-none transition-all text-left cursor-pointer",
-                            dropdownOpen ? "border-emerald-500 ring-2 ring-emerald-500/20" : "hover:border-[var(--m-border-primary)]"
-                          )}
-                        >
-                          <span className={businessType ? "text-[var(--m-text-primary)]" : "text-[var(--m-text-muted)]"}>
-                            {businessType
-                              ? businessTypes.find((t) => t.value === businessType)?.label
-                              : "Select type..."}
-                          </span>
-                          <ChevronDown className={cn("size-4 text-slate-500 transition-transform duration-200", dropdownOpen && "rotate-180")} />
-                        </button>
-
-                        <AnimatePresence>
-                          {dropdownOpen && (
-                            <motion.div
-                              initial={{ opacity: 0, y: -4 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -4 }}
-                              transition={{ duration: 0.15, ease: "easeOut" }}
-                              className="absolute top-[calc(100%+4px)] left-0 w-full z-50 rounded-lg border border-[var(--m-border-primary)] bg-[var(--m-bg-secondary)] shadow-xl overflow-hidden py-1"
-                            >
-                              {businessTypes.map((type) => {
-                                const isSelected = businessType === type.value;
-                                return (
-                                  <button
-                                    key={type.value}
-                                    type="button"
-                                    onClick={() => {
-                                      setBusinessType(type.value);
-                                      setDropdownOpen(false);
-                                    }}
-                                    className={cn(
-                                      "w-full text-left px-3 py-2 text-xs transition-colors block cursor-pointer",
-                                      isSelected
-                                        ? "bg-emerald-500/10 text-emerald-400 font-semibold"
-                                        : "text-[var(--m-text-primary)] hover:bg-emerald-500 hover:text-slate-950"
-                                    )}
-                                  >
-                                    {type.label}
-                                  </button>
-                                );
-                              })}
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
+                    {/* Mobile */}
+                    <div className="flex flex-col gap-1.2">
+                      <Label htmlFor="mobileNumber" className="text-[11px] font-semibold text-[var(--m-text-secondary)]/90">Mobile Number</Label>
+                      <Input id="mobileNumber" type="tel" placeholder="Enter mobile number" value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value)} required
+                        className="h-9 px-3 border-[var(--m-input-border)] bg-[var(--m-input-bg)] text-[11px] text-[var(--m-text-primary)] placeholder:text-[var(--m-text-muted)]/50 focus-visible:border-emerald-500/70 focus-visible:ring-emerald-500/10 transition-all duration-200" />
                     </div>
-                  </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="password" className="text-xs font-bold text-[var(--m-text-secondary)]">
-                        Password
-                      </Label>
+                    {/* Business Category */}
+                    <div className="flex flex-col gap-1.2">
+                      <Label htmlFor="businessCategory" className="text-[11px] font-semibold text-[var(--m-text-secondary)]/90">Business Category</Label>
                       <div className="relative">
-                        <Input
-                          id="password"
-                          type={showPassword ? "text" : "password"}
-                          placeholder="••••••"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          required
-                          className="h-9.5 border-[var(--m-input-border)] bg-[var(--m-input-bg)] text-xs text-[var(--m-text-primary)] placeholder:text-[var(--m-text-muted)] focus-visible:border-emerald-500 focus-visible:ring-emerald-500/20 pr-10 px-3 rounded-lg"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-400"
+                        <select id="businessCategory" value={businessCategory} onChange={(e) => setBusinessCategory(e.target.value)} required
+                          className="h-9 w-full rounded-md border border-[var(--m-input-border)] bg-[var(--m-input-bg)] px-3 text-[11px] text-[var(--m-text-primary)] focus-visible:border-emerald-500/70 focus-visible:ring-emerald-500/10 transition-all duration-200 outline-none cursor-pointer appearance-none pr-8 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_10px_center] bg-no-repeat"
                         >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          <option value="" disabled className="bg-slate-900 text-slate-400">Select business category</option>
+                          <option value="Beauty & Personal Care" className="bg-slate-900">Beauty & Personal Care</option>
+                          <option value="Health & Wellness" className="bg-slate-900">Health & Wellness</option>
+                          <option value="Trades & Home Services" className="bg-slate-900">Trades & Home Services</option>
+                          <option value="Professional Services" className="bg-slate-900">Professional Services</option>
+                          <option value="Automotive Services" className="bg-slate-900">Automotive Services</option>
+                          <option value="Medical & Allied Health" className="bg-slate-900">Medical & Allied Health</option>
+                          <option value="Education & Training" className="bg-slate-900">Education & Training</option>
+                          <option value="Hospitality" className="bg-slate-900">Hospitality</option>
+                          <option value="Pet Services" className="bg-slate-900">Pet Services</option>
+                          <option value="Other" className="bg-slate-900">Other</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Pricing Plan Field */}
+                    <div className="flex flex-col gap-1.2 sm:col-span-2">
+                      <Label htmlFor="selectedPlan" className="text-[11px] font-semibold text-[var(--m-text-secondary)]/90">Select Plan</Label>
+                      <div className="relative">
+                        <select
+                          id="selectedPlan"
+                          value={selectedPlan.id}
+                          onChange={(e) => {
+                            const plan = PLANS.find((p) => p.id === e.target.value)!;
+                            setSelectedPlan(plan);
+                          }}
+                          required
+                          className="h-9 w-full rounded-md border border-[var(--m-input-border)] bg-[var(--m-input-bg)] px-3 text-[11px] text-[var(--m-text-primary)] focus-visible:border-emerald-500/70 focus-visible:ring-emerald-500/10 transition-all duration-200 outline-none cursor-pointer appearance-none pr-8 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_10px_center] bg-no-repeat"
+                        >
+                          <option value="starter" className="bg-slate-900">Starter (₹799/month)</option>
+                          <option value="growth" className="bg-slate-900">Growth (₹1,499 first month, ₹799/mo after)</option>
+                          <option value="managed" className="bg-slate-900">Managed (₹2,999 pilot month, ₹799/mo after)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Password */}
+                    <div className="flex flex-col gap-1.2">
+                      <Label htmlFor="password" className="text-[11px] font-semibold text-[var(--m-text-secondary)]/90">Password</Label>
+                      <div className="relative">
+                        <Input id="password" type={showPassword ? "text" : "password"} placeholder="Enter your password" value={password} onChange={(e) => setPassword(e.target.value)} required
+                          className="h-9 pl-3 pr-9 w-full border-[var(--m-input-border)] bg-[var(--m-input-bg)] text-[11px] text-[var(--m-text-primary)] placeholder:text-[var(--m-text-muted)]/50 focus-visible:border-emerald-500/70 focus-visible:ring-emerald-500/10 transition-all duration-200" />
+                        <button type="button" onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-2 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer" aria-label="Toggle password">
+                          {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                         </button>
                       </div>
                     </div>
 
-                    <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="confirmPassword" className="text-xs font-bold text-[var(--m-text-secondary)]">
-                        Confirm Password
-                      </Label>
+                    {/* Confirm Password */}
+                    <div className="flex flex-col gap-1.2">
+                      <Label htmlFor="confirmPassword" className="text-[11px] font-semibold text-[var(--m-text-secondary)]/90">Confirm Password</Label>
                       <div className="relative">
-                        <Input
-                          id="confirmPassword"
-                          type={showConfirmPassword ? "text" : "password"}
-                          placeholder="••••••"
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          required
-                          className="h-9.5 border-[var(--m-input-border)] bg-[var(--m-input-bg)] text-xs text-[var(--m-text-primary)] placeholder:text-[var(--m-text-muted)] focus-visible:border-emerald-500 focus-visible:ring-emerald-500/20 pr-10 px-3 rounded-lg"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-400"
-                        >
-                          {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        <Input id="confirmPassword" type={showConfirmPassword ? "text" : "password"} placeholder="Confirm your password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required
+                          className="h-9 pl-3 pr-9 w-full border-[var(--m-input-border)] bg-[var(--m-input-bg)] text-[11px] text-[var(--m-text-primary)] placeholder:text-[var(--m-text-muted)]/50 focus-visible:border-emerald-500/70 focus-visible:ring-emerald-500/10 transition-all duration-200" />
+                        <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-3 top-2 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer" aria-label="Toggle confirm password">
+                          {showConfirmPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                         </button>
                       </div>
                     </div>
                   </div>
 
-                  {/* Password indicators removed for clean signup interface */}
-
-                  <Button
-                    type="submit"
-                    disabled={loading || !isPasswordFormValid}
-                    className="mt-2 h-10 w-full bg-emerald-500 text-slate-950 hover:bg-emerald-400 hover:scale-[1.005] active:scale-[0.995] font-bold text-xs transition-all shadow-[0_0_12px_rgba(16,185,129,0.18)] disabled:opacity-50"
-                  >
-                    {loading ? (
-                      <span className="flex items-center gap-2 justify-center">
-                        <Loader2 className="h-4 w-4 animate-spin" /> Sending...
-                      </span>
-                    ) : (
-                      "Send OTP Code"
-                    )}
+                  <Button type="submit" disabled={loading}
+                    className="mt-4 h-9 w-full bg-emerald-500 text-white hover:bg-emerald-400 hover:scale-[1.01] active:scale-[0.99] font-bold text-xs transition-all duration-200 border border-emerald-400/20">
+                    {loading ? "Creating account..." : "Create Account & Verify OTP →"}
                   </Button>
                 </form>
 
-                <p className="mt-5 text-center text-xs text-[var(--m-text-muted)]">
+                <p className="mt-4.5 text-center text-[11px] text-[var(--m-text-muted)]">
                   Already have an account?{" "}
-                  <Link href="/login" className="text-emerald-500 hover:text-emerald-400 font-bold">
-                    Sign In
-                  </Link>
+                  <Link href="/login" className="text-emerald-500 hover:text-emerald-400 font-bold transition-colors">Sign In</Link>
                 </p>
               </CardContent>
-            </motion.div>
-          )}
+            </Card>
+          </motion.div>
+        )}
 
-          {step === "otp" && (
-            <motion.div
-              key="otp"
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              className="w-full"
-            >
-              <div className="flex flex-col items-center text-center pb-3 pt-5 px-6">
-                <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                  <KeyRound className="h-6 w-6" />
-                </div>
-                <CardTitle className="text-xl font-bold tracking-tight text-[var(--m-text-heading)]">
-                  Enter OTP Code
-                </CardTitle>
-                <CardDescription className="text-xs text-[var(--m-text-tertiary)] mt-1">
-                  We&apos;ve sent a 6-digit verification code to <span className="text-white font-medium">{email}</span>.
+        {/* ─── STEP 2: OTP Verification ───────────────────────────────────── */}
+        {step === "otp" && (
+          <motion.div
+            key="otp"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.25 }}
+            className="w-full max-w-sm z-10"
+          >
+            <Card className="border border-[var(--m-border-glass)]/40 bg-[var(--m-bg-glass)]/70 backdrop-blur-xl p-6 md:p-8 shadow-none">
+              <CardHeader className="items-center text-center p-0 pb-4 relative">
+                <button
+                  type="button"
+                  onClick={() => setStep("form")}
+                  className="absolute left-0 top-0 text-[10px] font-semibold text-[var(--m-text-muted)] hover:text-[var(--m-text-primary)] transition-colors flex items-center gap-1"
+                >
+                  <ArrowLeft className="size-3" /> Back
+                </button>
+                <CardTitle className="text-lg font-bold text-[var(--m-text-heading)]">Enter OTP Code</CardTitle>
+                <CardDescription className="text-[11px] text-[var(--m-text-tertiary)] mt-2 leading-relaxed">
+                  We&apos;ve sent a 6-digit OTP code to <span className="text-[var(--m-text-primary)] font-semibold">{email}</span>.
                 </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0 pt-3">
+                <form onSubmit={handleVerifyOtp} className="flex flex-col gap-3.5">
+                  {error && (
+                    <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-[11px] text-red-400">
+                      {error}
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="otp" className="text-[11px] font-semibold text-[var(--m-text-secondary)] text-center">
+                      6-Digit OTP Code
+                    </Label>
+                    <Input
+                      id="otp"
+                      type="text"
+                      placeholder="••••••"
+                      maxLength={6}
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                      required
+                      className="h-10 border-[var(--m-input-border)] bg-[var(--m-input-bg)] text-center text-md font-bold tracking-[0.2em] text-[var(--m-text-primary)] focus-visible:border-emerald-500/70 focus-visible:ring-emerald-500/10 transition-all duration-200"
+                    />
+                  </div>
+
+                  <Button
+                    type="submit"
+                    disabled={verifyLoading}
+                    className="h-9 w-full bg-emerald-500 text-white hover:bg-emerald-400 hover:scale-[1.01] active:scale-[0.99] font-bold text-xs transition-all duration-200 border border-emerald-400/20"
+                  >
+                    {verifyLoading ? "Verifying..." : "Verify & Proceed to Payment"}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* ─── STEP 3: Payment QR & Proof ──────────────────────────────────── */}
+        {step === "payment" && (
+          <motion.div
+            key="payment"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.25 }}
+            className="w-full max-w-sm z-10"
+          >
+            <Card className="border border-[var(--m-border-glass)]/40 bg-[var(--m-bg-glass)]/70 backdrop-blur-xl p-6 md:p-8 shadow-none flex flex-col items-center gap-4">
+              <div className="flex flex-col items-center gap-2 text-center">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                  <QrCode className="size-5 text-emerald-400" />
+                </div>
+                <h2 className="text-base font-bold text-[var(--m-text-heading)]">Scan & Pay</h2>
+                <p className="text-[11px] text-[var(--m-text-tertiary)] leading-relaxed">
+                  Scan the QR below to pay. Then upload proof and send to activate.
+                </p>
               </div>
-              <CardContent className="flex flex-col items-center px-6 pb-6">
+
+              {/* plan badge */}
+              <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] font-bold bg-emerald-500/10 border-emerald-500/30 text-emerald-400`}>
+                <selectedPlan.icon className="size-3" />
+                {selectedPlan.name} Plan — {selectedPlan.price}{selectedPlan.period}
+              </div>
+
+              {/* QR Image */}
+              <div className="relative w-52 h-52 rounded-2xl overflow-hidden border-2 border-white/20 shadow-lg bg-white p-1.5">
+                <Image
+                  src="/images/payment-qr.png"
+                  alt="Payment QR Code"
+                  fill
+                  className="object-contain"
+                  priority
+                  unoptimized
+                />
+              </div>
+
+              <div className="w-full space-y-2">
                 {error && (
-                  <div className="w-full mb-4 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-xs text-red-400">
+                  <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-[11px] text-red-400 text-center">
                     {error}
                   </div>
                 )}
-
-                <motion.div
-                  className="flex gap-2.5 justify-center my-4"
-                  variants={shakeVariants}
-                  animate={isShaking ? "shake" : "idle"}
-                >
-                  {otp.map((val, idx) => {
-                    const isBoxFocused = focusedOtpIndex === idx;
-                    return (
-                      <motion.input
-                        key={idx}
-                        ref={(el) => {
-                          inputRefs.current[idx] = el;
-                        }}
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        maxLength={1}
-                        value={val}
-                        onFocus={() => setFocusedOtpIndex(idx)}
-                        onBlur={() => setFocusedOtpIndex(null)}
-                        onChange={(e) => handleOtpChange(e.target.value, idx)}
-                        onKeyDown={(e) => handleOtpKeyDown(e, idx)}
-                        onPaste={idx === 0 ? handleOtpPaste : undefined}
-                        className={cn(
-                          "h-11 w-11 flex-shrink-0 rounded-xl border text-center text-xl font-bold transition-all focus:outline-none focus:ring-2",
-                          error
-                            ? "border-red-500 focus:border-red-500 focus:ring-red-500/20 text-red-400"
-                            : isBoxFocused
-                            ? "border-emerald-500 bg-slate-800 text-white ring-2 ring-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.25)] scale-105"
-                            : val
-                            ? "border-emerald-500/80 bg-slate-800 text-white focus:border-emerald-500 focus:ring-emerald-500/20"
-                            : "border-slate-700 bg-slate-800 text-slate-400 focus:border-emerald-500 focus:ring-emerald-500/20"
-                        )}
-                        style={{ width: "44px", height: "44px" }}
-                        whileFocus={{ scale: 1.05 }}
-                        transition={{ duration: 0.12 }}
-                        disabled={loading}
-                      />
-                    );
-                  })}
-                </motion.div>
-
-                {loading && (
-                  <div className="flex items-center gap-2 text-xs text-slate-400 my-2">
-                    <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
-                    Registering account...
-                  </div>
-                )}
-
-                <div className="mt-5 flex flex-col gap-3 items-center w-full">
-                  <button
-                    onClick={handleResendOtp}
-                    disabled={resendTimer > 0}
-                    className={cn(
-                      "text-xs font-semibold uppercase tracking-wider transition-colors",
-                      resendTimer > 0
-                        ? "text-slate-500 cursor-not-allowed"
-                        : "text-emerald-500 hover:text-emerald-400 cursor-pointer"
-                    )}
-                  >
-                    {resendTimer > 0 ? `Resend Code in ${resendTimer}s` : "Resend OTP Code"}
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setError(null);
-                      setStep("details");
-                    }}
-                    className="flex items-center gap-2 text-xs text-slate-400 hover:text-slate-300 transition-colors mt-1"
-                  >
-                    <ArrowLeft className="h-4 w-4" /> Change Details
-                  </button>
-                </div>
-              </CardContent>
-            </motion.div>
-          )}
-
-          {step === "success" && (
-            <motion.div
-              key="success"
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              className="w-full flex flex-col items-center text-center px-6 py-6"
-            >
-              {/* Checkmark Circle */}
-              <div className="relative mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/10 border border-emerald-500/20 shadow-lg shadow-emerald-500/10">
-                <div className="absolute inset-0 rounded-full bg-emerald-500/5 blur-xl animate-pulse" />
-                <motion.div
-                  className="absolute h-24 w-24 rounded-full border border-emerald-500/10"
-                  initial={{ scale: 0.8, opacity: 0.8 }}
-                  animate={{ scale: 1.25, opacity: 0 }}
-                  transition={{ delay: 0.25, duration: 1.1, repeat: Infinity, ease: "easeOut" }}
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*,application/pdf"
+                  className="hidden"
+                  onChange={handleFileChange}
                 />
-
-                {/* Confetti Sparks */}
-                {Array.from({ length: 12 }).map((_, i) => {
-                  const angle = (i * 360) / 12;
-                  const distance = 40 + Math.random() * 20;
-                  const x = Math.cos((angle * Math.PI) / 180) * distance;
-                  const y = Math.sin((angle * Math.PI) / 180) * distance;
-                  return (
-                    <motion.div
-                      key={i}
-                      className="absolute h-1.5 w-1.5 rounded-full bg-emerald-500/80"
-                      initial={{ x: 0, y: 0, scale: 0, opacity: 1 }}
-                      animate={{
-                        x,
-                        y,
-                        scale: [0, 1, 0.8, 0],
-                        opacity: [1, 1, 0.4, 0],
-                      }}
-                      transition={{
-                        delay: 0.35,
-                        duration: 0.7 + Math.random() * 0.35,
-                        ease: "easeOut",
-                      }}
-                    />
-                  );
-                })}
-
-                <svg
-                  className="h-9 w-9 text-emerald-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={3}
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-emerald-500/40 hover:border-emerald-500/70 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-400 text-[11px] font-semibold transition-all duration-200 cursor-pointer"
                 >
-                  <motion.path
-                    vectorEffect="non-scaling-stroke"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M5 13l4 4L19 7"
-                    variants={checkmarkPathVariants}
-                    initial="hidden"
-                    animate="visible"
-                  />
-                </svg>
+                  <Paperclip className="size-3.5" />
+                  {proofFile ? proofFile.name : "Attach Payment Proof (Screenshot)"}
+                </button>
+                {proofFile && (
+                  <p className="text-[10px] text-emerald-400/80 text-center">
+                    ✓ {proofFile.name} ready
+                  </p>
+                )}
               </div>
 
-              <h2 className="text-2xl font-extrabold text-[var(--m-text-heading)] tracking-tight mb-2">
-                Registration Successful
-              </h2>
-              <p className="text-xs text-[var(--m-text-tertiary)] max-w-sm mb-6 leading-relaxed">
-                Your email has been verified and your account has been successfully created. Welcome aboard!
-              </p>
+              <button
+                type="button"
+                disabled={!proofFile || sending}
+                onClick={handleSendProof}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-[11px] font-bold shadow-md hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              >
+                {sending ? (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin" />
+                    Submitting Proof...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="size-3.5" />
+                    Payment Done — Send Proof on WhatsApp
+                  </>
+                )}
+              </button>
+            </Card>
+          </motion.div>
+        )}
 
-              <div className="w-full px-2">
-                <motion.div whileHover={{ scale: 1.015 }} whileTap={{ scale: 0.985 }} className="w-full">
-                  <Button
-                    onClick={() => router.push("/dashboard")}
-                    className="w-full h-10 bg-emerald-500 text-slate-950 hover:bg-emerald-400 font-bold rounded-xl shadow-lg transition-all duration-300 border-none text-xs"
-                  >
-                    Go to Dashboard
-                  </Button>
-                </motion.div>
+        {/* ─── STEP 4: Success Screen ────────────────────────────────────────── */}
+        {step === "done" && (
+          <motion.div
+            key="done"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.25 }}
+            className="w-full max-w-sm z-10"
+          >
+            <Card className="border border-[var(--m-border-glass)]/40 bg-[var(--m-bg-glass)]/70 backdrop-blur-xl p-8 flex flex-col items-center gap-4 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                <PartyPopper className="size-8 text-emerald-400" />
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </Card>
+
+              <div>
+                <h2 className="text-xl font-bold text-[var(--m-text-heading)]">Account Registration Done! 🎉</h2>
+                <p className="text-[11px] text-[var(--m-text-tertiary)] mt-2 leading-relaxed">
+                  <span className="text-[var(--m-text-primary)] font-semibold">
+                    Payment confirmation is under process.
+                  </span>{" "}
+                  You will get notified on your email/WhatsApp when your account gets activated.
+                </p>
+              </div>
+
+              <div className="w-full rounded-xl border border-emerald-500/20 bg-emerald-500/8 px-4 py-3 text-[10px] text-emerald-300/80 leading-relaxed">
+                Our team reviews payments within <span className="font-bold text-emerald-400">24–48 hours</span>.<br />
+                You will not be able to log in until activated by the Super Admin.
+              </div>
+
+              <Link href="/login" className="w-full">
+                <button className="w-full py-2.5 rounded-xl border border-[var(--m-border-glass)]/40 bg-[var(--m-bg-secondary)] hover:bg-[var(--m-bg-tertiary)] text-[var(--m-text-secondary)] text-[11px] font-bold transition-all">
+                  Back to Sign In
+                </button>
+              </Link>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

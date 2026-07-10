@@ -56,7 +56,7 @@ export async function GET(
     return NextResponse.json({ error: runsErr.message }, { status: 500 })
   }
 
-  const runIds = (runs ?? []).map((r) => (r as { id: string }).id)
+  const runIds = (runs ?? []).map((r: any) => (r as { id: string }).id)
   let events: Array<{
     flow_run_id: string
     event_type: string

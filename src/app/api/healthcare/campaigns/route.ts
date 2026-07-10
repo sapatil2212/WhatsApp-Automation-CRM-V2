@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/admin'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 
 /**
@@ -117,10 +117,7 @@ export async function POST(request: Request) {
   const contactIds: string[] = body.contact_ids || []
   const segmentFilter: string = body.segment_filter || 'all' // all, recent, inactive
 
-  const db = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
+  const db = createClient()
 
   // Get clinic info
   const { data: clinic } = await db
@@ -149,7 +146,7 @@ export async function POST(request: Request) {
         .select('contact_id')
         .eq('clinic_id', clinic.id)
         .gte('appointment_date', threeMonthsAgo.toISOString().split('T')[0])
-      targetContacts = [...new Set((recentAppts || []).map((a) => a.contact_id))]
+      targetContacts = [...new Set<string>((recentAppts || []).map((a: any) => a.contact_id as string))]
     } else if (segmentFilter === 'inactive') {
       // Patients who haven't visited in 6+ months
       const sixMonthsAgo = new Date()
@@ -159,15 +156,15 @@ export async function POST(request: Request) {
         .select('contact_id')
         .eq('clinic_id', clinic.id)
         .gte('appointment_date', sixMonthsAgo.toISOString().split('T')[0])
-      const recentIds = new Set((recentAppts || []).map((a) => a.contact_id))
+      const recentIds = new Set((recentAppts || []).map((a: any) => a.contact_id as string))
 
       const { data: allContacts } = await query
       targetContacts = (allContacts || [])
-        .map((c) => c.id)
-        .filter((id) => !recentIds.has(id))
+        .map((c: any) => c.id as string)
+        .filter((id: any) => !recentIds.has(id))
     } else {
       const { data: allContacts } = await query
-      targetContacts = (allContacts || []).map((c) => c.id)
+      targetContacts = (allContacts || []).map((c: any) => c.id as string)
     }
   }
 

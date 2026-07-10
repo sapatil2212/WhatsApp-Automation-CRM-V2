@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import type { Contact, Tag, ContactTag } from '@/types';
@@ -52,7 +52,7 @@ interface ContactWithTags extends Contact {
 }
 
 export default function ContactsPage() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const [contacts, setContacts] = useState<ContactWithTags[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,7 +78,7 @@ export default function ContactsPage() {
     const { data } = await supabase.from('tags').select('*');
     if (data) {
       const map: Record<string, Tag> = {};
-      data.forEach((t) => (map[t.id] = t));
+      data.forEach((t: any) => (map[t.id] = t));
       setTagsMap(map);
     }
   }, [supabase]);
@@ -102,7 +102,10 @@ export default function ContactsPage() {
 
     const { data, count, error } = await query;
 
+    console.log('[DEBUG fetchContacts] response:', { data, count, error, dataType: typeof data, isArray: Array.isArray(data), dataLength: data?.length });
+
     if (error) {
+      console.log('[DEBUG fetchContacts] error branch hit:', error);
       toast.error('Failed to load contacts');
       setLoading(false);
       return;
@@ -117,19 +120,19 @@ export default function ContactsPage() {
     }
 
     // Fetch tags for these contacts
-    const contactIds = data.map((c) => c.id);
+    const contactIds = data.map((c: any) => c.id);
     const { data: contactTags } = await supabase
       .from('contact_tags')
       .select('contact_id, tag_id')
       .in('contact_id', contactIds);
 
     const tagsByContact: Record<string, string[]> = {};
-    contactTags?.forEach((ct) => {
+    contactTags?.forEach((ct: any) => {
       if (!tagsByContact[ct.contact_id]) tagsByContact[ct.contact_id] = [];
       tagsByContact[ct.contact_id].push(ct.tag_id);
     });
 
-    const enriched: ContactWithTags[] = data.map((c) => ({
+    const enriched: ContactWithTags[] = data.map((c: any) => ({
       ...c,
       tags: (tagsByContact[c.id] ?? [])
         .map((tid) => tagsMap[tid])

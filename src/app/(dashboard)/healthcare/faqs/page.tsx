@@ -285,9 +285,9 @@ export default function FAQsManagement() {
       <Card className="border-slate-800 bg-slate-900/60 max-w-lg mx-auto mt-12 text-center p-6">
         <CardHeader className="flex flex-col items-center justify-center">
           <AlertCircle className="h-12 w-12 text-amber-500 mb-4 animate-bounce" />
-          <CardTitle className="text-white">Clinic Onboarding Required</CardTitle>
+          <CardTitle className="text-white">Business Onboarding Required</CardTitle>
           <CardDescription className="text-slate-400 mt-2">
-            You must set up your clinic information before managing FAQs.
+            You must set up your business information before managing FAQs.
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-2">
@@ -295,7 +295,7 @@ export default function FAQsManagement() {
             href="/healthcare/setup"
             className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
           >
-            Launch Clinic Setup Wizard
+            Launch Business Setup Wizard
           </Link>
         </CardContent>
       </Card>
@@ -309,10 +309,10 @@ export default function FAQsManagement() {
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-white flex items-center gap-3">
             <HelpCircle className="h-8 w-8 text-primary" />
-            Manage FAQs
+            AI Knowledge Base (FAQs)
           </h1>
           <p className="text-slate-400 text-sm mt-1">
-            Configure dynamic Q&A pairs for the AI to instantly respond to recurring patient queries.
+            Configure dynamic Q&A pairs for the AI to instantly respond to recurring client queries.
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -595,7 +595,7 @@ export default function FAQsManagement() {
                 {editingFaq ? "Edit FAQ Details" : "Create Q&A FAQ Template"}
               </DialogTitle>
               <DialogDescription className="text-slate-400">
-                Configure patient query patterns and corresponding AI automated responses.
+                Configure client query patterns and corresponding AI automated responses.
               </DialogDescription>
             </DialogHeader>
 
@@ -607,7 +607,7 @@ export default function FAQsManagement() {
                   value={form.question}
                   onChange={(e) => setForm({ ...form, question: e.target.value })}
                   className="bg-slate-950 border-slate-800 text-white"
-                  placeholder="E.g. Is Dr. Patil available today?"
+                  placeholder="E.g. What are your business hours or pricing?"
                 />
               </div>
 

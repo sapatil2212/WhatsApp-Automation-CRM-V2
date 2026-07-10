@@ -1,7 +1,32 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
+import { prisma } from '@/lib/prisma'
+import { verifyAccessToken, rotateRefreshToken } from '@/lib/auth'
 import { verifyPhoneNumber } from '@/lib/whatsapp/meta-api'
 import { encrypt, decrypt } from '@/lib/whatsapp/encryption'
+
+const MASKED_TOKEN = '••••••••••••••••'
+
+/**
+ * Shared helper: resolves the authenticated user payload from JWT cookies.
+ * Returns null if unauthenticated.
+ */
+async function getAuthUser() {
+  const cookieStore = await cookies()
+  let accessToken = cookieStore.get('accessToken')?.value
+  const refreshToken = cookieStore.get('refreshToken')?.value
+
+  let payload = accessToken ? verifyAccessToken(accessToken) : null
+
+  if (!payload && refreshToken) {
+    const rotation = await rotateRefreshToken(refreshToken)
+    if (rotation) {
+      payload = rotation.user
+    }
+  }
+
+  return payload
+}
 
 /**
  * GET /api/whatsapp/config
@@ -16,32 +41,23 @@ import { encrypt, decrypt } from '@/lib/whatsapp/encryption'
  *   { connected: false, reason: 'token_corrupted',  message: '...', needs_reset: true }
  *   { connected: false, reason: 'meta_api_error',   message: '...' }
  */
-export async function GET() {
+export async function GET(_req: NextRequest) {
   try {
-    const supabase = await createClient()
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
+    const payload = await getAuthUser()
+    if (!payload) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: config, error: configError } = await supabase
-      .from('whatsapp_config')
-      .select('phone_number_id, access_token, status')
-      .eq('user_id', user.id)
-      .maybeSingle()
-
-    if (configError) {
-      console.error('Error fetching whatsapp_config:', configError)
-      return NextResponse.json(
-        { connected: false, reason: 'db_error', message: 'Failed to fetch configuration' },
-        { status: 200 }
-      )
+    // Resolve tenant context
+    const profile = await prisma.profile.findUnique({ where: { userId: payload.userId } })
+    if (!profile?.tenantId) {
+      return NextResponse.json({ error: 'Tenant context not found' }, { status: 403 })
     }
+
+    const config = await prisma.whatsappConfig.findUnique({
+      where: { tenantId: profile.tenantId },
+      select: { phoneNumberId: true, accessToken: true, status: true },
+    })
 
     if (!config) {
       return NextResponse.json(
@@ -55,10 +71,9 @@ export async function GET() {
     }
 
     // Try to decrypt the stored token with the current ENCRYPTION_KEY.
-    // If this fails, the key changed (or was never consistent across envs).
-    let accessToken: string
+    let decryptedToken: string
     try {
-      accessToken = decrypt(config.access_token)
+      decryptedToken = decrypt(config.accessToken)
     } catch (err) {
       console.error('[whatsapp/config GET] Token decryption failed:', err)
       return NextResponse.json(
@@ -67,7 +82,7 @@ export async function GET() {
           reason: 'token_corrupted',
           needs_reset: true,
           message:
-            'The stored access token cannot be decrypted with the current ENCRYPTION_KEY. This usually means the key changed, or it differs between environments (local vs Hostinger vs Vercel). Click "Reset Configuration" below, then re-save.',
+            'The stored access token cannot be decrypted with the current ENCRYPTION_KEY. This usually means the key changed. Click "Reset Configuration" below, then re-save.',
         },
         { status: 200 }
       )
@@ -76,8 +91,8 @@ export async function GET() {
     // Validate credentials against Meta
     try {
       const phoneInfo = await verifyPhoneNumber({
-        phoneNumberId: config.phone_number_id,
-        accessToken,
+        phoneNumberId: config.phoneNumberId,
+        accessToken: decryptedToken,
       })
       return NextResponse.json({ connected: true, phone_info: phoneInfo })
     } catch (err) {
@@ -104,30 +119,48 @@ export async function GET() {
 /**
  * POST /api/whatsapp/config
  *
- * Saves or updates the WhatsApp config for the authenticated user.
- * Verifies credentials with Meta first, then encrypts and stores.
+ * Saves or updates WhatsApp config for the authenticated user's tenant.
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
+    const payload = await getAuthUser()
+    if (!payload) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
-    const { phone_number_id, waba_id, access_token, verify_token } = body
+    const profile = await prisma.profile.findUnique({ where: { userId: payload.userId } })
+    if (!profile?.tenantId) {
+      return NextResponse.json({ error: 'Tenant context not found' }, { status: 403 })
+    }
+    const { tenantId } = profile
 
-    if (!access_token || !phone_number_id) {
-      return NextResponse.json(
-        { error: 'access_token and phone_number_id are required' },
-        { status: 400 }
-      )
+    const body = await request.json()
+    const { phone_number_id, waba_id, access_token, verify_token, meta_app_secret } = body
+
+    if (!phone_number_id) {
+      return NextResponse.json({ error: 'phone_number_id is required' }, { status: 400 })
+    }
+
+    let resolvedAccessToken = access_token
+    let resolvedMetaAppSecret = meta_app_secret
+
+    // 1. If tokens are masked, fetch existing config to resolve them
+    if (access_token === MASKED_TOKEN || meta_app_secret === MASKED_TOKEN) {
+      const existing = await prisma.whatsappConfig.findUnique({
+        where: { tenantId }
+      })
+      if (existing) {
+        if (access_token === MASKED_TOKEN) {
+          resolvedAccessToken = decrypt(existing.accessToken)
+        }
+        if (meta_app_secret === MASKED_TOKEN && existing.metaAppSecret) {
+          resolvedMetaAppSecret = decrypt(existing.metaAppSecret)
+        }
+      }
+    }
+
+    if (!resolvedAccessToken) {
+      return NextResponse.json({ error: 'access_token is required' }, { status: 400 })
     }
 
     // Verify credentials with Meta BEFORE saving
@@ -135,84 +168,55 @@ export async function POST(request: Request) {
     try {
       phoneInfo = await verifyPhoneNumber({
         phoneNumberId: phone_number_id,
-        accessToken: access_token,
+        accessToken: resolvedAccessToken,
       })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown Meta API error'
       console.error('Meta API verification failed during save:', message)
-      return NextResponse.json(
-        { error: `Meta API error: ${message}` },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: `Meta API error: ${message}` }, { status: 400 })
     }
 
     // Encrypt sensitive tokens before storing
     let encryptedAccessToken: string
     let encryptedVerifyToken: string | null
+    let encryptedMetaAppSecret: string | null
     try {
-      encryptedAccessToken = encrypt(access_token)
+      encryptedAccessToken = encrypt(resolvedAccessToken)
       encryptedVerifyToken = verify_token ? encrypt(verify_token) : null
+      encryptedMetaAppSecret = resolvedMetaAppSecret ? encrypt(resolvedMetaAppSecret) : null
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown encryption error'
       console.error('Encryption failed:', message)
       return NextResponse.json(
-        {
-          error:
-            'Failed to encrypt token. Check that ENCRYPTION_KEY is a valid 64-character hex string in your environment variables.',
-        },
+        { error: 'Failed to encrypt token. Check that ENCRYPTION_KEY is a valid 64-character hex string.' },
         { status: 500 }
       )
     }
 
-    // Upsert — overwrite any existing (possibly corrupted) config
-    const { data: existing } = await supabase
-      .from('whatsapp_config')
-      .select('id')
-      .eq('user_id', user.id)
-      .maybeSingle()
-
-    if (existing) {
-      const { error: updateError } = await supabase
-        .from('whatsapp_config')
-        .update({
-          phone_number_id,
-          waba_id: waba_id || null,
-          access_token: encryptedAccessToken,
-          verify_token: encryptedVerifyToken,
-          status: 'connected',
-          connected_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('user_id', user.id)
-
-      if (updateError) {
-        console.error('Error updating whatsapp_config:', updateError)
-        return NextResponse.json(
-          { error: 'Failed to update configuration' },
-          { status: 500 }
-        )
-      }
-    } else {
-      const { error: insertError } = await supabase
-        .from('whatsapp_config')
-        .insert({
-          user_id: user.id,
-          phone_number_id,
-          waba_id: waba_id || null,
-          access_token: encryptedAccessToken,
-          verify_token: encryptedVerifyToken,
-          status: 'connected',
-          connected_at: new Date().toISOString(),
-        })
-
-      if (insertError) {
-        console.error('Error inserting whatsapp_config:', insertError)
-        return NextResponse.json(
-          { error: 'Failed to save configuration' },
-          { status: 500 }
-        )
-      }
-    }
+    // Upsert via Prisma
+    await prisma.whatsappConfig.upsert({
+      where: { tenantId },
+      create: {
+        tenantId,
+        userId: payload.userId,
+        phoneNumberId: phone_number_id,
+        wabaId: waba_id || null,
+        accessToken: encryptedAccessToken,
+        verifyToken: encryptedVerifyToken,
+        metaAppSecret: encryptedMetaAppSecret,
+        status: 'connected',
+        connectedAt: new Date(),
+      },
+      update: {
+        phoneNumberId: phone_number_id,
+        wabaId: waba_id || null,
+        accessToken: encryptedAccessToken,
+        verifyToken: encryptedVerifyToken !== undefined ? encryptedVerifyToken : undefined,
+        metaAppSecret: encryptedMetaAppSecret !== undefined ? encryptedMetaAppSecret : undefined,
+        status: 'connected',
+        connectedAt: new Date(),
+      },
+    })
 
     return NextResponse.json({ success: true, phone_info: phoneInfo })
   } catch (error) {
@@ -222,37 +226,85 @@ export async function POST(request: Request) {
 }
 
 /**
- * DELETE /api/whatsapp/config
- *
- * Removes the authenticated user's WhatsApp configuration row.
- * Used by the "Reset Configuration" button to recover from a corrupted
- * encrypted token (mismatched ENCRYPTION_KEY across environments).
+ * GET /api/whatsapp/config/data  — alias handled here via query param ?action=data
+ * Returns the saved config row (safe fields) without hitting Meta API.
  */
-export async function DELETE() {
+export async function PUT(request: NextRequest) {
+  // We repurpose PUT as a "read config row" endpoint for the frontend form.
   try {
-    const supabase = await createClient()
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
+    const payload = await getAuthUser()
+    if (!payload) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { error: deleteError } = await supabase
-      .from('whatsapp_config')
-      .delete()
-      .eq('user_id', user.id)
-
-    if (deleteError) {
-      console.error('Error deleting whatsapp_config:', deleteError)
-      return NextResponse.json(
-        { error: 'Failed to delete configuration' },
-        { status: 500 }
-      )
+    const profile = await prisma.profile.findUnique({ where: { userId: payload.userId } })
+    if (!profile?.tenantId) {
+      return NextResponse.json({ error: 'Tenant context not found' }, { status: 403 })
     }
+
+    const config = await prisma.whatsappConfig.findUnique({
+      where: { tenantId: profile.tenantId },
+      select: {
+        id: true,
+        phoneNumberId: true,
+        wabaId: true,
+        accessToken: true,  // encrypted – frontend will mask it
+        verifyToken: true,
+        metaAppSecret: true,
+        status: true,
+        connectedAt: true,
+      },
+    })
+
+    if (!config) return NextResponse.json({ data: null })
+
+    let decryptedVerifyToken: string | null = null
+    if (config.verifyToken) {
+      try {
+        decryptedVerifyToken = decrypt(config.verifyToken)
+      } catch (err) {
+        console.error('Failed to decrypt verifyToken:', err)
+      }
+    }
+
+    return NextResponse.json({
+      data: {
+        id: config.id,
+        phone_number_id: config.phoneNumberId,
+        waba_id: config.wabaId,
+        access_token: config.accessToken ? MASKED_TOKEN : '',   // Mask it
+        verify_token: decryptedVerifyToken || '',
+        meta_app_secret: config.metaAppSecret ? MASKED_TOKEN : '', // Mask it
+        status: config.status,
+        connected_at: config.connectedAt,
+      },
+    })
+  } catch (error) {
+    console.error('Error in WhatsApp config PUT (read):', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+/**
+ * DELETE /api/whatsapp/config
+ *
+ * Removes the authenticated user's WhatsApp configuration row.
+ */
+export async function DELETE(_req: NextRequest) {
+  try {
+    const payload = await getAuthUser()
+    if (!payload) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const profile = await prisma.profile.findUnique({ where: { userId: payload.userId } })
+    if (!profile?.tenantId) {
+      return NextResponse.json({ error: 'Tenant context not found' }, { status: 403 })
+    }
+
+    await prisma.whatsappConfig.deleteMany({
+      where: { tenantId: profile.tenantId },
+    })
 
     return NextResponse.json({ success: true })
   } catch (error) {

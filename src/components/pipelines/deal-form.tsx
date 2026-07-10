@@ -2,14 +2,12 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
 import type {
   Contact,
   Conversation,
   Deal,
   DealStatus,
   PipelineStage,
-  Profile,
 } from "@/types";
 import {
   Sheet,
@@ -50,19 +48,15 @@ export function DealForm({
   defaultStageId,
   onSaved,
 }: DealFormProps) {
-  const supabase = createClient();
-
   const [title, setTitle] = useState("");
   const [value, setValue] = useState("");
   const [currency, setCurrency] = useState("USD");
   const [contactId, setContactId] = useState("");
   const [stageId, setStageId] = useState("");
-  const [assignedTo, setAssignedTo] = useState("");
   const [expectedCloseDate, setExpectedCloseDate] = useState("");
   const [notes, setNotes] = useState("");
 
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [linkedConversation, setLinkedConversation] =
     useState<Conversation | null>(null);
 
@@ -71,9 +65,6 @@ export function DealForm({
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  // Reset the form fields every time the sheet opens or its input
-  // props change. This is a legitimate prop-driven sync; the rule is
-  // over-cautious here, hence the block-level disable.
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!open) return;
@@ -82,11 +73,8 @@ export function DealForm({
       setTitle(deal.title);
       setValue(String(deal.value ?? ""));
       setCurrency(deal.currency || "USD");
-      // contact_id is nullable when the contact has been deleted
-      // (migration 004: ON DELETE SET NULL). "" means "no selection".
       setContactId(deal.contact_id ?? "");
       setStageId(deal.stage_id);
-      setAssignedTo(deal.assigned_to ?? "");
       setExpectedCloseDate(deal.expected_close_date ?? "");
       setNotes(deal.notes ?? "");
     } else {
@@ -95,34 +83,42 @@ export function DealForm({
       setCurrency("USD");
       setContactId("");
       setStageId(defaultStageId || stages[0]?.id || "");
-      setAssignedTo("");
       setExpectedCloseDate("");
       setNotes("");
     }
   }, [open, deal, defaultStageId, stages]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // Load supporting data once the sheet is open
+  // Load contacts once the sheet is open (via compat client which handles auth)
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
     (async () => {
-      const [c, p] = await Promise.all([
-        supabase.from("contacts").select("*").order("name"),
-        supabase.from("profiles").select("*").order("full_name"),
-      ]);
-      if (cancelled) return;
-      setContacts((c.data ?? []) as Contact[]);
-      setProfiles((p.data ?? []) as Profile[]);
+      try {
+        const res = await fetch("/api/supabase-compat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            table: "contacts",
+            method: "select",
+            filters: [],
+            order: { field: "name", ascending: true },
+          }),
+        });
+        if (!cancelled && res.ok) {
+          const data = await res.json();
+          setContacts((data.data ?? []) as Contact[]);
+        }
+      } catch {
+        // silently fail — contacts list will be empty
+      }
     })();
     return () => {
       cancelled = true;
     };
-  }, [open, supabase]);
+  }, [open]);
 
-  // Fetch linked conversation for the selected contact (newest open one).
-  // Clearing on no-selection is sync with prop state; the populated
-  // case runs setLinkedConversation inside the async fetch callback.
+  // Fetch linked conversation for the selected contact (newest one).
   useEffect(() => {
     if (!open || !contactId) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -131,20 +127,33 @@ export function DealForm({
     }
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
-        .from("conversations")
-        .select("*")
-        .eq("contact_id", contactId)
-        .order("last_message_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (cancelled) return;
-      setLinkedConversation((data as Conversation | null) ?? null);
+      try {
+        const res = await fetch("/api/supabase-compat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            table: "conversations",
+            method: "select",
+            filters: [{ type: "eq", field: "contact_id", value: contactId }],
+            order: { field: "last_message_at", ascending: false },
+            limit: 1,
+            single: true,
+          }),
+        });
+        if (!cancelled && res.ok) {
+          const data = await res.json();
+          setLinkedConversation((data.data as Conversation | null) ?? null);
+        }
+      } catch {
+        // ignore
+      }
     })();
     return () => {
       cancelled = true;
     };
-  }, [open, contactId, supabase]);
+  }, [open, contactId]);
+
+  // ── Save / Create ──────────────────────────────────────────────────────
 
   async function handleSave() {
     if (!title.trim() || !contactId || !stageId) {
@@ -160,79 +169,94 @@ export function DealForm({
       contact_id: contactId,
       pipeline_id: pipelineId,
       stage_id: stageId,
-      assigned_to: assignedTo || null,
       notes: notes.trim() || null,
       expected_close_date: expectedCloseDate || null,
     };
 
-    if (deal) {
-      const { error } = await supabase
-        .from("deals")
-        .update(payload)
-        .eq("id", deal.id);
-      if (error) {
-        toast.error("Failed to save deal");
-        setSaving(false);
-        return;
+    try {
+      let res: Response;
+      if (deal) {
+        res = await fetch(`/api/deals/${deal.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        res = await fetch("/api/deals", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
       }
-    } else {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const user = session?.user;
-      if (!user) {
-        toast.error("Not signed in");
-        setSaving(false);
-        return;
-      }
-      const { error } = await supabase
-        .from("deals")
-        .insert({ ...payload, user_id: user.id, status: "open" });
-      if (error) {
-        toast.error("Failed to create deal");
-        setSaving(false);
-        return;
-      }
-    }
 
-    setSaving(false);
-    toast.success(deal ? "Deal updated" : "Deal created");
-    onOpenChange(false);
-    onSaved();
+      setSaving(false);
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || "Failed to save deal");
+        return;
+      }
+
+      toast.success(deal ? "Deal updated" : "Deal created");
+      onOpenChange(false);
+      onSaved();
+    } catch {
+      setSaving(false);
+      toast.error("Failed to save deal");
+    }
   }
+
+  // ── Status change ──────────────────────────────────────────────────────
 
   async function handleStatusChange(status: DealStatus) {
     if (!deal) return;
     setStatusAction(status);
-    const { error } = await supabase
-      .from("deals")
-      .update({ status })
-      .eq("id", deal.id);
-    setStatusAction(null);
-    if (error) {
+    try {
+      const res = await fetch(`/api/deals/${deal.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      setStatusAction(null);
+      if (!res.ok) {
+        toast.error("Failed to update deal status");
+        return;
+      }
+      toast.success(
+        status === "won"
+          ? "Marked as won"
+          : status === "lost"
+            ? "Marked as lost"
+            : "Deal reopened",
+      );
+      onOpenChange(false);
+      onSaved();
+    } catch {
+      setStatusAction(null);
       toast.error("Failed to update deal status");
-      return;
     }
-    toast.success(
-      status === "won" ? "Marked as won" : status === "lost" ? "Marked as lost" : "Deal reopened",
-    );
-    onOpenChange(false);
-    onSaved();
   }
+
+  // ── Delete ─────────────────────────────────────────────────────────────
 
   async function handleDelete() {
     if (!deal) return;
     setDeleting(true);
-    const { error } = await supabase.from("deals").delete().eq("id", deal.id);
-    setDeleting(false);
-    if (error) {
+    try {
+      const res = await fetch(`/api/deals/${deal.id}`, { method: "DELETE" });
+      setDeleting(false);
+      if (!res.ok) {
+        toast.error("Failed to delete deal");
+        return;
+      }
+      toast.success("Deal deleted");
+      setConfirmDelete(false);
+      onOpenChange(false);
+      onSaved();
+    } catch {
+      setDeleting(false);
       toast.error("Failed to delete deal");
-      return;
     }
-    toast.success("Deal deleted");
-    setConfirmDelete(false);
-    onOpenChange(false);
-    onSaved();
   }
 
   return (
@@ -309,6 +333,8 @@ export function DealForm({
                   <option value="USD">USD</option>
                   <option value="EUR">EUR</option>
                   <option value="GBP">GBP</option>
+                  <option value="INR">INR</option>
+                  <option value="AED">AED</option>
                 </select>
               </div>
             </div>
@@ -333,22 +359,6 @@ export function DealForm({
                 {stages.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid gap-2">
-              <Label className="text-slate-300">Assigned To</Label>
-              <select
-                value={assignedTo}
-                onChange={(e) => setAssignedTo(e.target.value)}
-                className="h-9 w-full rounded-lg border border-slate-700 bg-slate-800 px-2.5 text-sm text-white outline-none focus:border-primary"
-              >
-                <option value="">Unassigned</option>
-                {profiles.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.full_name || p.email}
                   </option>
                 ))}
               </select>
@@ -401,11 +411,11 @@ export function DealForm({
                     )}
                   </Button>
                 </div>
-                {deal.status && deal.status !== "open" && (
+                {deal.status && deal.status !== "open" && deal.status !== "active" && (
                   <Button
                     type="button"
                     variant="ghost"
-                    onClick={() => handleStatusChange("open")}
+                    onClick={() => handleStatusChange("active" as DealStatus)}
                     disabled={!!statusAction}
                     className="w-full text-slate-400 hover:text-white"
                   >

@@ -28,7 +28,7 @@ export default function HealthcareDashboard() {
     completedAppointments: 0,
     totalLogs: 0,
     aiEnabled: false,
-    clinicName: "No Clinic Set Up",
+    clinicName: "No Business Set Up",
   });
   const [appointments, setAppointments] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
@@ -86,8 +86,8 @@ export default function HealthcareDashboard() {
           .limit(5);
 
         const total = appts?.length || 0;
-        const scheduled = appts?.filter((a) => a.status === "scheduled").length || 0;
-        const completed = appts?.filter((a) => a.status === "completed").length || 0;
+        const scheduled = appts?.filter((a: any) => a.status === "scheduled").length || 0;
+        const completed = appts?.filter((a: any) => a.status === "completed").length || 0;
 
         setStats({
           totalAppointments: total,
@@ -115,7 +115,7 @@ export default function HealthcareDashboard() {
       <div className="flex h-[60vh] items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          <p className="text-sm text-slate-400">Loading healthcare automation dashboard...</p>
+          <p className="text-sm text-slate-400">Loading AI booking & automation dashboard...</p>
         </div>
       </div>
     );
@@ -128,10 +128,10 @@ export default function HealthcareDashboard() {
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-white flex items-center gap-3">
             <Activity className="h-8 w-8 text-primary animate-pulse" />
-            AI Healthcare Dashboard
+            AI Booking & Automation Dashboard
           </h1>
           <p className="text-slate-400 text-sm mt-1">
-            Overview of AI scheduling automation, patient interactions, and bookings for <span className="text-primary font-medium">{stats.clinicName}</span>.
+            Overview of AI scheduling automation, client interactions, and bookings for <span className="text-primary font-medium">{stats.clinicName}</span>.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -180,7 +180,7 @@ export default function HealthcareDashboard() {
             </div>
             <div className="mt-4">
               <span className="text-3xl font-bold text-white">{stats.scheduledAppointments}</span>
-              <span className="block text-xs text-slate-500 mt-1">Awaiting consultations</span>
+              <span className="block text-xs text-slate-500 mt-1">Awaiting sessions</span>
             </div>
           </CardContent>
         </Card>
@@ -195,7 +195,7 @@ export default function HealthcareDashboard() {
             </div>
             <div className="mt-4">
               <span className="text-3xl font-bold text-white">{stats.completedAppointments}</span>
-              <span className="block text-xs text-slate-500 mt-1">Fulfilled patient visits</span>
+              <span className="block text-xs text-slate-500 mt-1">Fulfilled client bookings</span>
             </div>
           </CardContent>
         </Card>
@@ -223,29 +223,29 @@ export default function HealthcareDashboard() {
           <CardHeader className="flex flex-row items-center justify-between border-b border-slate-800 pb-4">
             <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
               <Calendar className="h-5 w-5 text-primary" />
-              Upcoming Appointments
+              Upcoming Bookings
             </CardTitle>
             <Link
               href="/healthcare/doctors"
               className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "text-slate-400 hover:text-white")}
             >
-              Manage Doctors
+              Manage Staff & AI Agents
             </Link>
           </CardHeader>
           <CardContent className="p-6">
             {appointments.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <Calendar className="h-10 w-10 text-slate-600 mb-3" />
-                <p className="text-sm text-slate-400">No upcoming appointments scheduled yet.</p>
-                <p className="text-xs text-slate-600 mt-1">AI automatically books appointments when patients query via WhatsApp.</p>
+                <p className="text-sm text-slate-400">No upcoming bookings scheduled yet.</p>
+                <p className="text-xs text-slate-600 mt-1">AI automatically creates bookings when clients query via WhatsApp.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="border-b border-slate-800 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                      <th className="pb-3 font-medium">Patient</th>
-                      <th className="pb-3 font-medium">Doctor</th>
+                      <th className="pb-3 font-medium">Client</th>
+                      <th className="pb-3 font-medium">Assigned Staff / Agent</th>
                       <th className="pb-3 font-medium">Date & Time</th>
                       <th className="pb-3 font-medium">Status</th>
                     </tr>
@@ -255,14 +255,14 @@ export default function HealthcareDashboard() {
                       <tr key={appt.id} className="hover:bg-slate-800/20 transition-colors">
                         <td className="py-4">
                           <div className="font-medium text-white">
-                            {appt.contacts?.name || "Unknown Patient"}
+                            {appt.contacts?.name || "Unknown Client"}
                           </div>
                           <div className="text-xs text-slate-500">
                             {appt.contacts?.phone || ""}
                           </div>
                         </td>
                         <td className="py-4 text-slate-300">
-                          {appt.doctors ? `Dr. ${appt.doctors.doctor_name}` : "General Clinic"}
+                          {appt.doctors ? appt.doctors.doctor_name : "General Support"}
                         </td>
                         <td className="py-4 text-slate-300">
                           <div>{appt.appointment_date}</div>
@@ -318,7 +318,7 @@ export default function HealthcareDashboard() {
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
                         <User className="h-3 w-3 text-slate-500" />
-                        {log.contacts?.name || "Patient"}
+                        {log.contacts?.name || "Client"}
                       </span>
                       <Badge className="bg-teal-500/10 text-teal-400 border border-teal-500/20 text-[9px] font-semibold uppercase tracking-wider">
                         {log.detected_intent}

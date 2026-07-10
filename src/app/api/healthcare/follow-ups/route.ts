@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { prisma } from '@/lib/prisma'
 import { sendTextMessage } from '@/lib/whatsapp/meta-api'
 import { decrypt } from '@/lib/whatsapp/encryption'
 import { sanitizePhoneForMeta } from '@/lib/whatsapp/phone-utils'
@@ -17,13 +17,6 @@ import { sanitizePhoneForMeta } from '@/lib/whatsapp/phone-utils'
  *
  * This endpoint drastically reduces manual follow-up work for clinics.
  */
-
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
 
 function formatDocName(name: string): string {
   if (!name) return ''
@@ -44,55 +37,94 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const db = getSupabaseAdmin()
   const now = new Date()
   const nowIso = now.toISOString()
 
   // ─── 1. Post-Visit Feedback (24h after appointment completed) ──────────────
   // Find appointments completed in the last 20-28 hours that haven't
   // received a feedback request yet.
-  const feedbackWindowStart = new Date(now.getTime() - 28 * 60 * 60 * 1000).toISOString()
-  const feedbackWindowEnd = new Date(now.getTime() - 20 * 60 * 60 * 1000).toISOString()
+  const feedbackWindowStart = new Date(now.getTime() - 28 * 60 * 60 * 1000)
+  const feedbackWindowEnd = new Date(now.getTime() - 20 * 60 * 60 * 1000)
 
-  const { data: completedAppts } = await db
-    .from('appointments')
-    .select(`
-      id,
-      appointment_date,
-      appointment_time,
-      clinic_id,
-      contact_id,
-      feedback_sent,
-      contacts ( id, name, phone ),
-      doctors ( doctor_name, specialization ),
-      clinics ( user_id, clinic_name )
-    `)
-    .eq('status', 'completed')
-    .or('feedback_sent.is.null,feedback_sent.eq.false')
-    .gte('updated_at', feedbackWindowStart)
-    .lte('updated_at', feedbackWindowEnd)
+  const rawCompletedAppts = await prisma.appointment.findMany({
+    where: {
+      status: 'completed',
+      feedbackSent: false,
+      updatedAt: {
+        gte: feedbackWindowStart,
+        lte: feedbackWindowEnd,
+      }
+    },
+    include: {
+      contact: true,
+      doctor: true,
+      clinic: true
+    }
+  })
+
+  const completedAppts = rawCompletedAppts.map(appt => ({
+    id: appt.id,
+    appointment_date: appt.appointmentDate,
+    appointment_time: appt.appointmentTime,
+    clinic_id: appt.clinicId,
+    contact_id: appt.contactId,
+    feedback_sent: appt.feedbackSent,
+    contacts: appt.contact ? {
+      id: appt.contact.id,
+      name: appt.contact.name,
+      phone: appt.contact.phone
+    } : null,
+    doctors: appt.doctor ? {
+      doctor_name: appt.doctor.doctorName,
+      specialization: appt.doctor.specialization
+    } : null,
+    clinics: appt.clinic ? {
+      user_id: appt.clinic.userId,
+      clinic_name: appt.clinic.clinicName
+    } : null
+  }))
 
   // ─── 2. Follow-up Reminder (7 days after completed visit) ──────────────────
-  const followUpWindowStart = new Date(now.getTime() - 8 * 24 * 60 * 60 * 1000).toISOString()
-  const followUpWindowEnd = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000).toISOString()
+  const followUpWindowStart = new Date(now.getTime() - 8 * 24 * 60 * 60 * 1000)
+  const followUpWindowEnd = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000)
 
-  const { data: followUpAppts } = await db
-    .from('appointments')
-    .select(`
-      id,
-      appointment_date,
-      appointment_time,
-      clinic_id,
-      contact_id,
-      followup_sent,
-      contacts ( id, name, phone ),
-      doctors ( doctor_name, specialization ),
-      clinics ( user_id, clinic_name )
-    `)
-    .eq('status', 'completed')
-    .or('followup_sent.is.null,followup_sent.eq.false')
-    .gte('updated_at', followUpWindowStart)
-    .lte('updated_at', followUpWindowEnd)
+  const rawFollowUpAppts = await prisma.appointment.findMany({
+    where: {
+      status: 'completed',
+      followupSent: false,
+      updatedAt: {
+        gte: followUpWindowStart,
+        lte: followUpWindowEnd,
+      }
+    },
+    include: {
+      contact: true,
+      doctor: true,
+      clinic: true
+    }
+  })
+
+  const followUpAppts = rawFollowUpAppts.map(appt => ({
+    id: appt.id,
+    appointment_date: appt.appointmentDate,
+    appointment_time: appt.appointmentTime,
+    clinic_id: appt.clinicId,
+    contact_id: appt.contactId,
+    followup_sent: appt.followupSent,
+    contacts: appt.contact ? {
+      id: appt.contact.id,
+      name: appt.contact.name,
+      phone: appt.contact.phone
+    } : null,
+    doctors: appt.doctor ? {
+      doctor_name: appt.doctor.doctorName,
+      specialization: appt.doctor.specialization
+    } : null,
+    clinics: appt.clinic ? {
+      user_id: appt.clinic.userId,
+      clinic_name: appt.clinic.clinicName
+    } : null
+  }))
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const configCache: Record<string, any> = {}
@@ -100,12 +132,26 @@ export async function POST(request: Request) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async function getWhatsAppConfig(userId: string): Promise<any | null> {
     if (configCache[userId] !== undefined) return configCache[userId]
-    const { data: config } = await db
-      .from('whatsapp_config')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle()
-    configCache[userId] = config ?? null
+    const config = await prisma.whatsappConfig.findFirst({
+      where: { userId }
+    })
+    if (config) {
+      configCache[userId] = {
+        id: config.id,
+        tenant_id: config.tenantId,
+        user_id: config.userId,
+        phone_number_id: config.phoneNumberId,
+        waba_id: config.wabaId,
+        access_token: config.accessToken,
+        verify_token: config.verifyToken,
+        status: config.status,
+        connected_at: config.connectedAt,
+        created_at: config.createdAt,
+        updated_at: config.updatedAt
+      }
+    } else {
+      configCache[userId] = null
+    }
     return configCache[userId]
   }
 
@@ -153,28 +199,31 @@ export async function POST(request: Request) {
         }
       }
 
-      await db
-        .from('appointments')
-        .update({ feedback_sent: true })
-        .eq('id', appt.id)
+      await prisma.appointment.update({
+        where: { id: appt.id },
+        data: { feedbackSent: true }
+      })
 
       // Save to conversation
-      const { data: conv } = await db
-        .from('conversations')
-        .select('id')
-        .eq('user_id', clinic.user_id)
-        .eq('contact_id', appt.contact_id)
-        .maybeSingle()
+      const conv = await prisma.conversation.findFirst({
+        where: {
+          userId: clinic.user_id,
+          contactId: appt.contact_id
+        },
+        select: { id: true }
+      })
 
       if (conv) {
-        await db.from('messages').insert({
-          conversation_id: conv.id,
-          sender_type: 'bot',
-          content_type: 'text',
-          content_text: feedbackMsg,
-          message_id: `feedback-${appt.id}-${Date.now()}`,
-          status: 'sent',
-          created_at: nowIso,
+        await prisma.message.create({
+          data: {
+            conversationId: conv.id,
+            senderType: 'bot',
+            contentType: 'text',
+            contentText: feedbackMsg,
+            messageId: `feedback-${appt.id}-${Date.now()}`,
+            status: 'sent',
+            createdAt: now
+          }
         })
       }
 
@@ -225,28 +274,31 @@ export async function POST(request: Request) {
         }
       }
 
-      await db
-        .from('appointments')
-        .update({ followup_sent: true })
-        .eq('id', appt.id)
+      await prisma.appointment.update({
+        where: { id: appt.id },
+        data: { followupSent: true }
+      })
 
       // Save to conversation
-      const { data: conv } = await db
-        .from('conversations')
-        .select('id')
-        .eq('user_id', clinic.user_id)
-        .eq('contact_id', appt.contact_id)
-        .maybeSingle()
+      const conv = await prisma.conversation.findFirst({
+        where: {
+          userId: clinic.user_id,
+          contactId: appt.contact_id
+        },
+        select: { id: true }
+      })
 
       if (conv) {
-        await db.from('messages').insert({
-          conversation_id: conv.id,
-          sender_type: 'bot',
-          content_type: 'text',
-          content_text: followUpMsg,
-          message_id: `followup-${appt.id}-${Date.now()}`,
-          status: 'sent',
-          created_at: nowIso,
+        await prisma.message.create({
+          data: {
+            conversationId: conv.id,
+            senderType: 'bot',
+            contentType: 'text',
+            contentText: followUpMsg,
+            messageId: `followup-${appt.id}-${Date.now()}`,
+            status: 'sent',
+            createdAt: now
+          }
         })
       }
 

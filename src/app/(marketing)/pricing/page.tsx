@@ -12,11 +12,11 @@ export default function PricingPage() {
     {
       name: "Starter",
       tagline: "Full control. You run it.",
-      price: "₹2,999",
+      price: "₹799",
       subtext: "/WABA/month",
       setupFee: "No setup fee",
       ctaText: "Get Started",
-      ctaLink: "/login",
+      ctaLink: "/signup",
       ctaType: "link",
       popular: false,
       footerText: "Access provisioned within 24 hours of payment."
@@ -24,11 +24,12 @@ export default function PricingPage() {
     {
       name: "Growth",
       tagline: "We launch you. You own it.",
-      price: "₹9,999",
+      price: "₹1,499",
       subtext: "for first month",
-      setupFee: "₹2,999 /WABA/month after",
-      ctaText: "Book a Call",
-      ctaType: "trigger",
+      setupFee: "₹799 /WABA/month after",
+      ctaText: "Get Started",
+      ctaLink: "/signup",
+      ctaType: "link",
       popular: true,
       badge: "Recommended • Done For You",
       footerText: "Onboarding begins within 48 hours. Setup complete within 7 days."
@@ -36,11 +37,12 @@ export default function PricingPage() {
     {
       name: "Managed",
       tagline: "We run it. You check results.",
-      price: "₹29,999",
+      price: "₹2,999",
       subtext: "for first month",
-      setupFee: "₹2,999 /WABA/month after",
-      ctaText: "Book a Call",
-      ctaType: "trigger",
+      setupFee: "₹799 /WABA/month after",
+      ctaText: "Get Started",
+      ctaLink: "/signup",
+      ctaType: "link",
       popular: false,
       badge: "Done For You",
       footerText: "Application required. Pilot month available — ask us."
@@ -112,7 +114,7 @@ export default function PricingPage() {
           </span>
         </h1>
         <p className="text-sm text-[var(--m-text-tertiary)] max-w-xl mx-auto">
-          After setup, every plan is ₹2,999/WABA/month — flat. The difference is how much help you get on day one. You choose your level of support.
+          After setup, every plan is ₹799/WABA/month — flat. The difference is how much help you get on day one. You choose your level of support.
         </p>
       </div>
 

@@ -221,7 +221,7 @@ export default function DoctorsManagement() {
       <div className="flex h-[60vh] items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          <p className="text-sm text-slate-400">Loading doctor profiles...</p>
+          <p className="text-sm text-slate-400">Loading agent & staff profiles...</p>
         </div>
       </div>
     );
@@ -232,9 +232,9 @@ export default function DoctorsManagement() {
       <Card className="border-slate-800 bg-slate-900/60 max-w-lg mx-auto mt-12 text-center p-6">
         <CardHeader className="flex flex-col items-center justify-center">
           <AlertCircle className="h-12 w-12 text-amber-500 mb-4 animate-bounce" />
-          <CardTitle className="text-white">Clinic Onboarding Required</CardTitle>
+          <CardTitle className="text-white">Business Onboarding Required</CardTitle>
           <CardDescription className="text-slate-400 mt-2">
-            You must set up your clinic information before managing doctor directories.
+            You must set up your business information before managing staff & AI agents.
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-2">
@@ -242,7 +242,7 @@ export default function DoctorsManagement() {
             href="/healthcare/setup"
             className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
           >
-            Launch Clinic Setup Wizard
+            Launch Business Setup Wizard
           </Link>
         </CardContent>
       </Card>
@@ -256,14 +256,14 @@ export default function DoctorsManagement() {
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-white flex items-center gap-3">
             <UserRound className="h-8 w-8 text-primary" />
-            Manage Doctors
+            AI Agents & Staff
           </h1>
           <p className="text-slate-400 text-sm mt-1">
-            Add, update, or remove practitioners registered with the clinic.
+            Add, update, or remove staff and AI agents registered with the business.
           </p>
         </div>
         <Button onClick={handleOpenAdd} className="bg-primary text-primary-foreground hover:bg-primary/95">
-          <Plus className="h-4 w-4 mr-1.5" /> Add Doctor
+          <Plus className="h-4 w-4 mr-1.5" /> Add Staff / Agent
         </Button>
       </div>
 
@@ -274,12 +274,12 @@ export default function DoctorsManagement() {
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search doctors by name or specialty..."
+            placeholder="Search staff or agents by name or role..."
             className="pl-9 bg-slate-900 border-slate-800 text-white"
           />
         </div>
         <div className="text-xs text-slate-500 font-medium">
-          Showing {filteredDoctors.length} of {doctors.length} doctors
+          Showing {filteredDoctors.length} of {doctors.length} staff & agents
         </div>
       </div>
 
@@ -288,9 +288,9 @@ export default function DoctorsManagement() {
         {filteredDoctors.length === 0 ? (
           <div className="col-span-full bg-slate-900/40 border border-slate-800 rounded-xl p-12 text-center">
             <UserRound className="h-12 w-12 text-slate-700 mx-auto mb-3" />
-            <p className="text-slate-400 text-sm">No doctors found matching your query.</p>
+            <p className="text-slate-400 text-sm">No staff or agents found matching your query.</p>
             <Button onClick={handleOpenAdd} variant="outline" className="mt-4 border-slate-800 text-slate-300 hover:bg-slate-800">
-              Register First Doctor
+              Register First Staff / Agent
             </Button>
           </div>
         ) : (
@@ -310,9 +310,9 @@ export default function DoctorsManagement() {
                     </div>
                   )}
                   <div className="space-y-1">
-                    <CardTitle className="text-base text-white font-bold">Dr. {doc.doctor_name}</CardTitle>
+                    <CardTitle className="text-base text-white font-bold">{doc.doctor_name}</CardTitle>
                     <span className="inline-block text-xs font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                      {doc.specialization || "General Medicine"}
+                      {doc.specialization || "General Support"}
                     </span>
                   </div>
                 </div>
@@ -351,7 +351,7 @@ export default function DoctorsManagement() {
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500 flex items-center gap-1">
                       <span className="text-slate-600 font-semibold">₹</span>
-                      Consultation Fee:
+                      Session Fee:
                     </span>
                     <span className="text-emerald-400 font-bold">₹{doc.consultation_fee || 0}</span>
                   </div>
@@ -377,10 +377,10 @@ export default function DoctorsManagement() {
           <form onSubmit={handleSave} className="space-y-4">
             <DialogHeader>
               <DialogTitle className="text-white text-xl">
-                {editingDoc ? `Edit Doctor — Dr. ${editingDoc.doctor_name}` : "Register New Doctor"}
+                {editingDoc ? `Edit Profile — ${editingDoc.doctor_name}` : "Register New Staff / Agent"}
               </DialogTitle>
               <DialogDescription className="text-slate-400">
-                Provide credentials, active schedule hours, and consultation pricing.
+                Provide credentials, active schedule hours, and consultation / session pricing.
               </DialogDescription>
             </DialogHeader>            {/* Dialog Tab Navigation */}
             <div className="flex gap-4 border-b border-slate-800 pb-2 text-xs font-semibold">
@@ -423,33 +423,33 @@ export default function DoctorsManagement() {
             {dialogTab === "profile" && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
                 <div className="space-y-1">
-                  <Label htmlFor="doctor_name" className="text-xs text-slate-400">Doctor Name *</Label>
+                  <Label htmlFor="doctor_name" className="text-xs text-slate-400">Staff / Agent Name *</Label>
                   <Input
                     id="doctor_name"
                     value={form.doctor_name}
                     onChange={(e) => setForm({ ...form, doctor_name: e.target.value })}
                     className="bg-slate-950 border-slate-800 text-white"
-                    placeholder="E.g. Patil"
+                    placeholder="E.g. John Doe"
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="specialization" className="text-xs text-slate-400">Specialization</Label>
+                  <Label htmlFor="specialization" className="text-xs text-slate-400">Role / Specialty</Label>
                   <Input
                     id="specialization"
                     value={form.specialization}
                     onChange={(e) => setForm({ ...form, specialization: e.target.value })}
                     className="bg-slate-950 border-slate-800 text-white"
-                    placeholder="E.g. Dentist, General Surgeon"
+                    placeholder="E.g. Support, Sales, Marketing"
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="qualification" className="text-xs text-slate-400">Qualification</Label>
+                  <Label htmlFor="qualification" className="text-xs text-slate-400">Skills / Qualifications</Label>
                   <Input
                     id="qualification"
                     value={form.qualification}
                     onChange={(e) => setForm({ ...form, qualification: e.target.value })}
                     className="bg-slate-950 border-slate-800 text-white"
-                    placeholder="E.g. BDS, MDS"
+                    placeholder="E.g. Lead Gen, Support, CRM Expert"
                   />
                 </div>
                 <div className="space-y-1">
@@ -459,11 +459,11 @@ export default function DoctorsManagement() {
                     value={form.experience}
                     onChange={(e) => setForm({ ...form, experience: e.target.value })}
                     className="bg-slate-950 border-slate-800 text-white"
-                    placeholder="E.g. 8 Years"
+                    placeholder="E.g. 3 Years"
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="consultation_fee" className="text-xs text-slate-400">Consultation Fee (₹)</Label>
+                  <Label htmlFor="consultation_fee" className="text-xs text-slate-400">Session / Hourly Fee (₹)</Label>
                   <Input
                     id="consultation_fee"
                     type="number"

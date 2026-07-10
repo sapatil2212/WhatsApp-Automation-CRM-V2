@@ -16,7 +16,6 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { createClient } from "@/lib/supabase/client";
 import type { Pipeline, PipelineStage } from "@/types";
 import {
   Dialog,
@@ -68,8 +67,6 @@ export function PipelineSettings({
   onStagesChanged,
   onCreateNewPipeline,
 }: PipelineSettingsProps) {
-  const supabase = createClient();
-
   const [name, setName] = useState(pipeline.name);
   const [localStages, setLocalStages] = useState<PipelineStage[]>(stages);
   const [newStageName, setNewStageName] = useState("");
@@ -78,8 +75,6 @@ export function PipelineSettings({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  // Reset form state when the dialog opens or its prop inputs change
-  // — legitimate prop-driven sync.
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!open) return;
@@ -105,96 +100,113 @@ export function PipelineSettings({
   async function handleSave() {
     setSaving(true);
 
-    // One upsert for all stages — batches N stage writes into a single
-    // round-trip. Previous implementation did N sequential UPDATEs which
-    // latency-scaled linearly with stage count.
+    // Build the stages payload with updated positions
     const stageRows = localStages.map((s, i) => ({
       id: s.id,
-      pipeline_id: s.pipeline_id,
       name: s.name,
       color: s.color,
       position: i,
     }));
 
-    const [renameRes, stagesRes] = await Promise.all([
-      supabase
-        .from("pipelines")
-        .update({ name: name.trim() })
-        .eq("id", pipeline.id),
-      supabase.from("pipeline_stages").upsert(stageRows, { onConflict: "id" }),
-    ]);
+    try {
+      const [renameRes, stagesRes] = await Promise.all([
+        fetch(`/api/pipelines/${pipeline.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: name.trim() }),
+        }),
+        fetch(`/api/pipelines/${pipeline.id}/stages`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ stages: stageRows }),
+        }),
+      ]);
 
-    setSaving(false);
+      setSaving(false);
 
-    if (renameRes.error || stagesRes.error) {
+      if (!renameRes.ok || !stagesRes.ok) {
+        toast.error("Failed to save pipeline");
+        return;
+      }
+
+      onOpenChange(false);
+      onPipelinesChanged();
+      onStagesChanged();
+      toast.success("Pipeline saved");
+    } catch {
+      setSaving(false);
       toast.error("Failed to save pipeline");
-      return;
     }
-
-    onOpenChange(false);
-    onPipelinesChanged();
-    onStagesChanged();
-    toast.success("Pipeline saved");
   }
 
   async function handleAddStage() {
     const trimmed = newStageName.trim();
     if (!trimmed) return;
-    const { data, error } = await supabase
-      .from("pipeline_stages")
-      .insert({
-        pipeline_id: pipeline.id,
-        name: trimmed,
-        color: newStageColor,
-        position: localStages.length,
-      })
-      .select()
-      .single();
-    if (error || !data) {
+
+    try {
+      const res = await fetch(`/api/pipelines/${pipeline.id}/stages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed, color: newStageColor }),
+      });
+
+      if (!res.ok) {
+        toast.error("Failed to add stage");
+        return;
+      }
+
+      const { stage } = await res.json();
+      const newStage: PipelineStage = {
+        ...stage,
+        pipeline_id: stage.pipelineId ?? stage.pipeline_id,
+        created_at: stage.createdAt ?? stage.created_at,
+      };
+      setLocalStages([...localStages, newStage]);
+      setNewStageName("");
+      setNewStageColor(STAGE_COLORS[(localStages.length + 1) % STAGE_COLORS.length]);
+    } catch {
       toast.error("Failed to add stage");
-      return;
     }
-    setLocalStages([...localStages, data as PipelineStage]);
-    setNewStageName("");
-    setNewStageColor(STAGE_COLORS[(localStages.length + 1) % STAGE_COLORS.length]);
   }
 
   async function handleRemoveStage(stageId: string) {
-    // Refuse to delete if deals still reference the stage (FK would fail).
-    const { count } = await supabase
-      .from("deals")
-      .select("id", { count: "exact", head: true })
-      .eq("stage_id", stageId);
-    if (count && count > 0) {
-      toast.error("Move or delete deals in this stage first");
-      return;
-    }
-    const { error } = await supabase
-      .from("pipeline_stages")
-      .delete()
-      .eq("id", stageId);
-    if (error) {
+    try {
+      const res = await fetch(`/api/pipelines/stages/${stageId}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || "Failed to delete stage");
+        return;
+      }
+
+      setLocalStages(localStages.filter((s) => s.id !== stageId));
+    } catch {
       toast.error("Failed to delete stage");
-      return;
     }
-    setLocalStages(localStages.filter((s) => s.id !== stageId));
   }
 
   async function handleDeletePipeline() {
     setDeleting(true);
-    // ON DELETE CASCADE handles deals + stages.
-    const { error } = await supabase
-      .from("pipelines")
-      .delete()
-      .eq("id", pipeline.id);
-    setDeleting(false);
-    if (error) {
+    try {
+      const res = await fetch(`/api/pipelines/${pipeline.id}`, {
+        method: "DELETE",
+      });
+      setDeleting(false);
+
+      if (!res.ok) {
+        toast.error("Failed to delete pipeline");
+        return;
+      }
+
+      onOpenChange(false);
+      onPipelinesChanged();
+      toast.success("Pipeline deleted");
+    } catch {
+      setDeleting(false);
       toast.error("Failed to delete pipeline");
-      return;
     }
-    onOpenChange(false);
-    onPipelinesChanged();
-    toast.success("Pipeline deleted");
   }
 
   return (

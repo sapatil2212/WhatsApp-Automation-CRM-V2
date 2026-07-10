@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { createClient } from "@/lib/supabase/server";
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { prisma } from "@/lib/prisma";
+import { verifyAccessToken, rotateRefreshToken } from "@/lib/auth";
 
 async function isAuthorized(): Promise<boolean> {
-  // Check Supabase Auth
+  // Check Access Token Cookie
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) return true;
+    const cookieStore = await cookies();
+    const token = cookieStore.get("accessToken")?.value;
+    if (token) return true;
   } catch (err) {}
 
   // Check Super Admin Cookie
@@ -20,12 +20,60 @@ async function isAuthorized(): Promise<boolean> {
   }
 }
 
-function getDatabaseClient() {
-  // Use service role key to manage portfolio items directly
-  return createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+async function getAuthContext() {
+  try {
+    const cookieStore = await cookies()
+    let accessToken = cookieStore.get('accessToken')?.value
+    const refreshToken = cookieStore.get('refreshToken')?.value
+
+    let payload = accessToken ? verifyAccessToken(accessToken) : null
+
+    if (!payload && refreshToken) {
+      const rotation = await rotateRefreshToken(refreshToken)
+      if (rotation) {
+        payload = rotation.user
+      }
+    }
+
+    if (!payload) {
+      // Check if super admin is authenticated
+      const isAdmin = cookieStore.get("admin_session")?.value === "authenticated";
+      if (isAdmin) {
+        // Fallback or find first user/tenant
+        const firstUser = await prisma.user.findFirst({
+          include: { profile: true }
+        });
+        if (firstUser && firstUser.profile?.tenantId) {
+          return { userId: firstUser.id, tenantId: firstUser.profile.tenantId };
+        }
+      }
+      return null;
+    }
+
+    const profile = await prisma.profile.findUnique({
+      where: { userId: payload.userId }
+    })
+    if (!profile || !profile.tenantId) return null
+
+    return { userId: payload.userId, tenantId: profile.tenantId }
+  } catch (err) {
+    return null
+  }
+}
+
+function mapToSnakeCase(item: any) {
+  if (!item) return null;
+  return {
+    id: item.id,
+    title: item.title,
+    description: item.description,
+    thumbnail_url: item.thumbnailUrl,
+    metadata_tags: item.metadataTags || [],
+    project_links: item.projectLinks || {},
+    preview_media: item.previewMedia || [],
+    created_at: item.createdAt.toISOString(),
+    updated_at: item.updatedAt.toISOString(),
+  };
 }
 
 // GET /api/admin/portfolio - Get all showcase items
@@ -35,25 +83,12 @@ export async function GET() {
   }
 
   try {
-    const db = getDatabaseClient();
-    const { data, error } = await db
-      .from("portfolio_items")
-      .select("*")
-      .order("created_at", { ascending: false });
+    const data = await prisma.portfolioItem.findMany({
+      orderBy: { createdAt: "desc" }
+    });
 
-    if (error) {
-      // If table doesn't exist, we send a specific hint so frontend falls back to localStorage
-      if (error.code === "P0001" || error.message.includes("does not exist")) {
-        return NextResponse.json({
-          items: [],
-          db_fallback: true,
-          message: "portfolio_items table does not exist. Using local storage fallback."
-        });
-      }
-      throw error;
-    }
-
-    return NextResponse.json({ items: data ?? [], db_fallback: false });
+    const items = data.map(mapToSnakeCase);
+    return NextResponse.json({ items, db_fallback: false });
   } catch (error: any) {
     console.error("GET portfolio error:", error);
     return NextResponse.json({ error: error.message || "Failed to fetch items" }, { status: 500 });
@@ -62,7 +97,8 @@ export async function GET() {
 
 // POST /api/admin/portfolio - Create a new showcase item
 export async function POST(req: NextRequest) {
-  if (!(await isAuthorized())) {
+  const context = await getAuthContext()
+  if (!context) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -74,31 +110,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Title is required" }, { status: 400 });
     }
 
-    const db = getDatabaseClient();
-    const { data, error } = await db
-      .from("portfolio_items")
-      .insert({
+    const item = await prisma.portfolioItem.create({
+      data: {
         title,
         description: description || null,
-        thumbnail_url: thumbnail_url || null,
-        metadata_tags: metadata_tags || [],
-        project_links: project_links || {},
-        preview_media: preview_media || []
-      })
-      .select()
-      .single();
-
-    if (error) {
-      if (error.message.includes("does not exist")) {
-        return NextResponse.json({
-          db_fallback: true,
-          message: "portfolio_items table does not exist. Using local storage fallback."
-        });
+        thumbnailUrl: thumbnail_url || null,
+        metadataTags: metadata_tags || [],
+        projectLinks: project_links || {},
+        previewMedia: preview_media || [],
+        userId: context.userId,
+        tenantId: context.tenantId
       }
-      throw error;
-    }
+    });
 
-    return NextResponse.json({ item: data });
+    return NextResponse.json({ item: mapToSnakeCase(item) });
   } catch (error: any) {
     console.error("POST portfolio error:", error);
     return NextResponse.json({ error: error.message || "Failed to create item" }, { status: 500 });
@@ -119,33 +144,19 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "ID and Title are required" }, { status: 400 });
     }
 
-    const db = getDatabaseClient();
-    const { data, error } = await db
-      .from("portfolio_items")
-      .update({
+    const item = await prisma.portfolioItem.update({
+      where: { id },
+      data: {
         title,
         description: description || null,
-        thumbnail_url: thumbnail_url || null,
-        metadata_tags: metadata_tags || [],
-        project_links: project_links || {},
-        preview_media: preview_media || [],
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", id)
-      .select()
-      .single();
-
-    if (error) {
-      if (error.message.includes("does not exist")) {
-        return NextResponse.json({
-          db_fallback: true,
-          message: "portfolio_items table does not exist. Using local storage fallback."
-        });
+        thumbnailUrl: thumbnail_url || null,
+        metadataTags: metadata_tags || [],
+        projectLinks: project_links || {},
+        previewMedia: preview_media || []
       }
-      throw error;
-    }
+    });
 
-    return NextResponse.json({ item: data });
+    return NextResponse.json({ item: mapToSnakeCase(item) });
   } catch (error: any) {
     console.error("PUT portfolio error:", error);
     return NextResponse.json({ error: error.message || "Failed to update item" }, { status: 500 });
@@ -166,21 +177,9 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "ID parameter is required" }, { status: 400 });
     }
 
-    const db = getDatabaseClient();
-    const { error } = await db
-      .from("portfolio_items")
-      .delete()
-      .eq("id", id);
-
-    if (error) {
-      if (error.message.includes("does not exist")) {
-        return NextResponse.json({
-          db_fallback: true,
-          message: "portfolio_items table does not exist."
-        });
-      }
-      throw error;
-    }
+    await prisma.portfolioItem.delete({
+      where: { id }
+    });
 
     return NextResponse.json({ ok: true });
   } catch (error: any) {

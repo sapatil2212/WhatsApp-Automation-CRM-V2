@@ -30,8 +30,14 @@ interface MetaErrorResponse {
 async function throwMetaError(response: Response, fallback: string): Promise<never> {
   let message = fallback
   try {
-    const data = (await response.json()) as MetaErrorResponse
-    if (data.error?.message) message = data.error.message
+    const data = await response.json()
+    console.error('Raw Meta API Error payload:', JSON.stringify(data, null, 2))
+    if (data.error?.message) {
+      message = data.error.message
+      if (data.error.error_data) {
+        message += ` (Details: ${JSON.stringify(data.error.error_data)})`
+      }
+    }
   } catch {
     // response body wasn't JSON — keep the fallback
   }
@@ -184,6 +190,154 @@ export async function sendTemplateMessage(
   }
   const data = await response.json()
   return { messageId: data.messages[0].id }
+}
+
+// ============================================================
+// Message Templates — creation & approval workflow
+// ============================================================
+//
+// The Cloud API lets you submit a template for Meta's review directly
+// (POST /{waba-id}/message_templates). Meta then moves it through
+// PENDING → APPROVED / REJECTED. This is the "proper approval process"
+// — we submit, store the returned id + status, and the sync route
+// (or webhook) later reconciles the final verdict.
+//
+// Docs (read before editing):
+//   https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates
+
+/** Meta template categories (upper-snake as the Graph API expects). */
+export type MetaTemplateCategory = 'MARKETING' | 'UTILITY' | 'AUTHENTICATION'
+
+/**
+ * A single component of a template payload. Loosely typed on purpose —
+ * Meta accepts a wide, evolving shape (header/body/footer/buttons/carousel)
+ * and callers assemble it. We validate the important bits in the route.
+ */
+export interface MetaTemplateComponentInput {
+  type: 'HEADER' | 'BODY' | 'FOOTER' | 'BUTTONS'
+  format?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'LOCATION'
+  text?: string
+  example?: Record<string, unknown>
+  buttons?: MetaTemplateButtonInput[]
+}
+
+/**
+ * Button shapes Meta supports on templates. QUICK_REPLY drives webhook
+ * button_reply payloads; URL / PHONE_NUMBER are the call-to-action
+ * (CTA) buttons that open a link or dial a number. COPY_CODE is used by
+ * coupon/authentication templates.
+ */
+export interface MetaTemplateButtonInput {
+  type: 'QUICK_REPLY' | 'URL' | 'PHONE_NUMBER' | 'COPY_CODE'
+  text: string
+  /** Required for URL buttons. May contain a single {{1}} dynamic suffix. */
+  url?: string
+  /** Required for URL buttons that use a {{1}} variable — a sample value. */
+  example?: string[]
+  /** Required for PHONE_NUMBER buttons, in E.164 (e.g. +14155551234). */
+  phone_number?: string
+}
+
+/**
+ * Meta's hard limits for templates. Enforced before the network call so
+ * a bad template fails at submit time with a clear message rather than
+ * as an opaque 400 from Meta.
+ */
+export const TEMPLATE_LIMITS = {
+  nameMaxLength: 512,
+  bodyMaxLength: 1024,
+  footerMaxLength: 60,
+  headerTextMaxLength: 60,
+  buttonTextMaxLength: 25,
+  maxButtons: 10,
+  maxQuickReply: 10,
+  maxUrlButtons: 2,
+  maxPhoneButtons: 1,
+} as const
+
+export interface CreateMessageTemplateArgs {
+  wabaId: string
+  accessToken: string
+  name: string
+  language: string
+  category: MetaTemplateCategory
+  components: MetaTemplateComponentInput[]
+  /** Allow Meta to auto-assign a category if the chosen one mismatches. */
+  allowCategoryChange?: boolean
+}
+
+export interface CreateMessageTemplateResult {
+  id: string
+  status: string
+  category?: string
+}
+
+/**
+ * Submit a template to Meta for approval. Returns Meta's template id
+ * and initial status (usually PENDING, sometimes APPROVED for simple
+ * utility templates).
+ */
+export async function createMessageTemplate(
+  args: CreateMessageTemplateArgs,
+): Promise<CreateMessageTemplateResult> {
+  const {
+    wabaId,
+    accessToken,
+    name,
+    language,
+    category,
+    components,
+    allowCategoryChange = true,
+  } = args
+
+  const url = `${META_API_BASE}/${wabaId}/message_templates`
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      name,
+      language,
+      category,
+      allow_category_change: allowCategoryChange,
+      components,
+    }),
+  })
+  if (!response.ok) {
+    await throwMetaError(response, `Meta API error: ${response.status}`)
+  }
+  const data = await response.json()
+  return { id: data.id, status: data.status ?? 'PENDING', category: data.category }
+}
+
+export interface DeleteMessageTemplateArgs {
+  wabaId: string
+  accessToken: string
+  name: string
+  /** When set, deletes only the given language; otherwise all languages. */
+  templateId?: string
+}
+
+/**
+ * Delete a template from Meta by name (all languages) or by id+name for
+ * a specific language variant. Meta soft-deletes then purges.
+ */
+export async function deleteMessageTemplate(
+  args: DeleteMessageTemplateArgs,
+): Promise<void> {
+  const { wabaId, accessToken, name, templateId } = args
+  const params = new URLSearchParams({ name })
+  if (templateId) params.set('hsm_id', templateId)
+  const url = `${META_API_BASE}/${wabaId}/message_templates?${params.toString()}`
+  const response = await fetch(url, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  if (!response.ok) {
+    await throwMetaError(response, `Meta API error: ${response.status}`)
+  }
 }
 
 // ============================================================

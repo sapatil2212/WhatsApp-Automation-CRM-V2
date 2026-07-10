@@ -110,7 +110,7 @@ export function ContactDetailView({
 
     if (tagsRes.data) setAllTags(tagsRes.data);
     if (contactTagsRes.data) {
-      setContactTagIds(contactTagsRes.data.map((ct) => ct.tag_id));
+      setContactTagIds(contactTagsRes.data.map((ct: any) => ct.tag_id));
     }
   }, [contactId, supabase]);
 
@@ -143,7 +143,7 @@ export function ContactDetailView({
     if (fieldsRes.data) setCustomFields(fieldsRes.data);
     if (valuesRes.data) {
       const map: Record<string, string> = {};
-      valuesRes.data.forEach((v) => {
+      valuesRes.data.forEach((v: any) => {
         map[v.custom_field_id] = v.value ?? '';
       });
       setCustomValues(map);

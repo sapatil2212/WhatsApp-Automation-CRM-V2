@@ -1,30 +1,21 @@
-import { supabaseAdmin } from './admin-client'
-
-// ------------------------------------------------------------
-// Builder payload → flat rows for automation_steps.
-// Root steps arrive in order. A Condition step carries its children
-// under `branches: { yes: [...], no: [...] }`. We walk the tree and
-// assign stable UUIDs so parent_step_id references resolve in a
-// single INSERT.
-// ------------------------------------------------------------
+import { prisma } from '@/lib/prisma'
 
 export interface BuilderStepInput {
   id?: string
   step_type: string
   step_config: Record<string, unknown>
   branches?: { yes?: BuilderStepInput[]; no?: BuilderStepInput[] }
-  // Legacy flat form (from template seeds):
   branch?: 'yes' | 'no' | null
   parent_index?: number | null
 }
 
 interface InsertRow {
   id: string
-  automation_id: string
-  parent_step_id: string | null
-  branch: 'yes' | 'no' | null
-  step_type: string
-  step_config: Record<string, unknown>
+  automationId: string
+  parentStepId: string | null
+  branch: string | null
+  stepType: string
+  stepConfig: Record<string, any>
   position: number
 }
 
@@ -37,13 +28,14 @@ export async function replaceSteps(
   automationId: string,
   input: BuilderStepInput[],
 ): Promise<string | null> {
-  const admin = supabaseAdmin()
-  const { error: delErr } = await admin
-    .from('automation_steps')
-    .delete()
-    .eq('automation_id', automationId)
-  if (delErr) return delErr.message
-  return insertSteps(automationId, input)
+  try {
+    await prisma.automationStep.deleteMany({
+      where: { automationId }
+    })
+    return await insertSteps(automationId, input)
+  } catch (err: any) {
+    return err.message || 'Error replacing steps'
+  }
 }
 
 export async function insertSteps(
@@ -67,11 +59,11 @@ export async function insertSteps(
       const id = s.id ?? uid()
       rows.push({
         id,
-        automation_id: automationId,
-        parent_step_id: parentId,
+        automationId: automationId,
+        parentStepId: parentId,
         branch,
-        step_type: s.step_type,
-        step_config: s.step_config ?? {},
+        stepType: s.step_type,
+        stepConfig: s.step_config ?? {},
         position: idx,
       })
       if (s.step_type === 'condition' && s.branches) {
@@ -83,8 +75,15 @@ export async function insertSteps(
   walk(tree, null, null)
 
   if (rows.length === 0) return null
-  const { error } = await supabaseAdmin().from('automation_steps').insert(rows)
-  return error?.message ?? null
+  
+  try {
+    await prisma.automationStep.createMany({
+      data: rows
+    })
+    return null
+  } catch (err: any) {
+    return err.message || 'Error inserting steps'
+  }
 }
 
 function seedsToTree(seeds: BuilderStepInput[]): BuilderStepInput[] {
@@ -107,49 +106,32 @@ function seedsToTree(seeds: BuilderStepInput[]): BuilderStepInput[] {
   return roots
 }
 
-/**
- * Load the steps for an automation and rebuild the nested tree shape
- * the builder UI expects. One query, O(n) assembly.
- */
 export interface BuilderStepNode extends BuilderStepInput {
   id: string
   branches: { yes: BuilderStepNode[]; no: BuilderStepNode[] }
 }
 
-interface DbStep {
-  id: string
-  parent_step_id: string | null
-  branch: 'yes' | 'no' | null
-  step_type: string
-  step_config: Record<string, unknown>
-  position: number
-}
-
 export async function loadStepsTree(automationId: string): Promise<BuilderStepNode[]> {
-  const { data, error } = await supabaseAdmin()
-    .from('automation_steps')
-    .select('*')
-    .eq('automation_id', automationId)
-    .order('position', { ascending: true })
-
-  if (error) throw new Error(error.message)
-  const rows = (data ?? []) as DbStep[]
+  const data = await prisma.automationStep.findMany({
+    where: { automationId },
+    orderBy: { position: 'asc' }
+  })
 
   const byId = new Map<string, BuilderStepNode>()
-  for (const row of rows) {
+  for (const row of data) {
     byId.set(row.id, {
       id: row.id,
-      step_type: row.step_type,
-      step_config: row.step_config ?? {},
+      step_type: row.stepType,
+      step_config: (row.stepConfig as Record<string, any>) ?? {},
       branches: { yes: [], no: [] },
     })
   }
 
   const roots: BuilderStepNode[] = []
-  for (const row of rows) {
+  for (const row of data) {
     const node = byId.get(row.id)!
-    if (row.parent_step_id) {
-      const parent = byId.get(row.parent_step_id)
+    if (row.parentStepId) {
+      const parent = byId.get(row.parentStepId)
       if (parent) {
         const bucket = (row.branch ?? 'yes') as 'yes' | 'no'
         parent.branches[bucket].push(node)

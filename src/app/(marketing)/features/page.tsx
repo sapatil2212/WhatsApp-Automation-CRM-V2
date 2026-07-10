@@ -245,9 +245,7 @@ export default function FeaturesPage() {
       {/* Meta Business Integration */}
       <section className="py-24 px-4 md:px-6 border-t border-[var(--m-border-primary)] max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-12 items-start relative">
         <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-24">
-          <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-emerald-500/25 bg-[var(--m-badge-bg)] text-emerald-500 text-[10px] font-bold uppercase tracking-wider">
-            🛡️ Official Meta Partner
-          </div>
+
           <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight leading-tight text-[var(--m-text-heading)]">
             Meta Business Integration
           </h2>
@@ -280,10 +278,7 @@ export default function FeaturesPage() {
         </div>
       </section>
 
-      {/* Official Meta Business Partner footer-badge */}
-      <section className="py-12 border-t border-[var(--m-border-primary)] text-center text-xs font-semibold text-[var(--m-text-muted)]">
-        Official Meta Business Partner
-      </section>
+
     </div>
   );
 }

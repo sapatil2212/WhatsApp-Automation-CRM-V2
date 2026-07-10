@@ -44,8 +44,7 @@ import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { useTheme } from "@/hooks/use-theme";
 
 function formatDocName(name: string): string {
-  if (!name) return "";
-  return name.toLowerCase().startsWith("dr") ? name : `Dr. ${name}`;
+  return name || "";
 }
 
 export default function AppointmentsManagement() {
@@ -757,9 +756,9 @@ export default function AppointmentsManagement() {
       <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 max-w-lg mx-auto mt-12 text-center p-6 shadow-xl rounded-2xl">
         <CardHeader className="flex flex-col items-center justify-center">
           <AlertCircle className="h-12 w-12 text-amber-500 mb-4 animate-bounce" />
-          <CardTitle className="text-slate-900 dark:text-white">Clinic Onboarding Required</CardTitle>
+          <CardTitle className="text-slate-900 dark:text-white">Business Onboarding Required</CardTitle>
           <CardDescription className="text-slate-500 dark:text-slate-400 mt-2">
-            You must set up your clinic information before managing schedules and appointments.
+            You must set up your business information before managing schedules and bookings.
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-2">
@@ -767,7 +766,7 @@ export default function AppointmentsManagement() {
             href="/healthcare/setup"
             className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
           >
-            Launch Clinic Setup Wizard
+            Launch Business Setup Wizard
           </Link>
         </CardContent>
       </Card>
@@ -781,14 +780,14 @@ export default function AppointmentsManagement() {
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
             <CalendarDays className="h-8 w-8 text-primary" />
-            Appointments Dashboard
+            Bookings & Appointments
           </h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-            Track patients, schedule consultations, send automated notifications, and coordinate clinic queues.
+            Track clients, schedule consultations, send automated notifications, and coordinate service queues.
           </p>
         </div>
         <Button onClick={handleOpenAdd} className="bg-primary text-primary-foreground hover:bg-primary/95 shadow-lg shadow-primary/20 rounded-xl h-11 px-5">
-          <Plus className="h-4 w-4 mr-1.5" /> Book Appointment
+          <Plus className="h-4 w-4 mr-1.5" /> Book Session
         </Button>
       </div>
 
@@ -839,7 +838,7 @@ export default function AppointmentsManagement() {
               <Users className="size-5" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Patients</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Clients</p>
               <div className="flex items-baseline gap-2 mt-1">
                 <span className="text-2xl font-black text-slate-900 dark:text-white">{stats.uniquePatients}</span>
                 <span className="text-[10px] text-slate-500">distinct records</span>
@@ -880,7 +879,7 @@ export default function AppointmentsManagement() {
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search patient, phone, doctor..."
+              placeholder="Search client, phone, staff..."
               className="pl-9 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-xl h-10 placeholder:text-slate-500"
             />
           </div>
@@ -938,8 +937,8 @@ export default function AppointmentsManagement() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider bg-slate-50 dark:bg-slate-950/40">
-                    <th className="px-6 py-4">Patient Profile</th>
-                    <th className="px-6 py-4">Doctor assigned</th>
+                    <th className="px-6 py-4">Client Profile</th>
+                    <th className="px-6 py-4">Staff / Agent Assigned</th>
                     <th className="px-6 py-4">Schedule Date/Time</th>
                     <th className="px-6 py-4">Status</th>
                     <th className="px-6 py-4 text-center">Quick WhatsApp Actions</th>
@@ -951,8 +950,8 @@ export default function AppointmentsManagement() {
                     <tr>
                       <td colSpan={6} className="px-6 py-16 text-center text-slate-500">
                         <Calendar className="h-12 w-12 mx-auto text-slate-400 dark:text-slate-700 mb-3 animate-pulse" />
-                        <p className="font-semibold text-slate-650 dark:text-slate-400">No appointments cataloged.</p>
-                        <p className="text-xs text-slate-550 dark:text-slate-600 mt-1">Book a new appointment or modify your filter criteria.</p>
+                        <p className="font-semibold text-slate-650 dark:text-slate-400">No bookings cataloged.</p>
+                        <p className="text-xs text-slate-550 dark:text-slate-600 mt-1">Book a new session or modify your filter criteria.</p>
                       </td>
                     </tr>
                   ) : (
@@ -1412,7 +1411,7 @@ export default function AppointmentsManagement() {
         </div>
       )}
 
-      {/* Patient Detailed Drawer Dialog */}
+      {/* Client Detailed Drawer Dialog */}
       <Dialog open={patientDrawerOpen} onOpenChange={setPatientDrawerOpen}>
         <DialogContent className="max-w-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 overflow-hidden">
           {selectedPatientData ? (
@@ -1424,7 +1423,7 @@ export default function AppointmentsManagement() {
                   </div>
                   <div>
                     <DialogTitle className="text-slate-900 dark:text-white text-2xl font-black">
-                      {selectedPatientData.contact.name || "Unnamed Patient"}
+                      {selectedPatientData.contact.name || "Unnamed Client"}
                     </DialogTitle>
                     <DialogDescription className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5">
                       <Phone className="size-3 text-slate-400 dark:text-slate-500" />
@@ -1434,14 +1433,14 @@ export default function AppointmentsManagement() {
                 </div>
               </DialogHeader>
 
-              {/* Patient details body */}
+              {/* Client details body */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-slate-50 dark:bg-slate-950/40 p-4 rounded-2xl border border-slate-200 dark:border-slate-800/60 flex flex-col justify-center">
-                  <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Total Appointments</span>
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Total Bookings</span>
                   <span className="text-2xl font-extrabold text-slate-900 dark:text-white mt-1">{selectedPatientData.appointments.length}</span>
                 </div>
                 <div className="bg-slate-50 dark:bg-slate-950/40 p-4 rounded-2xl border border-slate-200 dark:border-slate-800/60 flex flex-col justify-center">
-                  <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">First Visit Date</span>
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">First Booking Date</span>
                   <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 mt-1">
                     {selectedPatientData.appointments.length > 0 
                       ? [...selectedPatientData.appointments].sort((a,b)=>a.appointment_date.localeCompare(b.appointment_date))[0].appointment_date
@@ -1474,7 +1473,7 @@ export default function AppointmentsManagement() {
                   }`}
                 >
                   <Activity className="size-3.5" />
-                  Visit History ({selectedPatientData.appointments.length})
+                  Booking History ({selectedPatientData.appointments.length})
                 </button>
                 <button
                   type="button"
@@ -1486,7 +1485,7 @@ export default function AppointmentsManagement() {
                   }`}
                 >
                   <Stethoscope className="size-3.5" />
-                  Clinical Intakes ({patientIntakes.length})
+                  Client Intakes ({patientIntakes.length})
                 </button>
                 <button
                   type="button"
@@ -1498,7 +1497,7 @@ export default function AppointmentsManagement() {
                   }`}
                 >
                   <MessageSquare className="size-3.5" />
-                  Patient Feedback ({patientFeedbacks.length})
+                  Client Feedback ({patientFeedbacks.length})
                 </button>
               </div>
 

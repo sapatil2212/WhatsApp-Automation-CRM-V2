@@ -8,11 +8,9 @@ import { ReferenceGrid } from "@/components/marketing/reference-grid";
 import { SpotlightCard } from "@/components/marketing/spotlight-card";
 import { MagneticButton } from "@/components/marketing/magnetic-button";
 import { AIChatSimulation } from "@/components/marketing/ai-chat-simulation";
-import { CRMPreviewBoard } from "@/components/marketing/crm-preview-board";
 import { ReferenceDashboard } from "@/components/marketing/reference-dashboard";
 import { SocialProofMetrics } from "@/components/marketing/social-proof-metrics";
 import { BookDemoTrigger } from "@/components/marketing/book-demo-trigger";
-import { InfiniteLogoMarquee } from "@/components/marketing/infinite-logo-marquee";
 
 interface FAQItem {
   q: string;
@@ -73,8 +71,8 @@ export default function HomePage() {
     {
       name: "Starter",
       tag: "Self-Managed Setup",
-      price: "₹2,999",
-      period: "/month per WABA",
+      price: "₹799",
+      period: "/month",
       desc: "Full platform access for self-service automation, visual flow builders, and shared team inbox.",
       features: [
         "Official WhatsApp Business API",
@@ -83,16 +81,16 @@ export default function HomePage() {
         "27+ Native Integrations",
         "0% Markup on Meta API fees",
       ],
-      cta: "Start Free Trial",
-      link: "/login",
+      cta: "Get Started",
+      link: "/signup",
       primary: false,
     },
     {
       name: "Growth",
       tag: "Done-With-You Setup",
-      price: "₹9,999",
+      price: "₹1,499",
       period: " first month",
-      renewal: "₹2,999/month after",
+      renewal: "₹799/month after",
       desc: "Perfect for growing teams. We guide your configuration, verify accounts, and deploy core channels.",
       features: [
         "Everything in Starter plan",
@@ -101,15 +99,16 @@ export default function HomePage() {
         "Custom Integrations Wired In",
         "Dedicated Account Setup Session",
       ],
-      cta: "Book Onboarding",
+      cta: "Get Started",
+      link: "/signup",
       primary: true,
     },
     {
       name: "Managed",
       tag: "Done-For-You Strategy",
-      price: "₹29,999",
+      price: "₹2,999",
       period: " pilot month",
-      renewal: "₹2,999/month after",
+      renewal: "₹799/month after",
       desc: "Fully managed operations. Our automation experts write templates, design bots, and report results.",
       features: [
         "Everything in Growth plan",
@@ -118,7 +117,8 @@ export default function HomePage() {
         "Dedicated Account Manager",
         "Monthly 1-on-1 Strategy Calls",
       ],
-      cta: "Consult Operations",
+      cta: "Get Started",
+      link: "/signup",
       primary: false,
     },
   ];
@@ -216,15 +216,7 @@ export default function HomePage() {
         </motion.div>
       </section>
 
-      {/* 2. TRUSTED BY BUSINESSES */}
-      <section className="py-10 border-b border-[var(--m-border-primary)] bg-[var(--m-bg-secondary)]/5 relative">
-        <div className="max-w-6xl mx-auto text-center space-y-4">
-          <span className="text-[10px] uppercase font-bold text-[var(--m-text-muted)] tracking-widest">
-            Integrated With Your Favorite Tools
-          </span>
-          <InfiniteLogoMarquee />
-        </div>
-      </section>
+
 
       {/* 3. HOW IT WORKS SECTION */}
       <section className="py-24 px-4 md:px-6 max-w-6xl mx-auto space-y-16 relative">
@@ -390,8 +382,27 @@ export default function HomePage() {
       </section>
 
       {/* 6. TESTIMONIALS SECTION */}
-      <section className="py-24 px-4 md:px-6 max-w-6xl mx-auto space-y-12">
-        <div className="text-center space-y-4 max-w-3xl mx-auto">
+      <section className="py-24 max-w-full overflow-hidden space-y-12 relative">
+        <style>{`
+          @keyframes testimonial-marquee {
+            0% {
+              transform: translateX(0%);
+            }
+            100% {
+              transform: translateX(-50%);
+            }
+          }
+          .animate-testimonial-marquee {
+            display: flex;
+            width: max-content;
+            animation: testimonial-marquee 45s linear infinite;
+          }
+          .animate-testimonial-marquee:hover {
+            animation-play-state: paused;
+          }
+        `}</style>
+
+        <div className="text-center space-y-4 max-w-3xl mx-auto px-4 md:px-6">
           <span className="text-xs font-bold uppercase tracking-widest text-emerald-400">Success Stories</span>
           <h2 className="text-3xl sm:text-4xl font-semibold text-[var(--m-text-heading)] tracking-tight">
             What our clients are saying
@@ -401,57 +412,41 @@ export default function HomePage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {testimonials.map((t, idx) => (
-            <SpotlightCard key={idx} interactive={true} glowColor="rgba(20, 184, 166, 0.08)">
-              <div className="space-y-4 flex flex-col justify-between h-full">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-0.5 text-amber-400">
-                    {[...Array(t.stars)].map((_, i) => (
-                      <Star key={i} className="size-3.5 fill-current" />
-                    ))}
+        {/* Marquee Wrapper */}
+        <div className="relative w-full overflow-hidden py-4 select-none">
+          {/* Fade gradients */}
+          <div className="absolute inset-y-0 left-0 w-16 md:w-32 bg-gradient-to-r from-[var(--m-bg-primary)] to-transparent z-10 pointer-events-none" />
+          <div className="absolute inset-y-0 right-0 w-16 md:w-32 bg-gradient-to-l from-[var(--m-bg-primary)] to-transparent z-10 pointer-events-none" />
+
+          <div className="animate-testimonial-marquee flex gap-6">
+            {/* Duplicated list to enable seamless loop */}
+            {[...testimonials, ...testimonials, ...testimonials, ...testimonials].map((t, idx) => (
+              <div key={idx} className="w-[320px] sm:w-[380px] shrink-0">
+                <SpotlightCard interactive={true} glowColor="rgba(20, 184, 166, 0.08)">
+                  <div className="space-y-4 flex flex-col justify-between h-full min-h-[165px]">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-0.5 text-amber-400">
+                        {[...Array(t.stars)].map((_, i) => (
+                          <Star key={i} className="size-3.5 fill-current" />
+                        ))}
+                      </div>
+                      <p className="text-xs text-[var(--m-text-tertiary)] italic leading-relaxed pt-1">
+                        "{t.content}"
+                      </p>
+                    </div>
+                    <div className="border-t border-[var(--m-border-primary)]/50 pt-3 mt-4">
+                      <h4 className="text-xs font-bold text-[var(--m-text-primary)]">{t.name}</h4>
+                      <p className="text-[10px] text-[var(--m-text-muted)]">{t.role} • {t.company}</p>
+                    </div>
                   </div>
-                  <p className="text-xs text-[var(--m-text-tertiary)] italic leading-relaxed pt-1">
-                    "{t.content}"
-                  </p>
-                </div>
-                <div className="border-t border-[var(--m-border-primary)]/50 pt-3 mt-4">
-                  <h4 className="text-xs font-bold text-[var(--m-text-primary)]">{t.name}</h4>
-                  <p className="text-[10px] text-[var(--m-text-muted)]">{t.role} • {t.company}</p>
-                </div>
+                </SpotlightCard>
               </div>
-            </SpotlightCard>
-          ))}
-        </div>
-      </section>
-
-      {/* 7. CRM BOARD SHOWCASE */}
-      <section className="py-24 px-4 md:px-6 max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-12 items-center">
-        <div className="lg:col-span-2 relative">
-          <div className="absolute inset-0 bg-emerald-500/5 blur-[100px] pointer-events-none" />
-          <CRMPreviewBoard />
-        </div>
-
-        <div className="space-y-6">
-          <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-400 uppercase tracking-wide">
-            <Users className="size-4" /> CRM Pipelines
-          </div>
-          <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight leading-tight text-[var(--m-text-heading)] transition-colors duration-300">
-            A Sales Pipeline Designed for Chats.
-          </h2>
-          <p className="text-sm leading-relaxed text-[var(--m-text-tertiary)] transition-colors duration-300">
-            Track deal stages, assign support tickets, configure follow-up variables, and monitor customer parameters directly from a high-fidelity kanban interface.
-          </p>
-          <div className="pt-2">
-            <Link
-              href="/pricing"
-              className="text-xs font-semibold transition-colors flex items-center gap-1 text-emerald-500 hover:text-emerald-400"
-            >
-              Explore Pricing and Features <ArrowRight className="size-3.5" />
-            </Link>
+            ))}
           </div>
         </div>
       </section>
+
+
 
       {/* 8. PRICING PREVIEW */}
       <section className="py-24 px-4 md:px-6 border-t border-[var(--m-border-primary)] max-w-6xl mx-auto space-y-16">

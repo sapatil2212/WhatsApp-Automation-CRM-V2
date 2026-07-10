@@ -62,7 +62,8 @@ export function PasswordForm() {
 
       const { error: updateError } = await supabase.auth.updateUser({
         password: next,
-      });
+        currentPassword: current,
+      } as any);
       if (updateError) {
         toast.error(`Password update failed: ${updateError.message}`);
         return;

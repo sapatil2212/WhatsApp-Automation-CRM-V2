@@ -1,31 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-/**
- * POST /api/healthcare/symptom-triage
- *
- * AI-powered symptom pre-screening endpoint.
- * Analyzes patient-reported symptoms and provides:
- *   - Urgency level (emergency, urgent, routine, self-care)
- *   - Recommended specialist / doctor
- *   - Suggested appointment priority
- *   - Basic care advice (non-diagnostic)
- *
- * This reduces clinic workload by:
- *   - Auto-routing patients to the correct specialist
- *   - Flagging emergencies for immediate human attention
- *   - Providing self-care guidance for minor issues
- *   - Pre-filling appointment context for faster booking
- *
- * Used by the AI healthcare service when `detected_intent` is `symptom_inquiry`.
- */
-
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
+import { prisma } from '@/lib/prisma'
 
 interface TriageRequest {
   symptoms: string
@@ -53,16 +27,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'GEMINI_API_KEY not configured' }, { status: 500 })
   }
 
-  const db = getSupabaseAdmin()
-
   // Fetch doctors for specialist matching
-  const { data: doctors } = await db
-    .from('doctors')
-    .select('id, doctor_name, specialization')
-    .eq('clinic_id', body.clinicId)
+  const doctors = await prisma.doctor.findMany({
+    where: { clinicId: body.clinicId },
+    select: { id: true, doctorName: true, specialization: true }
+  })
 
   const doctorsContext = (doctors || [])
-    .map((d) => `- ${d.doctor_name} (${d.specialization || 'General'}) [ID: ${d.id}]`)
+    .map((d: any) => `- ${d.doctorName} (${d.specialization || 'General'}) [ID: ${d.id}]`)
     .join('\n')
 
   const systemPrompt = `You are a medical triage assistant. You do NOT diagnose conditions or prescribe treatments. Your role is to assess reported symptoms and determine urgency level and appropriate specialist routing.
@@ -135,14 +107,15 @@ ${doctorsContext || 'No doctors registered.'}
     const result: TriageResult = JSON.parse(content)
 
     // Log triage for analytics
-    await db.from('ai_chat_logs').insert({
-      clinic_id: body.clinicId,
-      patient_id: body.userId,
-      user_message: `[SYMPTOM TRIAGE] ${body.symptoms}`,
-      ai_response: JSON.stringify(result),
-      detected_intent: 'symptom_triage',
-      confidence_score: 0.9,
-      created_at: new Date().toISOString(),
+    await prisma.aiChatLog.create({
+      data: {
+        clinicId: body.clinicId,
+        patientId: body.userId,
+        userMessage: `[SYMPTOM TRIAGE] ${body.symptoms}`,
+        aiResponse: JSON.stringify(result),
+        detectedIntent: 'symptom_triage',
+        confidenceScore: 0.9,
+      }
     })
 
     return NextResponse.json(result)
