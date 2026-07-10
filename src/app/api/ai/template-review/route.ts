@@ -180,6 +180,59 @@ Score: start 100, deduct 15 per error, 5 per warning. passed=true only if zero e
       }
     }
 
+    // Try OpenAI/OpenRouter fallback (using OPENAI_API_KEY)
+    if (!success) {
+      let openAIKey = process.env.OPENAI_API_KEY || '';
+      openAIKey = openAIKey.replace(/^["']|["']$/g, '');
+
+      if (openAIKey) {
+        try {
+          const isOrToken = openAIKey.startsWith('sk-or-v1-');
+          const endpoint = isOrToken 
+            ? 'https://openrouter.ai/api/v1/chat/completions'
+            : 'https://api.openai.com/v1/chat/completions';
+          const modelName = isOrToken
+            ? 'google/gemini-2.5-flash'
+            : 'gpt-4o-mini';
+
+          console.log(`Attempting OpenAI API Key fallback targeting: ${isOrToken ? 'OpenRouter' : 'OpenAI'} with model ${modelName}`);
+
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${openAIKey}`,
+          };
+          if (isOrToken) {
+            headers['HTTP-Referer'] = 'http://localhost:3000';
+            headers['X-Title'] = 'WhatsApp CRM';
+          }
+
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              model: modelName,
+              messages: [{ role: 'user', content: prompt }],
+              temperature: 0.1,
+            }),
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            rawText = data?.choices?.[0]?.message?.content ?? '';
+            if (rawText) {
+              success = true;
+              console.log(`OpenAI/OpenRouter fallback success with: ${modelName}`);
+            }
+          } else {
+            const errText = await res.text();
+            console.warn(`OpenAI/OpenRouter fallback returned non-OK status: ${res.status}`, errText);
+          }
+        } catch (e) {
+          console.warn('OpenAI/OpenRouter fallback failed:', e);
+        }
+      }
+    }
+
     if (!success) {
       return NextResponse.json({ error: 'AI review service currently rate limited or unavailable. Please try again in a few seconds.' }, { status: 502 });
     }
