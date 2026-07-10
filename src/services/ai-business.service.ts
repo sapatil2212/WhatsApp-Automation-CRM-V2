@@ -76,9 +76,26 @@ export async function processBusinessAIMessage(options: {
     prisma.businessStaff.findMany({ where: { businessId: business.id, isActive: true } }),
   ])
 
+  // Build working hours context
+  let workingHoursText = 'Not specified.'
+  if (business.workingHours) {
+    try {
+      const hours = typeof business.workingHours === 'string' 
+        ? JSON.parse(business.workingHours) 
+        : business.workingHours
+      if (Array.isArray(hours)) {
+        workingHoursText = hours
+          .map((h: any) => `- ${h.day_name || h.dayName || ''}: ${h.is_closed || h.isClosed ? 'Closed' : `${h.opening_time || h.openingTime || ''} - ${h.closing_time || h.closingTime || ''}`}`)
+          .join('\n')
+      }
+    } catch (e) {
+      console.error('Failed to parse working hours:', e)
+    }
+  }
+
   // Build prompts contexts
   const servicesContext = services
-    .map((s) => `- ${s.name}: ${s.description || ''} (Price: $${s.price || 0}, duration ${s.durationMinutes || 30} mins)`)
+    .map((s) => `- ${s.name}: ${s.description || ''} (Price: ₹${s.price || 0}, duration ${s.durationMinutes || 30} mins)`)
     .join('\n')
 
   const faqsContext = faqs
@@ -92,26 +109,84 @@ export async function processBusinessAIMessage(options: {
   const systemPrompt = `You are a professional, polite, and helpful AI assistant for "${business.businessName || 'our business'}" (Category: ${segment}).
 Your tone is "${aiSettings.aiTone || 'polite and professional'}".
 
-### BUSINESS INFO:
+### BUSINESS PROFILE & DETAILS:
+About Us: ${business.description || 'No description provided.'}
 Address: ${business.address || ''}, ${business.city || ''}, ${business.state || ''} - ${business.pincode || ''}
 Phone: ${business.phone || ''}
 WhatsApp: ${business.whatsappNumber || ''}
+Email: ${business.email || ''}
+Website: ${business.website || ''}
+Location Map: ${business.googleMapLink || ''}
+
+### BUSINESS HOURS:
+${workingHoursText}
 
 ### SERVICES OFFERED:
 ${servicesContext || 'No specific services listed. General bookings.'}
 
-### AVAILABLE STAFF:
+### AVAILABLE STAFF / PROVIDERS:
 ${staffContext || 'General staff handles bookings.'}
 
 ### FREQUENTLY ASKED QUESTIONS (Use these answers directly):
 ${faqsContext || 'Answer customer queries politely according to business guidelines.'}
 
 ### INSTRUCTIONS:
+- Answer the customer's questions accurately based on the business details, hours, services, and FAQs provided above.
+- If they ask about services, explain the pricing (in ₹ INR) and duration.
 - Identify if the user wants to book, modify, cancel, or ask questions.
 - If they want to book, extract preferred_date (YYYY-MM-DD), preferred_time (HH:MM), contact_name, and notes.
 - Format your response strictly in the JSON schema requested.
 - Always output a valid JSON object.
 `
+
+  // Fetch recent conversation history (last 8 messages)
+  const recentMessages = await prisma.message.findMany({
+    where: { conversationId },
+    orderBy: { createdAt: 'desc' },
+    take: 8,
+  })
+  
+  // Sort chronologically (oldest to newest)
+  recentMessages.reverse()
+
+  // Format history for Gemini
+  const geminiContents: any[] = []
+  for (const msg of recentMessages) {
+    if (!msg.contentText) continue
+    const role = msg.senderType === 'customer' || msg.senderType === 'contact' || msg.senderType === 'user' ? 'user' : 'model'
+    geminiContents.push({
+      role,
+      parts: [{ text: msg.contentText }]
+    })
+  }
+  // Ensure the current user prompt is attached
+  const lastGeminiMsg = geminiContents[geminiContents.length - 1]
+  if (!lastGeminiMsg || lastGeminiMsg.role !== 'user' || lastGeminiMsg.parts[0].text !== messageText) {
+    geminiContents.push({
+      role: 'user',
+      parts: [{ text: messageText }]
+    })
+  }
+
+  // Format history for OpenAI
+  const openaiMessages = [
+    { role: 'system', content: systemPrompt }
+  ]
+  for (const msg of recentMessages) {
+    if (!msg.contentText) continue
+    const role = msg.senderType === 'customer' || msg.senderType === 'contact' || msg.senderType === 'user' ? 'user' : 'assistant'
+    openaiMessages.push({
+      role,
+      content: msg.contentText
+    })
+  }
+  const lastOpenAIMsg = openaiMessages[openaiMessages.length - 1]
+  if (!lastOpenAIMsg || lastOpenAIMsg.role !== 'user' || lastOpenAIMsg.content !== messageText) {
+    openaiMessages.push({
+      role: 'user',
+      content: messageText
+    })
+  }
 
   // Calling LLM (Gemini with OpenAI fallback)
   async function callLLM(): Promise<string> {
@@ -126,7 +201,7 @@ ${faqsContext || 'Answer customer queries politely according to business guideli
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             systemInstruction: { parts: [{ text: systemPrompt }] },
-            contents: [{ role: 'user', parts: [{ text: messageText }] }],
+            contents: geminiContents,
             generationConfig: {
               temperature: 0.2,
               responseMimeType: 'application/json',
@@ -171,10 +246,7 @@ ${faqsContext || 'Answer customer queries politely according to business guideli
         },
         body: JSON.stringify({
           model: 'gpt-4o-mini',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: messageText },
-          ],
+          messages: openaiMessages,
           temperature: 0.2,
           response_format: { type: 'json_object' },
         }),
