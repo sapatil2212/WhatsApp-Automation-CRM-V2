@@ -2,9 +2,8 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Loader2, KeyRound } from 'lucide-react';
+import { Loader2, KeyRound, Eye, EyeOff } from 'lucide-react';
 
-import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,19 +19,20 @@ import {
 const MIN_PASSWORD = 8;
 
 export function PasswordForm() {
-  const { profile } = useAuth();
-  const supabase = createClient();
+  const { user } = useAuth();
 
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
   const [saving, setSaving] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profile?.email) {
-      toast.error('Cannot change password without a current email');
+    if (!user) {
+      toast.error('You must be logged in to change your password');
       return;
     }
     if (next.length < MIN_PASSWORD) {
@@ -47,32 +47,26 @@ export function PasswordForm() {
     setSaving(true);
 
     try {
-      // Supabase doesn't expose a "verify password without issuing a
-      // session" API, so we re-authenticate with the provided current
-      // password. If it matches, the session refreshes silently; if it
-      // doesn't, we abort before calling updateUser.
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: profile.email,
-        password: current,
+      const res = await fetch('/api/auth/update-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentPassword: current,
+          password: next,
+        }),
       });
-      if (signInError) {
-        toast.error('Current password is incorrect');
-        return;
-      }
 
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: next,
-        currentPassword: current,
-      } as any);
-      if (updateError) {
-        toast.error(`Password update failed: ${updateError.message}`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || 'Password update failed');
         return;
       }
 
       setCurrent('');
       setNext('');
       setConfirm('');
-      toast.success('Password updated');
+      toast.success('Password updated successfully');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
       toast.error(msg);
@@ -86,7 +80,7 @@ export function PasswordForm() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-white">
           <KeyRound className="size-4 text-primary" />
-          Password
+          Change Password
         </CardTitle>
         <CardDescription className="text-slate-400">
           Use at least {MIN_PASSWORD} characters. You will stay signed in on
@@ -100,15 +94,25 @@ export function PasswordForm() {
             <Label htmlFor="current-password" className="text-slate-200">
               Current password
             </Label>
-            <Input
-              id="current-password"
-              type="password"
-              value={current}
-              onChange={(e) => setCurrent(e.target.value)}
-              autoComplete="current-password"
-              disabled={saving}
-              required
-            />
+            <div className="relative">
+              <Input
+                id="current-password"
+                type={showCurrent ? 'text' : 'password'}
+                value={current}
+                onChange={(e) => setCurrent(e.target.value)}
+                autoComplete="current-password"
+                disabled={saving}
+                required
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowCurrent(!showCurrent)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+              >
+                {showCurrent ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -116,16 +120,26 @@ export function PasswordForm() {
               <Label htmlFor="new-password" className="text-slate-200">
                 New password
               </Label>
-              <Input
-                id="new-password"
-                type="password"
-                value={next}
-                onChange={(e) => setNext(e.target.value)}
-                autoComplete="new-password"
-                minLength={MIN_PASSWORD}
-                disabled={saving}
-                required
-              />
+              <div className="relative">
+                <Input
+                  id="new-password"
+                  type={showNew ? 'text' : 'password'}
+                  value={next}
+                  onChange={(e) => setNext(e.target.value)}
+                  autoComplete="new-password"
+                  minLength={MIN_PASSWORD}
+                  disabled={saving}
+                  required
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNew(!showNew)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                >
+                  {showNew ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirm-password" className="text-slate-200">

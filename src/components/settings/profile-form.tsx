@@ -1,10 +1,24 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { toast } from 'sonner';
-import { Loader2, Upload, Trash2, Mail, CircleAlert } from 'lucide-react';
+import {
+  Loader2,
+  Upload,
+  Trash2,
+  CircleAlert,
+  Shield,
+  CreditCard,
+  Calendar,
+  Building2,
+  Phone,
+  Mail,
+  User as UserIcon,
+  CheckCircle2,
+  XCircle,
+  Clock,
+} from 'lucide-react';
 
-import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,32 +44,89 @@ const ALLOWED_MIME = new Set([
   'image/gif',
 ]);
 
-// Rough email shape check — the real validator is Supabase Auth, which
-// rejects anything malformed when we call updateUser({ email }). We
-// just want to stop obvious typos before making a network call.
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+interface AccountData {
+  id: string;
+  email: string;
+  role: string;
+  isVerified: boolean;
+  isEmailVerified: boolean;
+  selectedPlan: string | null;
+  paymentProofAttached: boolean;
+  subscriptionExpiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface ProfileData {
+  id: string;
+  fullName: string | null;
+  email: string | null;
+  avatarUrl: string | null;
+  role: string | null;
+  businessName: string | null;
+  businessType: string | null;
+  phoneNumber: string | null;
+  tenantId: string | null;
+}
+
+interface TenantData {
+  id: string;
+  name: string | null;
+  plan: string | null;
+  isActive: boolean;
+  createdAt: string;
+}
 
 export function ProfileForm() {
-  const { user, profile, refreshProfile } = useAuth();
-  const supabase = createClient();
+  const { user, refreshProfile } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [loading, setLoading] = useState(true);
+  const [account, setAccount] = useState<AccountData | null>(null);
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [tenant, setTenant] = useState<TenantData | null>(null);
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
+  const [businessName, setBusinessName] = useState('');
+  const [businessType, setBusinessType] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+
   const [pendingAvatar, setPendingAvatar] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [removeAvatar, setRemoveAvatar] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [emailChangePending, setEmailChangePending] = useState(false);
 
-  // Seed form state once the profile loads.
+  const fetchAccount = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/account');
+      if (!res.ok) return;
+      const data = await res.json();
+      setAccount(data.account);
+      setProfileData(data.profile);
+      setTenant(data.tenant);
+
+      if (data.profile) {
+        setFullName(data.profile.fullName ?? '');
+        setEmail(data.profile.email ?? data.account.email ?? '');
+        setBusinessName(data.profile.businessName ?? '');
+        setBusinessType(data.profile.businessType ?? '');
+        setPhoneNumber(data.profile.phoneNumber ?? '');
+      }
+    } catch (err) {
+      console.error('Failed to fetch account:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    if (!profile) return;
-    setFullName(profile.full_name ?? '');
-    setEmail(profile.email ?? '');
-  }, [profile]);
+    if (!user) return;
+    fetchAccount();
+  }, [user, fetchAccount]);
 
-  // Cleanup object URLs to avoid leaks.
+  // Cleanup object URLs
   useEffect(() => {
     return () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -63,27 +134,23 @@ export function ProfileForm() {
   }, [previewUrl]);
 
   const currentAvatar =
-    previewUrl ?? (!removeAvatar ? profile?.avatar_url ?? null : null);
+    previewUrl ?? (!removeAvatar ? profileData?.avatarUrl ?? null : null);
 
-  const initial = (fullName || profile?.full_name || profile?.email || 'U')
+  const initial = (fullName || profileData?.fullName || account?.email || 'U')
     .charAt(0)
     .toUpperCase();
 
   const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    e.target.value = ''; // reset so the same file can be re-picked
+    e.target.value = '';
     if (!file) return;
 
     if (!ALLOWED_MIME.has(file.type)) {
-      toast.error('Unsupported image type', {
-        description: 'Use PNG, JPG, WebP, or GIF.',
-      });
+      toast.error('Unsupported image type', { description: 'Use PNG, JPG, WebP, or GIF.' });
       return;
     }
     if (file.size > MAX_AVATAR_BYTES) {
-      toast.error('Image is too large', {
-        description: 'Maximum 2 MB.',
-      });
+      toast.error('Image is too large', { description: 'Maximum 2 MB.' });
       return;
     }
 
@@ -102,34 +169,29 @@ export function ProfileForm() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !profile) return;
+    if (!user || !account) return;
 
     const trimmedName = fullName.trim();
     if (!trimmedName) {
       toast.error('Display name is required');
       return;
     }
-    const trimmedEmail = email.trim();
-    if (!EMAIL_RE.test(trimmedEmail)) {
-      toast.error('Enter a valid email address');
-      return;
-    }
 
     setSaving(true);
     try {
-      let nextAvatarUrl: string | null = profile.avatar_url ?? null;
+      let nextAvatarUrl: string | null = profileData?.avatarUrl ?? null;
 
-      // Upload a newly-staged image, if any.
+      // Upload avatar if staged
       if (pendingAvatar) {
-        const uploadFormData = new FormData();
-        uploadFormData.append('file', pendingAvatar);
+        const formData = new FormData();
+        formData.append('file', pendingAvatar);
         const uploadRes = await fetch('/api/avatar/upload', {
           method: 'POST',
-          body: uploadFormData,
+          body: formData,
         });
         if (!uploadRes.ok) {
-          const errData = await uploadRes.json();
-          throw new Error(errData.error || 'Upload failed');
+          const err = await uploadRes.json();
+          throw new Error(err.error || 'Upload failed');
         }
         const uploadData = await uploadRes.json();
         nextAvatarUrl = uploadData.url;
@@ -137,50 +199,45 @@ export function ProfileForm() {
         nextAvatarUrl = null;
       }
 
-      // Persist name + avatar to profiles.
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({
-          full_name: trimmedName,
-          avatar_url: nextAvatarUrl,
-        })
-        .eq('user_id', user.id);
-      if (updateError) {
-        throw new Error(`Save failed: ${updateError.message}`);
+      // Update profile via PATCH /api/auth/account
+      const profileRes = await fetch('/api/auth/account', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: trimmedName,
+          businessName: businessName.trim(),
+          businessType: businessType.trim(),
+          phoneNumber: phoneNumber.trim(),
+          avatarUrl: nextAvatarUrl,
+        }),
+      });
+
+      if (!profileRes.ok) {
+        const err = await profileRes.json();
+        throw new Error(err.error || 'Save failed');
       }
 
-      // Email change goes through Supabase Auth, which emails a
-      // confirmation to both the old and new addresses. We don't
-      // touch profiles.email — Supabase will push the change there
-      // after the user clicks the link (handled by the handle_new_user
-      // trigger pattern in production deployments).
-      let emailSent = false;
-      if (trimmedEmail.toLowerCase() !== profile.email.toLowerCase()) {
-        const { error: emailError } = await supabase.auth.updateUser({
-          email: trimmedEmail,
+      // Update email if changed
+      const trimmedEmail = email.trim().toLowerCase();
+      if (trimmedEmail && trimmedEmail !== account.email.toLowerCase()) {
+        const emailRes = await fetch('/api/auth/update-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: trimmedEmail }),
         });
-        if (emailError) {
-          // Partial success: name/avatar saved but email didn't.
-          toast.success('Profile saved');
-          toast.error(`Email change failed: ${emailError.message}`);
-          setSaving(false);
-          await refreshProfile();
-          return;
+        if (!emailRes.ok) {
+          const err = await emailRes.json();
+          toast.warning(`Profile saved but email change failed: ${err.error}`);
         }
-        emailSent = true;
       }
 
-      setEmailChangePending(emailSent);
       setPendingAvatar(null);
       setPreviewUrl(null);
       setRemoveAvatar(false);
       await refreshProfile();
+      await fetchAccount();
 
-      toast.success(
-        emailSent
-          ? 'Profile saved — check your email to confirm the address change'
-          : 'Profile saved',
-      );
+      toast.success('Profile saved successfully');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
       toast.error(msg);
@@ -190,165 +247,350 @@ export function ProfileForm() {
   };
 
   const dirty =
-    !!profile &&
-    (fullName.trim() !== (profile.full_name ?? '') ||
-      email.trim().toLowerCase() !== (profile.email ?? '').toLowerCase() ||
+    !!profileData &&
+    (fullName.trim() !== (profileData.fullName ?? '') ||
+      email.trim().toLowerCase() !== (profileData.email ?? '').toLowerCase() ||
+      businessName.trim() !== (profileData.businessName ?? '') ||
+      businessType.trim() !== (profileData.businessType ?? '') ||
+      phoneNumber.trim() !== (profileData.phoneNumber ?? '') ||
       pendingAvatar !== null ||
       removeAvatar);
 
-  const joined = user?.created_at
-    ? new Date(user.created_at).toLocaleDateString(undefined, {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="size-6 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const joined = account?.createdAt
+    ? new Date(account.createdAt).toLocaleDateString(undefined, {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
       })
     : '—';
 
+  const subscriptionExpiry = account?.subscriptionExpiresAt
+    ? new Date(account.subscriptionExpiresAt).toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : null;
+
+  const isSubscriptionActive = account?.subscriptionExpiresAt
+    ? new Date(account.subscriptionExpiresAt) > new Date()
+    : false;
+
+  const planLabels: Record<string, string> = {
+    starter: '₹799 Starter',
+    professional: '₹1,499 Professional',
+    enterprise: '₹2,999 Enterprise',
+  };
+
   return (
-    <Card className="bg-slate-900/40 border-slate-800">
-      <CardHeader>
-        <CardTitle className="text-white">Profile</CardTitle>
-        <CardDescription className="text-slate-400">
-          How you show up across the app. Your avatar and name appear in the
-          header, sidebar, and anywhere your teammates see you.
-        </CardDescription>
-      </CardHeader>
+    <div className="space-y-6">
+      {/* Profile Edit Card */}
+      <Card className="bg-slate-900/40 border-slate-800">
+        <CardHeader>
+          <CardTitle className="text-white">Profile</CardTitle>
+          <CardDescription className="text-slate-400">
+            Your personal and business details. Update your information below.
+          </CardDescription>
+        </CardHeader>
 
-      <CardContent>
-        <form onSubmit={onSubmit} className="space-y-6">
-          {/* Avatar row */}
-          <div className="flex flex-wrap items-center gap-5">
-            <Avatar size="lg" className="size-16">
-              {currentAvatar ? (
-                <AvatarImage src={currentAvatar} alt={fullName || 'Avatar'} />
-              ) : null}
-              <AvatarFallback className="bg-primary/10 text-base text-primary">
-                {initial}
-              </AvatarFallback>
-            </Avatar>
+        <CardContent>
+          <form onSubmit={onSubmit} className="space-y-6">
+            {/* Avatar row */}
+            <div className="flex flex-wrap items-center gap-5">
+              <Avatar size="lg" className="size-16">
+                {currentAvatar ? (
+                  <AvatarImage src={currentAvatar} alt={fullName || 'Avatar'} />
+                ) : null}
+                <AvatarFallback className="bg-primary/10 text-base text-primary">
+                  {initial}
+                </AvatarFallback>
+              </Avatar>
 
-            <div className="flex flex-wrap gap-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif"
-                className="hidden"
-                onChange={onPickFile}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={saving}
-              >
-                <Upload className="size-4" />
-                {currentAvatar ? 'Change photo' : 'Upload photo'}
-              </Button>
-              {currentAvatar && (
+              <div className="flex flex-wrap gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  className="hidden"
+                  onChange={onPickFile}
+                />
                 <Button
                   type="button"
-                  variant="ghost"
-                  onClick={onRemoveAvatar}
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
                   disabled={saving}
-                  className="text-slate-400 hover:text-white"
                 >
-                  <Trash2 className="size-4" />
-                  Remove
+                  <Upload className="size-4" />
+                  {currentAvatar ? 'Change photo' : 'Upload photo'}
                 </Button>
-              )}
-              <p className="w-full text-xs text-slate-500">
-                PNG, JPG, WebP, or GIF. Up to 2 MB.
+                {currentAvatar && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={onRemoveAvatar}
+                    disabled={saving}
+                    className="text-slate-400 hover:text-white"
+                  >
+                    <Trash2 className="size-4" />
+                    Remove
+                  </Button>
+                )}
+                <p className="w-full text-xs text-slate-500">
+                  PNG, JPG, WebP, or GIF. Up to 2 MB.
+                </p>
+              </div>
+            </div>
+
+            {/* Form fields - 2 columns */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="profile-full-name" className="text-slate-200">
+                  <UserIcon className="inline size-3.5 mr-1" />
+                  Display Name
+                </Label>
+                <Input
+                  id="profile-full-name"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="John Doe"
+                  maxLength={120}
+                  disabled={saving}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="profile-email" className="text-slate-200">
+                  <Mail className="inline size-3.5 mr-1" />
+                  Email
+                </Label>
+                <Input
+                  id="profile-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={saving}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="profile-business-name" className="text-slate-200">
+                  <Building2 className="inline size-3.5 mr-1" />
+                  Business Name
+                </Label>
+                <Input
+                  id="profile-business-name"
+                  value={businessName}
+                  onChange={(e) => setBusinessName(e.target.value)}
+                  placeholder="My Business"
+                  disabled={saving}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="profile-business-type" className="text-slate-200">
+                  <Building2 className="inline size-3.5 mr-1" />
+                  Business Type
+                </Label>
+                <Input
+                  id="profile-business-type"
+                  value={businessType}
+                  onChange={(e) => setBusinessType(e.target.value)}
+                  placeholder="e.g. Healthcare, Retail"
+                  disabled={saving}
+                />
+              </div>
+
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="profile-phone" className="text-slate-200">
+                  <Phone className="inline size-3.5 mr-1" />
+                  Phone Number
+                </Label>
+                <Input
+                  id="profile-phone"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="+91 9876543210"
+                  disabled={saving}
+                />
+              </div>
+            </div>
+
+            {!profileData && (
+              <p className="flex items-center gap-2 text-sm text-slate-400">
+                <CircleAlert className="size-4" />
+                Loading your profile…
+              </p>
+            )}
+
+            <div className="flex justify-end">
+              <Button type="submit" disabled={saving || !dirty || !profileData}>
+                {saving ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    Saving…
+                  </>
+                ) : (
+                  'Save changes'
+                )}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Account Details Card — Read-only info */}
+      <Card className="bg-slate-900/40 border-slate-800">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-white">
+            <Shield className="size-4 text-primary" />
+            Account Details
+          </CardTitle>
+          <CardDescription className="text-slate-400">
+            Your account status, subscription, and system information.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {/* Role */}
+            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Role</p>
+              <p className="text-sm font-semibold text-slate-200 capitalize">
+                {account?.role ?? 'user'}
+              </p>
+            </div>
+
+            {/* Verification Status */}
+            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Account Status</p>
+              <p className="flex items-center gap-1.5 text-sm font-semibold">
+                {account?.isVerified ? (
+                  <>
+                    <CheckCircle2 className="size-3.5 text-emerald-400" />
+                    <span className="text-emerald-400">Active</span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="size-3.5 text-amber-400" />
+                    <span className="text-amber-400">Pending Approval</span>
+                  </>
+                )}
+              </p>
+            </div>
+
+            {/* Email Verified */}
+            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Email Verified</p>
+              <p className="flex items-center gap-1.5 text-sm font-semibold">
+                {account?.isEmailVerified ? (
+                  <>
+                    <CheckCircle2 className="size-3.5 text-emerald-400" />
+                    <span className="text-emerald-400">Verified</span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="size-3.5 text-red-400" />
+                    <span className="text-red-400">Not Verified</span>
+                  </>
+                )}
+              </p>
+            </div>
+
+            {/* Selected Plan */}
+            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                <CreditCard className="inline size-3 mr-1" />
+                Plan
+              </p>
+              <p className="text-sm font-semibold text-slate-200">
+                {account?.selectedPlan ? planLabels[account.selectedPlan] || account.selectedPlan : 'No Plan'}
+              </p>
+            </div>
+
+            {/* Subscription Expiry */}
+            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                <Clock className="inline size-3 mr-1" />
+                Subscription
+              </p>
+              <p className={`flex items-center gap-1.5 text-sm font-semibold ${isSubscriptionActive ? 'text-emerald-400' : 'text-red-400'}`}>
+                {subscriptionExpiry ? (
+                  <>
+                    {isSubscriptionActive ? (
+                      <CheckCircle2 className="size-3.5" />
+                    ) : (
+                      <XCircle className="size-3.5" />
+                    )}
+                    {isSubscriptionActive ? `Active until ${subscriptionExpiry}` : `Expired on ${subscriptionExpiry}`}
+                  </>
+                ) : (
+                  <span className="text-slate-400">Not subscribed</span>
+                )}
+              </p>
+            </div>
+
+            {/* Payment Proof */}
+            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Payment Proof</p>
+              <p className="flex items-center gap-1.5 text-sm font-semibold">
+                {account?.paymentProofAttached ? (
+                  <>
+                    <CheckCircle2 className="size-3.5 text-emerald-400" />
+                    <span className="text-emerald-400">Submitted</span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="size-3.5 text-slate-500" />
+                    <span className="text-slate-400">Not Submitted</span>
+                  </>
+                )}
+              </p>
+            </div>
+
+            {/* Joined Date */}
+            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                <Calendar className="inline size-3 mr-1" />
+                Joined
+              </p>
+              <p className="text-sm font-semibold text-slate-200">{joined}</p>
+            </div>
+
+            {/* Tenant Info */}
+            {tenant && (
+              <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                  <Building2 className="inline size-3 mr-1" />
+                  Workspace
+                </p>
+                <p className="text-sm font-semibold text-slate-200">
+                  {tenant.name || 'Default Workspace'}
+                </p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {tenant.isActive ? 'Active' : 'Inactive'} · Plan: {tenant.plan || 'None'}
+                </p>
+              </div>
+            )}
+
+            {/* User ID */}
+            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3 sm:col-span-2 lg:col-span-3">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">User ID</p>
+              <p className="break-all font-mono text-xs text-slate-400">
+                {account?.id ?? '—'}
               </p>
             </div>
           </div>
-
-          {/* Name */}
-          <div className="space-y-2">
-            <Label htmlFor="profile-full-name" className="text-slate-200">
-              Display name
-            </Label>
-            <Input
-              id="profile-full-name"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="Ada Lovelace"
-              maxLength={120}
-              disabled={saving}
-              required
-            />
-          </div>
-
-          {/* Email */}
-          <div className="space-y-2">
-            <Label htmlFor="profile-email" className="text-slate-200">
-              Email
-            </Label>
-            <Input
-              id="profile-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={saving}
-              required
-            />
-            {emailChangePending && (
-              <p className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-300">
-                <Mail className="mt-0.5 size-3.5 shrink-0" />
-                <span>
-                  Check the inbox for <strong>{profile?.email}</strong> and{' '}
-                  <strong>{email}</strong> — both need to confirm before the
-                  change takes effect.
-                </span>
-              </p>
-            )}
-          </div>
-
-          {/* Read-only block */}
-          <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Account details
-            </p>
-            <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-              <div>
-                <dt className="text-slate-500">Role</dt>
-                <dd className="mt-0.5 font-mono text-slate-200">
-                  {profile?.role ?? 'user'}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-slate-500">Joined</dt>
-                <dd className="mt-0.5 text-slate-200">{joined}</dd>
-              </div>
-              <div className="sm:col-span-2">
-                <dt className="text-slate-500">User ID</dt>
-                <dd className="mt-0.5 break-all font-mono text-xs text-slate-400">
-                  {user?.id ?? '—'}
-                </dd>
-              </div>
-            </dl>
-          </div>
-
-          {!profile && (
-            <p className="flex items-center gap-2 text-sm text-slate-400">
-              <CircleAlert className="size-4" />
-              Loading your profile…
-            </p>
-          )}
-
-          <div className="flex justify-end">
-            <Button type="submit" disabled={saving || !dirty || !profile}>
-              {saving ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" />
-                  Saving…
-                </>
-              ) : (
-                'Save changes'
-              )}
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
