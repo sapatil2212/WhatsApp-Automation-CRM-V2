@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import nodemailer from "nodemailer";
+import { sendSystemEmail } from "@/lib/email/smtp";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { emailLayout, emailHeading, emailSubtitle, emailOtp, emailText, emailTokens } from "@/lib/email/template";
@@ -48,52 +48,24 @@ export async function POST(req: NextRequest) {
         expires: Date.now() + 10 * 60 * 1000,
       });
 
-      // 3. Prepare SMTP Configuration
-      const cleanEnv = (val: string | undefined): string => {
-        if (!val) return "";
-        return val.replace(/^["']|["']$/g, "");
-      };
-
-      const smtpHost = cleanEnv(process.env.SMTP_HOST || process.env.EMAIL_HOST);
-      const rawPort = process.env.SMTP_PORT || process.env.EMAIL_PORT;
-      const smtpPort = rawPort ? parseInt(cleanEnv(rawPort)) : 587;
-      const smtpUser = cleanEnv(process.env.SMTP_USER || process.env.EMAIL_USERNAME);
-      const smtpPass = cleanEnv(process.env.SMTP_PASS || process.env.EMAIL_PASSWORD);
-
-      if (!smtpHost || !smtpUser || !smtpPass) {
-        console.warn("SMTP settings are not configured. Falling back to mock console output.");
-        console.log(`[SMTP MOCK OTP] Code for ${email} is ${code}`);
-        return NextResponse.json({ success: true, mock: true });
-      }
-
-      // 4. Send Email via Nodemailer
-      const transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: smtpPort,
-        secure: smtpPort === 465,
-        auth: {
-          user: smtpUser,
-          pass: smtpPass,
-        },
+      const emailHtml = emailLayout({
+        title: "Reset your ChatNexGen password",
+        preview: `Your password reset code is ${code}`,
+        contentHtml:
+          emailHeading("Reset your password") +
+          emailSubtitle("Use the 6-digit code below to reset your password.") +
+          emailOtp(code) +
+          emailText(
+            "This code is valid for <strong>10 minutes</strong>. If you didn't request a password reset, you can safely ignore this email.",
+            { size: 12, color: emailTokens.muted }
+          ),
       });
 
-      await transporter.sendMail({
-        from: `"ChatNexGen Support" <${smtpUser}>`,
+      await sendSystemEmail({
         to: email,
         subject: "ChatNexGen Password Reset Code",
         text: `Your password reset code is: ${code}. It expires in 10 minutes.`,
-        html: emailLayout({
-          title: "Reset your ChatNexGen password",
-          preview: `Your password reset code is ${code}`,
-          contentHtml:
-            emailHeading("Reset your password") +
-            emailSubtitle("Use the 6-digit code below to reset your password.") +
-            emailOtp(code) +
-            emailText(
-              "This code is valid for <strong>10 minutes</strong>. If you didn't request a password reset, you can safely ignore this email.",
-              { size: 12, color: emailTokens.muted }
-            ),
-        }),
+        html: emailHtml,
       });
 
       return NextResponse.json({ success: true });

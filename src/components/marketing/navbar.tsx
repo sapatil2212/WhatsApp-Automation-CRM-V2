@@ -9,6 +9,7 @@ import { useMarketingTheme } from "@/components/marketing/marketing-theme-provid
 import { ThemeToggle } from "./theme-toggle";
 import { MagneticButton } from "./magnetic-button";
 import { BookDemoTrigger } from "./book-demo-trigger";
+import { usePublicSettings } from "@/lib/cms/use-public-settings";
 import { cn } from "@/lib/utils";
 
 function lerp(a: number, b: number, t: number) { return a + (b - a) * t; }
@@ -23,6 +24,10 @@ export function GlassNavbar() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const { resolvedTheme } = useMarketingTheme();
   const isLight = resolvedTheme === "light";
+  const { settings } = usePublicSettings();
+  const logoSrc = isLight
+    ? settings.site_branding.logoLightUrl || "/images/logo/chatnexgen-logo-light.png"
+    : settings.site_branding.logoDarkUrl || "/images/logo/chatnexgen-logo.png";
   const supabase = createClient();
   const rafRef = useRef<number | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -118,8 +123,8 @@ export function GlassNavbar() {
           {/* Brand */}
           <Link href="/" className="flex items-center gap-2 group shrink-0">
             <img
-              src={isLight ? "/images/logo/chatnexgen-logo-light.png" : "/images/logo/chatnexgen-logo.png"}
-              alt="ChatNexGen Logo"
+              src={logoSrc}
+              alt={settings.site_branding.siteName || "ChatNexGen Logo"}
               className="h-8 w-auto object-contain group-hover:scale-110 transition-transform"
             />
           </Link>

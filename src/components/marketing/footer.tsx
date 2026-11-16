@@ -3,10 +3,16 @@
 import React from "react";
 import Link from "next/link";
 import { useMarketingTheme } from "@/components/marketing/marketing-theme-provider";
+import { usePublicSettings } from "@/lib/cms/use-public-settings";
 
 export function Footer() {
   const { resolvedTheme } = useMarketingTheme();
   const isLight = resolvedTheme === "light";
+  const { settings } = usePublicSettings();
+
+  const branding = settings.site_branding;
+  const footer = settings.footer_details;
+  const contact = settings.contact_info;
 
   const productLinks = [
     { name: "Features", href: "/features" },
@@ -23,6 +29,10 @@ export function Footer() {
     { name: "Refund Policy", href: "/refund-policy" },
   ];
 
+  const logoSrc = isLight
+    ? branding.logoLightUrl || "/images/logo/chatnexgen-logo-light.png"
+    : branding.logoDarkUrl || "/images/logo/chatnexgen-logo.png";
+
   return (
     <footer className="relative w-full border-t border-[var(--m-border-primary)] bg-[var(--m-bg-glass)] py-16 px-4 md:px-6 overflow-hidden">
       {/* Background radial highlight */}
@@ -33,16 +43,16 @@ export function Footer() {
         <div className="col-span-1 md:col-span-2 space-y-4">
           <Link href="/" className="inline-block">
             <img
-              src={isLight ? "/images/logo/chatnexgen-logo-light.png" : "/images/logo/chatnexgen-logo.png"}
-              alt="ChatNexGen Logo"
+              src={logoSrc}
+              alt={branding.siteName || "ChatNexGen Logo"}
               className="h-8 w-auto object-contain"
             />
           </Link>
           <p className="text-xs text-[var(--m-text-tertiary)] leading-relaxed max-w-sm">
-            ChatNexGen is a premium AI-powered WhatsApp CRM and customer support automation platform. Automate business communication, configure smart chatbots, organize leads, and sync calendar reminders using the official WhatsApp Business API.
+            {footer.footerDescription}
           </p>
           <p className="text-xs font-medium text-[var(--m-text-secondary)]">
-            A product of Brightwave Digital Products LLP.
+            {footer.attributionText}
           </p>
         </div>
 
@@ -78,12 +88,13 @@ export function Footer() {
         <div className="col-span-1 space-y-4">
           <h6 className="text-[10px] uppercase font-bold tracking-wider text-[var(--m-text-tertiary)]">Contact Us</h6>
           <ul className="space-y-2.5 text-xs text-[var(--m-text-muted)]">
-            <li>ChatNexGen Technologies</li>
-            <li>Pune, Maharashtra, India</li>
+            <li>{branding.siteName || "ChatNexGen"}</li>
+            <li>{contact.address}</li>
+            {contact.phone && <li>Phone: {contact.phone}</li>}
             <li className="pt-1">
               <span className="block text-[11px] text-[var(--m-text-tertiary)] font-medium">Help &amp; Support:</span>
-              <a href="mailto:chatnexgen@gmail.com" className="text-emerald-400 hover:underline">
-                chatnexgen@gmail.com
+              <a href={`mailto:${contact.supportEmail}`} className="text-emerald-400 hover:underline">
+                {contact.supportEmail}
               </a>
             </li>
           </ul>
@@ -104,13 +115,15 @@ export function Footer() {
 
       {/* Meta API disclaimer & Copyright footer */}
       <div className="max-w-6xl mx-auto mt-12 pt-8 border-t border-[var(--m-border-primary)]/50 space-y-4 relative z-10 text-center">
-        <p className="text-[10px] leading-relaxed text-[var(--m-text-muted)] max-w-3xl mx-auto">
-          "ChatNexGen uses WhatsApp Business API solutions in accordance with Meta and WhatsApp Business policies. Businesses are responsible for obtaining user consent before initiating communication."
-        </p>
+        {footer.disclaimerText && (
+          <p className="text-[10px] leading-relaxed text-[var(--m-text-muted)] max-w-3xl mx-auto">
+            &quot;{footer.disclaimerText}&quot;
+          </p>
+        )}
         <div className="text-[10px] text-[var(--m-text-muted)] pt-2 space-y-1">
-          <p>© 2026 ChatNexGen Technologies. All rights reserved.</p>
+          <p>{footer.copyrightText}</p>
           <p className="text-xs font-medium text-[var(--m-text-secondary)]">
-            A product of Brightwave Digital Products LLP.
+            {footer.attributionText}
           </p>
         </div>
       </div>

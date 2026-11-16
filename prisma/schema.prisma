@@ -1172,3 +1172,11 @@ model CmsChangelog {
   @@index([isPublished])
 }
 
+model CmsSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+

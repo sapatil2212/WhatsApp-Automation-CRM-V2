@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import nodemailer from "nodemailer";
+import { sendSystemEmail } from "@/lib/email/smtp";
 import { emailLayout, emailHeading, emailSubtitle, emailText, emailButton, emailDivider, emailTokens } from "@/lib/email/template";
 
 export async function GET(req: NextRequest) {
@@ -69,60 +69,35 @@ export async function GET(req: NextRequest) {
     const dashboardUrl = `${siteUrl}/dashboard`;
     const fullName = user.profile?.fullName || "Valued Partner";
 
-    const cleanEnv = (val: string | undefined): string => {
-      if (!val) return "";
-      return val.replace(/^["']|["']$/g, "");
-    };
+    const htmlContent = emailLayout({
+      title: "Your ChatNexGen account is activated",
+      preview: "Your workspace is active and ready to use.",
+      contentHtml:
+        emailHeading("Account activated 🎉") +
+        emailSubtitle(`Welcome to ChatNexGen, ${fullName}!`) +
+        emailDivider() +
+        emailText(
+          "Your payment has been confirmed and your 1-month subscription has started. Your workspace is fully active and ready to use."
+        ) +
+        emailText(`Subscription active until <strong>${subscriptionExpiresAt.toLocaleDateString()}</strong>.`, {
+          size: 12,
+          color: emailTokens.muted,
+        }) +
+        emailButton(dashboardUrl, "Log in to dashboard"),
+    });
 
-    const smtpHost = cleanEnv(process.env.SMTP_HOST || process.env.EMAIL_HOST);
-    const rawPort = process.env.SMTP_PORT || process.env.EMAIL_PORT;
-    const smtpPort = rawPort ? parseInt(cleanEnv(rawPort)) : 587;
-    const smtpUser = cleanEnv(process.env.SMTP_USER || process.env.EMAIL_USERNAME);
-    const smtpPass = cleanEnv(process.env.SMTP_PASS || process.env.EMAIL_PASSWORD);
-
-    if (smtpHost && smtpUser && smtpPass) {
-      try {
-        const transporter = nodemailer.createTransport({
-          host: smtpHost,
-          port: smtpPort,
-          secure: smtpPort === 465,
-          auth: {
-            user: smtpUser,
-            pass: smtpPass,
-          },
-        });
-
-        const htmlContent = emailLayout({
-          title: "Your ChatNexGen account is activated",
-          preview: "Your workspace is active and ready to use.",
-          contentHtml:
-            emailHeading("Account activated 🎉") +
-            emailSubtitle(`Welcome to ChatNexGen, ${fullName}!`) +
-            emailDivider() +
-            emailText(
-              "Your payment has been confirmed and your 1-month subscription has started. Your workspace is fully active and ready to use."
-            ) +
-            emailText(`Subscription active until <strong>${subscriptionExpiresAt.toLocaleDateString()}</strong>.`, {
-              size: 12,
-              color: emailTokens.muted,
-            }) +
-            emailButton(dashboardUrl, "Log in to dashboard"),
-        });
-
-        await transporter.sendMail({
-          from: `"ChatNexGen Support" <${smtpUser}>`,
-          to: user.email,
-          subject: "🎉 Account Activated! Your ChatNexGen Workspace is Ready",
-          text: `Welcome, ${fullName}! Your account has been activated. Subscription valid until ${subscriptionExpiresAt.toLocaleDateString()}. Login here: ${dashboardUrl}`,
-          html: htmlContent
-        });
+    sendSystemEmail({
+      to: user.email,
+      subject: "🎉 Account Activated! Your ChatNexGen Workspace is Ready",
+      text: `Welcome, ${fullName}! Your account has been activated. Subscription valid until ${subscriptionExpiresAt.toLocaleDateString()}. Login here: ${dashboardUrl}`,
+      html: htmlContent,
+    })
+      .then(() => {
         console.log(`[SMTP] Welcome and activation email sent to ${user.email}`);
-      } catch (mailErr: any) {
+      })
+      .catch((mailErr: any) => {
         console.error("[approve] Error sending welcome activation email:", mailErr.message || mailErr);
-      }
-    } else {
-      console.warn("SMTP settings are not configured. Welcome email not sent.");
-    }
+      });
 
     return new NextResponse(
       `

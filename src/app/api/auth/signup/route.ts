@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { hashPassword } from '@/lib/auth'
 import crypto from 'crypto'
-import nodemailer from 'nodemailer'
+import { sendSystemEmail } from '@/lib/email/smtp'
 import { emailLayout, emailHeading, emailSubtitle, emailOtp, emailText, emailTokens } from '@/lib/email/template'
 
 export async function POST(req: NextRequest) {
@@ -143,70 +143,33 @@ export async function POST(req: NextRequest) {
     })
 
     // 4. Send Verification Email with 6-digit OTP
-    const cleanEnv = (val: string | undefined): string => {
-      if (!val) return "";
-      return val.replace(/^["']|["']$/g, "");
-    };
-
-    const smtpHost = cleanEnv(process.env.SMTP_HOST || process.env.EMAIL_HOST);
-    const rawPort = process.env.SMTP_PORT || process.env.EMAIL_PORT;
-    const smtpPort = rawPort ? parseInt(cleanEnv(rawPort)) : 587;
-    const smtpUser = cleanEnv(process.env.SMTP_USER || process.env.EMAIL_USERNAME);
-    const smtpPass = cleanEnv(process.env.SMTP_PASS || process.env.EMAIL_PASSWORD);
-    const smtpBcc = cleanEnv(process.env.EMAIL_BCC);
-
     const otpCode = result.user.verificationToken!
 
-    if (smtpHost && smtpUser && smtpPass) {
-      try {
-        const transporter = nodemailer.createTransport({
-          host: smtpHost,
-          port: smtpPort,
-          secure: smtpPort === 465,
-          auth: {
-            user: smtpUser,
-            pass: smtpPass,
-          },
-        });
+    const htmlContent = emailLayout({
+      title: "Verify your ChatNexGen account",
+      preview: `Your verification code is ${otpCode}`,
+      contentHtml:
+        emailHeading("Verify your account") +
+        emailSubtitle("Use the 6-digit code below to complete your signup.") +
+        emailOtp(otpCode) +
+        emailText(
+          "This code is valid for <strong>5 minutes</strong>. If you didn't request this, you can safely ignore this email.",
+          { size: 12, color: emailTokens.muted }
+        ),
+    });
 
-        const htmlContent = emailLayout({
-          title: "Verify your ChatNexGen account",
-          preview: `Your verification code is ${otpCode}`,
-          contentHtml:
-            emailHeading("Verify your account") +
-            emailSubtitle("Use the 6-digit code below to complete your signup.") +
-            emailOtp(otpCode) +
-            emailText(
-              "This code is valid for <strong>5 minutes</strong>. If you didn't request this, you can safely ignore this email.",
-              { size: 12, color: emailTokens.muted }
-            ),
-        });
-
-        // Send in the background so the signup request returns immediately.
-        // The OTP is already persisted in the database, so the client can move
-        // to the verification step without waiting for SMTP delivery.
-        transporter
-          .sendMail({
-            from: `"ChatNexGen Support" <${smtpUser}>`,
-            to: email,
-            bcc: smtpBcc || undefined,
-            subject: "Verify your ChatNexGen Account",
-            text: `Your verification code is: ${otpCode}. It is valid for 5 minutes.`,
-            html: htmlContent
-          })
-          .then(() => {
-            console.log(`[SMTP SIGNUP] OTP verification email sent to ${email}`);
-          })
-          .catch((mailErr: any) => {
-            console.error('[signup] Error sending verification email:', mailErr?.message || mailErr);
-          });
-      } catch (mailErr: any) {
-        console.error('[signup] Error preparing verification email:', mailErr.message || mailErr)
-      }
-    } else {
-      console.warn("SMTP settings are not configured. Falling back to mock console output.");
-      console.log(`[SMTP MOCK SIGNUP] OTP code for ${email}: ${otpCode}`);
-    }
+    sendSystemEmail({
+      to: email,
+      subject: "Verify your ChatNexGen Account",
+      text: `Your verification code is: ${otpCode}. It is valid for 5 minutes.`,
+      html: htmlContent,
+    })
+      .then(() => {
+        console.log(`[SMTP SIGNUP] OTP verification email sent to ${email}`);
+      })
+      .catch((mailErr: any) => {
+        console.error('[signup] Error sending verification email:', mailErr?.message || mailErr);
+      });
 
     return NextResponse.json({
       user: {
