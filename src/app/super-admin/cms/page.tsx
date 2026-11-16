@@ -284,27 +284,27 @@ export default function SuperAdminCmsPage() {
 
   return (
     <SuperAdminShell>
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2.5">
-              <span className="p-2 rounded-xl bg-violet-100 text-violet-700">
-                <FileText className="size-6" />
+            <h1 className="text-base font-bold text-slate-900 tracking-tight flex items-center gap-2">
+              <span className="p-1.5 rounded-lg bg-violet-100 text-violet-700">
+                <FileText className="size-4" />
               </span>
               Super Admin CMS & Platform Settings
             </h1>
-            <p className="text-sm text-slate-500 mt-1">
+            <p className="text-[11px] text-slate-500 mt-0.5">
               Configure platform logos, footer details, support contacts, SMTP email gateway, and in-app tenant banners.
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <button
               onClick={loadData}
-              className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-semibold shadow-sm flex items-center gap-1.5 transition active:scale-95"
+              className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-semibold flex items-center gap-1.5 transition active:scale-95"
             >
-              <RefreshCw className={cn("size-3.5", loading && "animate-spin")} />
+              <RefreshCw className={cn("size-3", loading && "animate-spin")} />
               Refresh
             </button>
           </div>
@@ -330,18 +330,18 @@ export default function SuperAdminCmsPage() {
                   setSearch("");
                 }}
                 className={cn(
-                  "flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold transition-all relative border-b-2 -mb-px whitespace-nowrap",
+                  "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-all relative border-b-2 -mb-px whitespace-nowrap",
                   isActive
                     ? "border-violet-600 text-violet-700 bg-violet-50/50 rounded-t-lg"
                     : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50/60"
                 )}
               >
-                <tab.icon className={cn("size-4", isActive ? "text-violet-600" : "text-slate-400")} />
+                <tab.icon className={cn("size-3.5", isActive ? "text-violet-600" : "text-slate-400")} />
                 <span>{tab.label}</span>
                 {tab.count !== null && (
                   <span
                     className={cn(
-                      "text-[10px] px-1.5 py-0.2 rounded-full font-bold tabular-nums",
+                      "text-[9px] px-1 py-0.2 rounded-full font-bold tabular-nums",
                       isActive ? "bg-violet-200 text-violet-800" : "bg-slate-100 text-slate-500"
                     )}
                   >
@@ -355,15 +355,15 @@ export default function SuperAdminCmsPage() {
 
         {/* TAB 1: Brand Logo & UI */}
         {activeTab === "branding" && (
-          <div className="space-y-6 max-w-4xl">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
+          <div className="space-y-4 max-w-4xl">
+            <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 space-y-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                    <Palette className="size-5 text-violet-600" />
+                  <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <Palette className="size-4 text-violet-600" />
                     Frontend Brand Identity & Logos
                   </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <p className="text-[10px] text-slate-500 mt-0.5">
                     Controls the logo displayed across marketing landing pages, navigation headers, and sidebar menus.
                   </p>
                 </div>
@@ -371,82 +371,82 @@ export default function SuperAdminCmsPage() {
                 <button
                   onClick={() => handleSaveSettings("site_branding", branding)}
                   disabled={savingKey === "site_branding"}
-                  className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold shadow-md shadow-violet-500/20 flex items-center gap-1.5 transition active:scale-95 disabled:opacity-50"
+                  className="px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95 disabled:opacity-50"
                 >
-                  {savingKey === "site_branding" ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+                  {savingKey === "site_branding" ? <Loader2 className="size-3 animate-spin" /> : <Check className="size-3" />}
                   Save Branding
                 </button>
               </div>
 
               {savedSuccessKey === "site_branding" && (
-                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
-                  <CheckCircle2 className="size-4 text-emerald-600" />
+                <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] flex items-center gap-2">
+                  <CheckCircle2 className="size-3.5 text-emerald-600" />
                   Branding settings updated and applied across the frontend.
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Platform Brand Name</label>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Platform Brand Name</label>
                   <input
                     value={branding.siteName}
                     onChange={(e) => setBranding({ ...branding, siteName: e.target.value })}
                     placeholder="ChatNexGen"
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-violet-500"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-violet-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Brand Tagline</label>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Brand Tagline</label>
                   <input
                     value={branding.siteTagline}
                     onChange={(e) => setBranding({ ...branding, siteTagline: e.target.value })}
                     placeholder="AI-Powered WhatsApp CRM"
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-violet-500"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-violet-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Logo URL (Light Theme)</label>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Logo URL (Light Theme)</label>
                   <input
                     value={branding.logoLightUrl}
                     onChange={(e) => setBranding({ ...branding, logoLightUrl: e.target.value })}
                     placeholder="/images/logo/chatnexgen-logo-light.png"
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-violet-500"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 font-mono focus:outline-none focus:border-violet-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Logo URL (Dark Theme)</label>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Logo URL (Dark Theme)</label>
                   <input
                     value={branding.logoDarkUrl}
                     onChange={(e) => setBranding({ ...branding, logoDarkUrl: e.target.value })}
                     placeholder="/images/logo/chatnexgen-logo.png"
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-violet-500"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 font-mono focus:outline-none focus:border-violet-500"
                   />
                 </div>
               </div>
 
               {/* Live Logo Preview Box */}
-              <div className="pt-4 border-t border-slate-100">
-                <p className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Live Logo Preview</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="p-6 rounded-xl border border-slate-200 bg-white flex flex-col items-center justify-center gap-2">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Light Background</span>
+              <div className="pt-3 border-t border-slate-100">
+                <p className="text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-2">Live Logo Preview</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-4 rounded-lg border border-slate-200 bg-white flex flex-col items-center justify-center gap-1.5">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Light Background</span>
                     <img
                       src={branding.logoLightUrl}
                       alt="Light Logo Preview"
-                      className="h-9 w-auto object-contain max-w-[200px]"
+                      className="h-7 w-auto object-contain max-w-[180px]"
                       onError={(e: any) => (e.target.src = "/images/logo/chatnexgen-logo-light.png")}
                     />
                   </div>
 
-                  <div className="p-6 rounded-xl border border-slate-800 bg-slate-900 flex flex-col items-center justify-center gap-2">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Dark Background</span>
+                  <div className="p-4 rounded-lg border border-slate-800 bg-slate-900 flex flex-col items-center justify-center gap-1.5">
+                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Dark Background</span>
                     <img
                       src={branding.logoDarkUrl}
                       alt="Dark Logo Preview"
-                      className="h-9 w-auto object-contain max-w-[200px]"
+                      className="h-7 w-auto object-contain max-w-[180px]"
                       onError={(e: any) => (e.target.src = "/images/logo/chatnexgen-logo.png")}
                     />
                   </div>
@@ -458,15 +458,15 @@ export default function SuperAdminCmsPage() {
 
         {/* TAB 2: Footer & Attribution Details */}
         {activeTab === "footer" && (
-          <div className="space-y-6 max-w-4xl">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
+          <div className="space-y-4 max-w-4xl">
+            <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 space-y-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                    <Layout className="size-5 text-violet-600" />
+                  <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <Layout className="size-4 text-violet-600" />
                     Footer Details & Legal Attributions
                   </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <p className="text-[10px] text-slate-500 mt-0.5">
                     Changes made here update the marketing footer, legal policy headers, and corporate statements.
                   </p>
                 </div>
@@ -474,95 +474,95 @@ export default function SuperAdminCmsPage() {
                 <button
                   onClick={() => handleSaveSettings("footer_details", footer)}
                   disabled={savingKey === "footer_details"}
-                  className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold shadow-md shadow-violet-500/20 flex items-center gap-1.5 transition active:scale-95 disabled:opacity-50"
+                  className="px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95 disabled:opacity-50"
                 >
-                  {savingKey === "footer_details" ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+                  {savingKey === "footer_details" ? <Loader2 className="size-3 animate-spin" /> : <Check className="size-3" />}
                   Save Footer Details
                 </button>
               </div>
 
               {savedSuccessKey === "footer_details" && (
-                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
-                  <CheckCircle2 className="size-4 text-emerald-600" />
+                <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] flex items-center gap-2">
+                  <CheckCircle2 className="size-3.5 text-emerald-600" />
                   Footer details saved and updated live on the website.
                 </div>
               )}
 
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Product Ownership Statement</label>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Product Ownership Statement</label>
                     <input
                       value={footer.attributionText}
                       onChange={(e) => setFooter({ ...footer, attributionText: e.target.value })}
                       placeholder="A product of Brightwave Digital Products LLP."
-                      className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-violet-500 font-semibold text-slate-900"
+                      className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-violet-500 font-semibold text-slate-900"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Company Entity Name</label>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Company Entity Name</label>
                     <input
                       value={footer.companyName}
                       onChange={(e) => setFooter({ ...footer, companyName: e.target.value })}
                       placeholder="Brightwave Digital Products LLP"
-                      className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-violet-500"
+                      className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-violet-500"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Copyright Statement</label>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Copyright Statement</label>
                   <input
                     value={footer.copyrightText}
                     onChange={(e) => setFooter({ ...footer, copyrightText: e.target.value })}
                     placeholder="© 2026 ChatNexGen Technologies. All rights reserved."
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-violet-500"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-violet-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Footer Tagline & Description</label>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Footer Tagline & Description</label>
                   <textarea
-                    rows={3}
+                    rows={2}
                     value={footer.footerDescription}
                     onChange={(e) => setFooter({ ...footer, footerDescription: e.target.value })}
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-violet-500"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-violet-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Meta API Compliance Disclaimer</label>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Meta API Compliance Disclaimer</label>
                   <textarea
                     rows={2}
                     value={footer.disclaimerText}
                     onChange={(e) => setFooter({ ...footer, disclaimerText: e.target.value })}
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-violet-500 text-slate-600"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-violet-500 text-slate-600"
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">LinkedIn URL</label>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">LinkedIn URL</label>
                     <input
                       value={footer.socialLinks?.linkedin || ""}
                       onChange={(e) =>
                         setFooter({ ...footer, socialLinks: { ...footer.socialLinks, linkedin: e.target.value } })
                       }
                       placeholder="https://linkedin.com/..."
-                      className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200"
+                      className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Twitter / X URL</label>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Twitter / X URL</label>
                     <input
                       value={footer.socialLinks?.twitter || ""}
                       onChange={(e) =>
                         setFooter({ ...footer, socialLinks: { ...footer.socialLinks, twitter: e.target.value } })
                       }
                       placeholder="https://twitter.com/..."
-                      className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200"
+                      className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200"
                     />
                   </div>
                 </div>
@@ -573,15 +573,15 @@ export default function SuperAdminCmsPage() {
 
         {/* TAB 3: Contact & Support Information */}
         {activeTab === "contact" && (
-          <div className="space-y-6 max-w-4xl">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
+          <div className="space-y-4 max-w-4xl">
+            <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 space-y-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                    <Phone className="size-5 text-violet-600" />
+                  <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <Phone className="size-4 text-violet-600" />
                     Public Contact & Customer Support Details
                   </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <p className="text-[10px] text-slate-500 mt-0.5">
                     Displayed on the footer, Contact Us page, and tenant help desk cards.
                   </p>
                 </div>
@@ -589,68 +589,68 @@ export default function SuperAdminCmsPage() {
                 <button
                   onClick={() => handleSaveSettings("contact_info", contact)}
                   disabled={savingKey === "contact_info"}
-                  className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold shadow-md shadow-violet-500/20 flex items-center gap-1.5 transition active:scale-95 disabled:opacity-50"
+                  className="px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95 disabled:opacity-50"
                 >
-                  {savingKey === "contact_info" ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+                  {savingKey === "contact_info" ? <Loader2 className="size-3 animate-spin" /> : <Check className="size-3" />}
                   Save Contact Details
                 </button>
               </div>
 
               {savedSuccessKey === "contact_info" && (
-                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
-                  <CheckCircle2 className="size-4 text-emerald-600" />
+                <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] flex items-center gap-2">
+                  <CheckCircle2 className="size-3.5 text-emerald-600" />
                   Contact details updated successfully.
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Help &amp; Support Email</label>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Help &amp; Support Email</label>
                   <input
                     value={contact.supportEmail}
                     onChange={(e) => setContact({ ...contact, supportEmail: e.target.value })}
                     placeholder="chatnexgen@gmail.com"
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-violet-500"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 font-mono focus:outline-none focus:border-violet-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Sales &amp; Partnership Email</label>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Sales &amp; Partnership Email</label>
                   <input
                     value={contact.salesEmail}
                     onChange={(e) => setContact({ ...contact, salesEmail: e.target.value })}
                     placeholder="sales@chatnexgen.com"
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-violet-500"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 font-mono focus:outline-none focus:border-violet-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Support Phone / WhatsApp</label>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Support Phone / WhatsApp</label>
                   <input
                     value={contact.phone}
                     onChange={(e) => setContact({ ...contact, phone: e.target.value })}
                     placeholder="+91 98765 43210"
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-violet-500"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-violet-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Business Support Hours</label>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Business Support Hours</label>
                   <input
                     value={contact.businessHours}
                     onChange={(e) => setContact({ ...contact, businessHours: e.target.value })}
                     placeholder="Monday - Saturday, 9:00 AM - 6:00 PM IST"
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-violet-500"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-violet-500"
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Physical Office Address</label>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Physical Office Address</label>
                   <input
                     value={contact.address}
                     onChange={(e) => setContact({ ...contact, address: e.target.value })}
                     placeholder="Pune, Maharashtra, India"
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-violet-500"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-violet-500"
                   />
                 </div>
               </div>
@@ -660,15 +660,15 @@ export default function SuperAdminCmsPage() {
 
         {/* TAB 4: Email SMTP Configuration */}
         {activeTab === "smtp" && (
-          <div className="space-y-6 max-w-4xl">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
+          <div className="space-y-4 max-w-4xl">
+            <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 space-y-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                    <Server className="size-5 text-violet-600" />
+                  <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <Server className="size-4 text-violet-600" />
                     Outgoing Email SMTP Configuration
                   </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <p className="text-[10px] text-slate-500 mt-0.5">
                     Powers all verification OTPs, welcome emails, password resets, and demo notifications.
                   </p>
                 </div>
@@ -676,142 +676,142 @@ export default function SuperAdminCmsPage() {
                 <button
                   onClick={() => handleSaveSettings("smtp_config", smtp)}
                   disabled={savingKey === "smtp_config"}
-                  className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold shadow-md shadow-violet-500/20 flex items-center gap-1.5 transition active:scale-95 disabled:opacity-50"
+                  className="px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95 disabled:opacity-50"
                 >
-                  {savingKey === "smtp_config" ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+                  {savingKey === "smtp_config" ? <Loader2 className="size-3 animate-spin" /> : <Check className="size-3" />}
                   Save SMTP Settings
                 </button>
               </div>
 
               {savedSuccessKey === "smtp_config" && (
-                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
-                  <CheckCircle2 className="size-4 text-emerald-600" />
+                <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] flex items-center gap-2">
+                  <CheckCircle2 className="size-3.5 text-emerald-600" />
                   SMTP credentials updated and stored in database.
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">SMTP Host</label>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">SMTP Host</label>
                   <input
                     value={smtp.host}
                     onChange={(e) => setSmtp({ ...smtp, host: e.target.value })}
                     placeholder="smtp.gmail.com"
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-violet-500"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 font-mono focus:outline-none focus:border-violet-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">SMTP Port</label>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">SMTP Port</label>
                   <input
                     type="number"
                     value={smtp.port}
                     onChange={(e) => setSmtp({ ...smtp, port: Number(e.target.value) })}
                     placeholder="587"
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-violet-500"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 font-mono focus:outline-none focus:border-violet-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">SMTP Username / Email</label>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">SMTP Username / Email</label>
                   <input
                     value={smtp.user}
                     onChange={(e) => setSmtp({ ...smtp, user: e.target.value })}
                     placeholder="infomedinexplus@gmail.com"
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-violet-500"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 font-mono focus:outline-none focus:border-violet-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">SMTP Password / App Password</label>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">SMTP Password / App Password</label>
                   <div className="relative">
                     <input
                       type={showSmtpPass ? "text" : "password"}
                       value={smtp.pass}
                       onChange={(e) => setSmtp({ ...smtp, pass: e.target.value })}
                       placeholder="••••••••••••••••"
-                      className="w-full text-xs px-3.5 py-2.5 pr-10 rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-violet-500"
+                      className="w-full text-xs px-3 py-1.5 pr-8 rounded-lg border border-slate-200 font-mono focus:outline-none focus:border-violet-500"
                     />
                     <button
                       type="button"
                       onClick={() => setShowSmtpPass(!showSmtpPass)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                     >
-                      {showSmtpPass ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                      {showSmtpPass ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
                     </button>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Sender Name</label>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Sender Name</label>
                   <input
                     value={smtp.fromName}
                     onChange={(e) => setSmtp({ ...smtp, fromName: e.target.value })}
                     placeholder="ChatNexGen Support"
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-violet-500"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-violet-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">From Email Address</label>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">From Email Address</label>
                   <input
                     value={smtp.fromEmail}
                     onChange={(e) => setSmtp({ ...smtp, fromEmail: e.target.value })}
                     placeholder="infomedinexplus@gmail.com"
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-violet-500"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 font-mono focus:outline-none focus:border-violet-500"
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-bold text-slate-700 mb-1">BCC Admin Audit Email (Optional)</label>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">BCC Admin Audit Email (Optional)</label>
                   <input
                     value={smtp.bccEmail || ""}
                     onChange={(e) => setSmtp({ ...smtp, bccEmail: e.target.value })}
                     placeholder="saptechnoeditors@gmail.com"
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-violet-500"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 font-mono focus:outline-none focus:border-violet-500"
                   />
                 </div>
               </div>
 
               {/* Live SMTP Tester Card */}
-              <div className="p-5 rounded-xl border border-slate-200 bg-slate-50/60 space-y-4">
-                <div className="flex items-center gap-2">
-                  <Send className="size-4 text-violet-600" />
-                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Test SMTP Connection Live</h4>
+              <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/60 space-y-3">
+                <div className="flex items-center gap-1.5">
+                  <Send className="size-3.5 text-violet-600" />
+                  <h4 className="text-[11px] font-bold text-slate-900 uppercase tracking-wider">Test SMTP Connection Live</h4>
                 </div>
 
-                <form onSubmit={handleTestSmtp} className="flex flex-col sm:flex-row items-center gap-3">
+                <form onSubmit={handleTestSmtp} className="flex flex-col sm:flex-row items-center gap-2">
                   <input
                     type="email"
                     required
                     value={testEmailRecipient}
                     onChange={(e) => setTestEmailRecipient(e.target.value)}
                     placeholder="Enter recipient email to verify (e.g. your email)"
-                    className="w-full sm:flex-1 text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-violet-500"
+                    className="w-full sm:flex-1 text-xs px-3 py-1.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-violet-500"
                   />
                   <button
                     type="submit"
                     disabled={testingSmtp}
-                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 whitespace-nowrap"
+                    className="w-full sm:w-auto px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 disabled:opacity-50 whitespace-nowrap"
                   >
-                    {testingSmtp ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
-                    {testingSmtp ? "Testing Connection..." : "Send Test Email"}
+                    {testingSmtp ? <Loader2 className="size-3 animate-spin" /> : <Send className="size-3" />}
+                    {testingSmtp ? "Testing..." : "Send Test Email"}
                   </button>
                 </form>
 
                 {testSmtpResult && (
                   <div
                     className={cn(
-                      "p-3 rounded-xl border text-xs flex items-start gap-2",
+                      "p-2.5 rounded-lg border text-[11px] flex items-start gap-1.5",
                       testSmtpResult.ok
                         ? "bg-emerald-50 border-emerald-200 text-emerald-800"
                         : "bg-red-50 border-red-200 text-red-800"
                     )}
                   >
                     {testSmtpResult.ok ? (
-                      <CheckCircle2 className="size-4 text-emerald-600 shrink-0 mt-0.5" />
+                      <CheckCircle2 className="size-3.5 text-emerald-600 shrink-0 mt-0.5" />
                     ) : (
-                      <AlertCircle className="size-4 text-red-600 shrink-0 mt-0.5" />
+                      <AlertCircle className="size-3.5 text-red-600 shrink-0 mt-0.5" />
                     )}
                     <span className="font-medium leading-relaxed">{testSmtpResult.message}</span>
                   </div>
@@ -823,23 +823,23 @@ export default function SuperAdminCmsPage() {
 
         {/* TAB 5: In-App Banners & Announcements */}
         {activeTab === "announcements" && (
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200">
-              <div className="relative w-full sm:w-72">
-                <Search className="size-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 bg-white p-2.5 rounded-xl border border-slate-200">
+              <div className="relative w-full sm:w-64">
+                <Search className="size-3 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   placeholder="Search announcements..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:outline-none focus:border-violet-500 transition"
+                  className="w-full pl-8 pr-2.5 py-1 text-xs rounded-lg border border-slate-200 bg-slate-50/50 focus:bg-white focus:outline-none focus:border-violet-500 transition"
                 />
               </div>
 
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-slate-500 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  {announcements.filter((a) => a.isActive).length} Active Banners
+              <div className="flex items-center gap-2.5">
+                <span className="text-[11px] text-slate-500 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  {announcements.filter((a) => a.isActive).length} Active
                 </span>
 
                 <button
@@ -847,15 +847,15 @@ export default function SuperAdminCmsPage() {
                     setEditingAnnouncement(null);
                     setAnnouncementModalOpen(true);
                   }}
-                  className="px-3.5 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold flex items-center gap-1.5"
+                  className="px-3 py-1 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold flex items-center gap-1.5"
                 >
-                  <Plus className="size-3.5" />
+                  <Plus className="size-3" />
                   New Banner
                 </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {announcements
                 .filter((a) => !search || a.title.toLowerCase().includes(search.toLowerCase()) || a.content.toLowerCase().includes(search.toLowerCase()))
                 .map((ann) => {
@@ -873,79 +873,79 @@ export default function SuperAdminCmsPage() {
                     <div
                       key={ann.id}
                       className={cn(
-                        "rounded-2xl border p-5 flex flex-col justify-between transition-all bg-white hover:shadow-md",
-                        ann.isActive ? "border-slate-200 shadow-sm" : "border-slate-100 opacity-70 bg-slate-50/30"
+                        "rounded-xl border p-3.5 flex flex-col justify-between transition-all bg-white",
+                        ann.isActive ? "border-slate-200" : "border-slate-100 opacity-70 bg-slate-50/30"
                       )}
                     >
-                      <div className="space-y-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-center gap-2">
-                            <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full capitalize", typeConfig.badge)}>
+                      <div className="space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded capitalize", typeConfig.badge)}>
                               {ann.type}
                             </span>
                             {ann.priority === "urgent" && (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 flex items-center gap-1">
-                                <AlertCircle className="size-3" /> Urgent
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-700 flex items-center gap-1">
+                                <AlertCircle className="size-2.5" /> Urgent
                               </span>
                             )}
-                            <span className="text-[10px] text-slate-400 font-mono">
-                              Target: {ann.targetPlan.toUpperCase()}
+                            <span className="text-[9px] text-slate-400 font-mono">
+                              {ann.targetPlan.toUpperCase()}
                             </span>
                           </div>
 
                           <button
                             onClick={() => toggleAnnouncement(ann)}
                             className={cn(
-                              "relative w-10 h-5.5 rounded-full transition-colors p-0.5 flex items-center",
+                              "relative w-8 h-4.5 rounded-full transition-colors p-0.5 flex items-center",
                               ann.isActive ? "bg-violet-600" : "bg-slate-200"
                             )}
                             title={ann.isActive ? "Active (Click to Pause)" : "Inactive (Click to Activate)"}
                           >
                             <div
                               className={cn(
-                                "w-4 h-4 rounded-full bg-white shadow-sm transition-transform",
-                                ann.isActive ? "translate-x-4.5" : "translate-x-0"
+                                "w-3.5 h-3.5 rounded-full bg-white shadow-xs transition-transform",
+                                ann.isActive ? "translate-x-3.5" : "translate-x-0"
                               )}
                             />
                           </button>
                         </div>
 
                         <div>
-                          <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                            <Icon className="size-4 shrink-0 text-violet-600" />
+                          <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                            <Icon className="size-3.5 shrink-0 text-violet-600" />
                             {ann.title}
                           </h4>
-                          <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">{ann.content}</p>
+                          <p className="text-[11px] text-slate-600 mt-1 leading-normal">{ann.content}</p>
                         </div>
 
                         {ann.actionLabel && ann.actionUrl && (
-                          <div className="pt-2">
-                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-violet-600 bg-violet-50 px-2.5 py-1 rounded-lg border border-violet-100">
-                              Action: {ann.actionLabel} → <code className="font-mono text-[10px] text-violet-500">{ann.actionUrl}</code>
+                          <div className="pt-1">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-violet-600 bg-violet-50 px-2 py-0.5 rounded border border-violet-100">
+                              Action: {ann.actionLabel} → <code className="font-mono text-[9px] text-violet-500">{ann.actionUrl}</code>
                             </span>
                           </div>
                         )}
                       </div>
 
-                      <div className="flex items-center justify-between pt-4 mt-4 border-t border-slate-100 text-[11px] text-slate-400">
-                        <span>Created {new Date(ann.createdAt).toLocaleDateString()}</span>
-                        <div className="flex items-center gap-1.5">
+                      <div className="flex items-center justify-between pt-2.5 mt-2.5 border-t border-slate-100 text-[10px] text-slate-400">
+                        <span>{new Date(ann.createdAt).toLocaleDateString()}</span>
+                        <div className="flex items-center gap-1">
                           <button
                             onClick={() => {
                               setEditingAnnouncement(ann);
                               setAnnouncementModalOpen(true);
                             }}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
+                            className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
                             title="Edit"
                           >
-                            <Edit2 className="size-3.5" />
+                            <Edit2 className="size-3" />
                           </button>
                           <button
                             onClick={() => deleteAnnouncement(ann.id)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
+                            className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
                             title="Delete"
                           >
-                            <Trash2 className="size-3.5" />
+                            <Trash2 className="size-3" />
                           </button>
                         </div>
                       </div>
@@ -958,16 +958,16 @@ export default function SuperAdminCmsPage() {
 
         {/* TAB 6: Knowledge Base Articles */}
         {activeTab === "articles" && (
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200">
-              <div className="relative w-full sm:w-72">
-                <Search className="size-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 bg-white p-2.5 rounded-xl border border-slate-200">
+              <div className="relative w-full sm:w-64">
+                <Search className="size-3 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   placeholder="Search articles..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:outline-none focus:border-violet-500 transition"
+                  className="w-full pl-8 pr-2.5 py-1 text-xs rounded-lg border border-slate-200 bg-slate-50/50 focus:bg-white focus:outline-none focus:border-violet-500 transition"
                 />
               </div>
 
@@ -977,60 +977,60 @@ export default function SuperAdminCmsPage() {
                     setEditingArticle(null);
                     setArticleModalOpen(true);
                   }}
-                  className="px-3.5 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold flex items-center gap-1.5"
+                  className="px-3 py-1 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold flex items-center gap-1.5"
                 >
-                  <Plus className="size-3.5" />
+                  <Plus className="size-3" />
                   New Article
                 </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {articles
                 .filter((a) => !search || a.title.toLowerCase().includes(search.toLowerCase()))
                 .map((art) => (
                   <div
                     key={art.id}
-                    className="rounded-2xl border border-slate-200 bg-white p-5 flex flex-col justify-between hover:shadow-md transition-all duration-200"
+                    className="rounded-xl border border-slate-200 bg-white p-3.5 flex flex-col justify-between transition-all"
                   >
-                    <div className="space-y-2.5">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-100 capitalize">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-1.5">
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-100 capitalize">
                           {art.category}
                         </span>
                         <span className={cn(
-                          "text-[10px] font-bold px-2 py-0.5 rounded-full capitalize",
+                          "text-[9px] font-bold px-1.5 py-0.5 rounded capitalize",
                           art.status === "published" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"
                         )}>
                           {art.status}
                         </span>
                       </div>
 
-                      <h4 className="text-sm font-bold text-slate-900 line-clamp-1">{art.title}</h4>
-                      <p className="text-xs text-slate-500 line-clamp-3 leading-relaxed">
+                      <h4 className="text-xs font-bold text-slate-900 line-clamp-1">{art.title}</h4>
+                      <p className="text-[11px] text-slate-500 line-clamp-2 leading-normal">
                         {art.excerpt || art.content}
                       </p>
                     </div>
 
-                    <div className="flex items-center justify-between pt-4 mt-4 border-t border-slate-100 text-xs">
-                      <code className="text-[10px] text-slate-400 font-mono truncate max-w-[120px]">
+                    <div className="flex items-center justify-between pt-2.5 mt-2.5 border-t border-slate-100 text-[11px]">
+                      <code className="text-[9px] text-slate-400 font-mono truncate max-w-[120px]">
                         /{art.slug}
                       </code>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1">
                         <button
                           onClick={() => {
                             setEditingArticle(art);
                             setArticleModalOpen(true);
                           }}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
+                          className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
                         >
-                          <Edit2 className="size-3.5" />
+                          <Edit2 className="size-3" />
                         </button>
                         <button
                           onClick={() => deleteArticle(art.id)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
+                          className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
                         >
-                          <Trash2 className="size-3.5" />
+                          <Trash2 className="size-3" />
                         </button>
                       </div>
                     </div>
@@ -1042,9 +1042,9 @@ export default function SuperAdminCmsPage() {
 
         {/* TAB 7: Product Changelog */}
         {activeTab === "changelog" && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between bg-white p-3.5 rounded-2xl border border-slate-200">
-              <span className="text-xs text-slate-500">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between bg-white p-2.5 rounded-xl border border-slate-200">
+              <span className="text-[11px] text-slate-500">
                 Latest Version: <strong className="font-mono text-violet-600">{changelogs[0]?.version || "v1.0.0"}</strong>
               </span>
 
@@ -1053,48 +1053,48 @@ export default function SuperAdminCmsPage() {
                   setEditingChangelog(null);
                   setChangelogModalOpen(true);
                 }}
-                className="px-3.5 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold flex items-center gap-1.5"
+                className="px-3 py-1 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold flex items-center gap-1.5"
               >
-                <Plus className="size-3.5" />
+                <Plus className="size-3" />
                 New Release Note
               </button>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {changelogs.map((log) => (
-                <div key={log.id} className="rounded-2xl border border-slate-200 bg-white p-5 hover:shadow-sm transition">
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-2.5">
-                      <span className="font-mono text-xs font-bold text-violet-700 bg-violet-50 px-2.5 py-1 rounded-lg border border-violet-100">
+                <div key={log.id} className="rounded-xl border border-slate-200 bg-white p-3.5 transition">
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[10px] font-bold text-violet-700 bg-violet-50 px-2 py-0.5 rounded border border-violet-100">
                         {log.version}
                       </span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase bg-emerald-50 text-emerald-700 border-emerald-100">
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase bg-emerald-50 text-emerald-700 border-emerald-100">
                         {log.tag}
                       </span>
-                      <h4 className="text-sm font-bold text-slate-900">{log.title}</h4>
+                      <h4 className="text-xs font-bold text-slate-900">{log.title}</h4>
                     </div>
 
-                    <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
                       <span>{new Date(log.publishedAt).toLocaleDateString()}</span>
                       <button
                         onClick={() => {
                           setEditingChangelog(log);
                           setChangelogModalOpen(true);
                         }}
-                        className="p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100"
+                        className="p-1 text-slate-400 hover:text-slate-700 rounded hover:bg-slate-100"
                       >
-                        <Edit2 className="size-3.5" />
+                        <Edit2 className="size-3" />
                       </button>
                       <button
                         onClick={() => deleteChangelog(log.id)}
-                        className="p-1 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50"
+                        className="p-1 text-slate-400 hover:text-red-600 rounded hover:bg-red-50"
                       >
-                        <Trash2 className="size-3.5" />
+                        <Trash2 className="size-3" />
                       </button>
                     </div>
                   </div>
 
-                  <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line pl-1">{log.content}</p>
+                  <p className="text-[11px] text-slate-600 leading-normal whitespace-pre-line pl-0.5">{log.content}</p>
                 </div>
               ))}
             </div>
@@ -1105,23 +1105,23 @@ export default function SuperAdminCmsPage() {
       {/* ─── MODAL: Create/Edit Announcement ─── */}
       <AnimatePresence>
         {announcementModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-lg rounded-2xl bg-white border border-slate-200 shadow-2xl overflow-hidden"
+              className="w-full max-w-md rounded-xl bg-white border border-slate-200 shadow-xl overflow-hidden"
             >
-              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                  <Megaphone className="size-4 text-violet-600" />
+              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/50">
+                <h3 className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                  <Megaphone className="size-3.5 text-violet-600" />
                   {editingAnnouncement ? "Edit Announcement" : "Create New Tenant Announcement"}
                 </h3>
                 <button
                   onClick={() => setAnnouncementModalOpen(false)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
+                  className="p-1 rounded-md text-slate-400 hover:text-slate-600"
                 >
-                  <X className="size-4" />
+                  <X className="size-3.5" />
                 </button>
               </div>
 
@@ -1162,38 +1162,38 @@ export default function SuperAdminCmsPage() {
                     setSubmitting(false);
                   }
                 }}
-                className="p-6 space-y-4 max-h-[80vh] overflow-y-auto"
+                className="p-4 space-y-3 max-h-[80vh] overflow-y-auto"
               >
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Banner Title</label>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Banner Title</label>
                   <input
                     name="title"
                     required
                     defaultValue={editingAnnouncement?.title || ""}
                     placeholder="e.g. Scheduled Maintenance or New Feature"
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-violet-500"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-violet-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Banner Message / Content</label>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Banner Message / Content</label>
                   <textarea
                     name="content"
                     required
                     rows={3}
                     defaultValue={editingAnnouncement?.content || ""}
                     placeholder="Detailed message shown to tenants on their CRM dashboard..."
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-violet-500"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-violet-500"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Banner Style</label>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Banner Style</label>
                     <select
                       name="type"
                       defaultValue={editingAnnouncement?.type || "info"}
-                      className="w-full text-xs px-3 py-2.5 rounded-xl border border-slate-200 bg-white"
+                      className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white"
                     >
                       <option value="info">Info (Blue)</option>
                       <option value="warning">Warning (Amber)</option>
@@ -1204,11 +1204,11 @@ export default function SuperAdminCmsPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Target Plan</label>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Target Plan</label>
                     <select
                       name="targetPlan"
                       defaultValue={editingAnnouncement?.targetPlan || "all"}
-                      className="w-full text-xs px-3 py-2.5 rounded-xl border border-slate-200 bg-white"
+                      className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white"
                     >
                       <option value="all">All Plans</option>
                       <option value="free">Free Tier Only</option>
@@ -1219,13 +1219,13 @@ export default function SuperAdminCmsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Priority</label>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Priority</label>
                     <select
                       name="priority"
                       defaultValue={editingAnnouncement?.priority || "normal"}
-                      className="w-full text-xs px-3 py-2.5 rounded-xl border border-slate-200 bg-white"
+                      className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white"
                     >
                       <option value="normal">Normal Banner</option>
                       <option value="urgent">Urgent / Top Priority</option>
@@ -1233,28 +1233,28 @@ export default function SuperAdminCmsPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Action Button Text (Optional)</label>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Action Button Text (Optional)</label>
                     <input
                       name="actionLabel"
                       defaultValue={editingAnnouncement?.actionLabel || ""}
                       placeholder="e.g. Upgrade Now"
-                      className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-violet-500"
+                      className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-violet-500"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Action Button Link (URL)</label>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Action Button Link (URL)</label>
                   <input
                     name="actionUrl"
                     defaultValue={editingAnnouncement?.actionUrl || ""}
                     placeholder="e.g. /settings or https://..."
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-violet-500"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-violet-500"
                   />
                 </div>
 
-                <div className="flex items-center gap-6 pt-2">
-                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700">
+                <div className="flex items-center gap-4 pt-1">
+                  <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-slate-700">
                     <input
                       type="checkbox"
                       name="isActive"
@@ -1264,7 +1264,7 @@ export default function SuperAdminCmsPage() {
                     Publish Immediately
                   </label>
 
-                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700">
+                  <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-slate-700">
                     <input
                       type="checkbox"
                       name="isDismissible"
@@ -1275,20 +1275,20 @@ export default function SuperAdminCmsPage() {
                   </label>
                 </div>
 
-                <div className="flex gap-2.5 pt-4 border-t border-slate-100">
+                <div className="flex gap-2 pt-3 border-t border-slate-100">
                   <button
                     type="button"
                     onClick={() => setAnnouncementModalOpen(false)}
-                    className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                    className="flex-1 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="flex-1 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold shadow-md shadow-violet-500/20 flex items-center justify-center gap-2"
+                    className="flex-1 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold flex items-center justify-center gap-1.5"
                   >
-                    {submitting ? <Loader2 className="size-4 animate-spin" /> : "Save Announcement"}
+                    {submitting ? <Loader2 className="size-3.5 animate-spin" /> : "Save Announcement"}
                   </button>
                 </div>
               </form>
@@ -1300,23 +1300,23 @@ export default function SuperAdminCmsPage() {
       {/* ─── MODAL: Create/Edit Article ─── */}
       <AnimatePresence>
         {articleModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-lg rounded-2xl bg-white border border-slate-200 shadow-2xl overflow-hidden"
+              className="w-full max-w-md rounded-xl bg-white border border-slate-200 shadow-xl overflow-hidden"
             >
-              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                  <BookOpen className="size-4 text-violet-600" />
+              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/50">
+                <h3 className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                  <BookOpen className="size-3.5 text-violet-600" />
                   {editingArticle ? "Edit Article" : "Create Knowledge Base Article"}
                 </h3>
                 <button
                   onClick={() => setArticleModalOpen(false)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
+                  className="p-1 rounded-md text-slate-400 hover:text-slate-600"
                 >
-                  <X className="size-4" />
+                  <X className="size-3.5" />
                 </button>
               </div>
 
@@ -1355,26 +1355,26 @@ export default function SuperAdminCmsPage() {
                     setSubmitting(false);
                   }
                 }}
-                className="p-6 space-y-4 max-h-[80vh] overflow-y-auto"
+                className="p-4 space-y-3 max-h-[80vh] overflow-y-auto"
               >
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Article Title</label>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Article Title</label>
                   <input
                     name="title"
                     required
                     defaultValue={editingArticle?.title || ""}
                     placeholder="e.g. Connecting Meta WhatsApp Business"
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-violet-500"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-violet-500"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Category</label>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Category</label>
                     <select
                       name="category"
                       defaultValue={editingArticle?.category || "general"}
-                      className="w-full text-xs px-3 py-2.5 rounded-xl border border-slate-200 bg-white"
+                      className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white"
                     >
                       <option value="general">General</option>
                       <option value="whatsapp">WhatsApp Meta Setup</option>
@@ -1385,11 +1385,11 @@ export default function SuperAdminCmsPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Status</label>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Status</label>
                     <select
                       name="status"
                       defaultValue={editingArticle?.status || "published"}
-                      className="w-full text-xs px-3 py-2.5 rounded-xl border border-slate-200 bg-white"
+                      className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white"
                     >
                       <option value="published">Published</option>
                       <option value="draft">Draft</option>
@@ -1399,62 +1399,62 @@ export default function SuperAdminCmsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Short Excerpt</label>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Short Excerpt</label>
                   <input
                     name="excerpt"
                     defaultValue={editingArticle?.excerpt || ""}
                     placeholder="Brief description shown in search results..."
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-violet-500"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-violet-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Content / Guide Text</label>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Content / Guide Text</label>
                   <textarea
                     name="content"
                     required
-                    rows={5}
+                    rows={4}
                     defaultValue={editingArticle?.content || ""}
                     placeholder="Step by step documentation, code snippets, or setup instructions..."
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-violet-500 font-mono"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-violet-500 font-mono"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Custom URL Slug (Optional)</label>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Custom URL Slug (Optional)</label>
                     <input
                       name="slug"
                       defaultValue={editingArticle?.slug || ""}
                       placeholder="e.g. meta-whatsapp-guide"
-                      className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-violet-500 font-mono"
+                      className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-violet-500 font-mono"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Author Name</label>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Author Name</label>
                     <input
                       name="author"
                       defaultValue={editingArticle?.author || "ChatNexGen Team"}
-                      className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-violet-500"
+                      className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-violet-500"
                     />
                   </div>
                 </div>
 
-                <div className="flex gap-2.5 pt-4 border-t border-slate-100">
+                <div className="flex gap-2 pt-3 border-t border-slate-100">
                   <button
                     type="button"
                     onClick={() => setArticleModalOpen(false)}
-                    className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                    className="flex-1 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="flex-1 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold shadow-md shadow-violet-500/20 flex items-center justify-center gap-2"
+                    className="flex-1 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold flex items-center justify-center gap-1.5"
                   >
-                    {submitting ? <Loader2 className="size-4 animate-spin" /> : "Save Article"}
+                    {submitting ? <Loader2 className="size-3.5 animate-spin" /> : "Save Article"}
                   </button>
                 </div>
               </form>
@@ -1466,23 +1466,23 @@ export default function SuperAdminCmsPage() {
       {/* ─── MODAL: Create/Edit Changelog ─── */}
       <AnimatePresence>
         {changelogModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-lg rounded-2xl bg-white border border-slate-200 shadow-2xl overflow-hidden"
+              className="w-full max-w-md rounded-xl bg-white border border-slate-200 shadow-xl overflow-hidden"
             >
-              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                  <History className="size-4 text-violet-600" />
+              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/50">
+                <h3 className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                  <History className="size-3.5 text-violet-600" />
                   {editingChangelog ? "Edit Release Update" : "Publish Release Note"}
                 </h3>
                 <button
                   onClick={() => setChangelogModalOpen(false)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
+                  className="p-1 rounded-md text-slate-400 hover:text-slate-600"
                 >
-                  <X className="size-4" />
+                  <X className="size-3.5" />
                 </button>
               </div>
 
@@ -1519,26 +1519,26 @@ export default function SuperAdminCmsPage() {
                     setSubmitting(false);
                   }
                 }}
-                className="p-6 space-y-4"
+                className="p-4 space-y-3"
               >
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Version Number</label>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Version Number</label>
                     <input
                       name="version"
                       required
                       defaultValue={editingChangelog?.version || "v2.5.0"}
                       placeholder="e.g. v2.5.0"
-                      className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 font-mono focus:outline-none focus:border-violet-500"
+                      className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 font-mono focus:outline-none focus:border-violet-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Release Category</label>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Release Category</label>
                     <select
                       name="tag"
                       defaultValue={editingChangelog?.tag || "feature"}
-                      className="w-full text-xs px-3 py-2.5 rounded-xl border border-slate-200 bg-white"
+                      className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white"
                     >
                       <option value="feature">New Feature</option>
                       <option value="improvement">Improvement</option>
@@ -1549,25 +1549,25 @@ export default function SuperAdminCmsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Release Title</label>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Release Title</label>
                   <input
                     name="title"
                     required
                     defaultValue={editingChangelog?.title || ""}
                     placeholder="e.g. Super Admin Realtime Dashboard & CMS"
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-violet-500"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-violet-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Release Notes</label>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Release Notes</label>
                   <textarea
                     name="content"
                     required
                     rows={4}
                     defaultValue={editingChangelog?.content || ""}
                     placeholder="Detailed bullet points of what changed..."
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-violet-500"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-violet-500"
                   />
                 </div>
 
@@ -1583,20 +1583,20 @@ export default function SuperAdminCmsPage() {
                   </label>
                 </div>
 
-                <div className="flex gap-2.5 pt-4 border-t border-slate-100">
+                <div className="flex gap-2 pt-3 border-t border-slate-100">
                   <button
                     type="button"
                     onClick={() => setChangelogModalOpen(false)}
-                    className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                    className="flex-1 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="flex-1 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold shadow-md shadow-violet-500/20 flex items-center justify-center gap-2"
+                    className="flex-1 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold flex items-center justify-center gap-1.5"
                   >
-                    {submitting ? <Loader2 className="size-4 animate-spin" /> : "Publish Note"}
+                    {submitting ? <Loader2 className="size-3.5 animate-spin" /> : "Publish Note"}
                   </button>
                 </div>
               </form>

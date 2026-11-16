@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
 
       // 1. Generate 6-digit OTP code
       const code = crypto.randomInt(100000, 999999).toString();
-      
+
       // 2. Save code in our store with 10-minute validity
       otpStore.set(email, {
         code,

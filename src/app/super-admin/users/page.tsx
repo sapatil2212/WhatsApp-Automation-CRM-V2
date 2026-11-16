@@ -54,7 +54,7 @@ function fmt(d: string | null) {
 
 function Avatar({ name, email }: { name: string; email: string }) {
   return (
-    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600/10 to-indigo-600/10 border border-violet-500/10 flex items-center justify-center text-violet-600 text-sm font-bold shrink-0">
+    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-600/10 to-indigo-600/10 border border-violet-500/10 flex items-center justify-center text-violet-600 text-xs font-bold shrink-0">
       {(name || email).charAt(0).toUpperCase()}
     </div>
   );
@@ -122,15 +122,15 @@ function UserModal({
     }
   };
 
-  const inputCls = "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 transition-all";
-  const labelCls = "block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5";
+  const inputCls = "w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-violet-500 transition-all";
+  const labelCls = "block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
+        className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs" onClick={onClose} />
       <motion.div initial={{ opacity: 0, scale: 0.95, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
-        className="relative w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden"
+        className="relative w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal header */}
@@ -444,24 +444,24 @@ export default function SuperAdminUsersPage() {
 
   return (
     <SuperAdminShell>
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* Header */}
-        <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-              <Users className="size-6 text-violet-500" /> Users
+            <h1 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <Users className="size-5 text-violet-500" /> Users Directory
             </h1>
-            <p className="mt-1 text-sm text-slate-500 font-medium">
+            <p className="mt-0.5 text-[11px] text-slate-500 font-medium">
               {users.length} registered · {users.filter((u) => u.isVerified).length} verified · {users.filter((u) => u.waConnected).length} WA connected
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={load} className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:text-slate-800 hover:bg-slate-50 hover:border-slate-350 shadow-sm text-xs font-semibold active:scale-[0.97] transition-all duration-200">
-              <RefreshCw className="size-3.5" /> Refresh
+            <button onClick={load} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:text-slate-800 hover:bg-slate-50 text-xs font-semibold active:scale-[0.97] transition-all">
+              <RefreshCw className="size-3" /> Refresh
             </button>
             <button
               onClick={() => setEditUser("new")}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-xs font-bold shadow-md shadow-violet-500/20 hover:shadow-lg hover:shadow-violet-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold active:scale-[0.98] transition-all"
             >
               <Plus className="size-3.5" /> Add User
             </button>
@@ -469,21 +469,21 @@ export default function SuperAdminUsersPage() {
         </div>
 
         {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col sm:flex-row gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400" />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, email, or business..."
-              className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/10 transition-all" />
+              className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-violet-500 transition-all" />
           </div>
           <select value={statusF} onChange={(e) => setStatusF(e.target.value as FilterStatus)}
-            className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:border-violet-500/60 transition-all">
+            className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:border-violet-500 transition-all">
             <option value="all">All Status</option>
             <option value="verified">Verified</option>
             <option value="unverified">Unverified</option>
             <option value="wa_connected">WA Connected</option>
           </select>
           <select value={planF} onChange={(e) => setPlanF(e.target.value as FilterPlan)}
-            className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:border-violet-500/60 transition-all">
+            className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:border-violet-500 transition-all">
             <option value="all">All Plans</option>
             <option value="free">Free</option>
             <option value="starter">Starter</option>
@@ -493,16 +493,16 @@ export default function SuperAdminUsersPage() {
         </div>
 
         {/* Table */}
-        <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm shadow-slate-100">
+        <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
           {loading ? (
-            <div className="flex items-center justify-center py-24">
-              <Loader2 className="size-7 text-violet-600 animate-spin" />
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="size-6 text-violet-600 animate-spin" />
             </div>
           ) : (
             <div className="overflow-x-auto overflow-y-visible">
-              <table className="w-full text-sm">
+              <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50/40">
+                  <tr className="border-b border-slate-200 bg-slate-50/50">
                     {([
                       ["fullName",      "User",          true],
                       ["email",         "Email",         true],
@@ -513,70 +513,70 @@ export default function SuperAdminUsersPage() {
                       ["conversations", "Convos",        true],
                       ["createdAt",     "Joined",        true],
                     ] as [SortKey | string, string, boolean][]).map(([k, label, sortable]) => (
-                      <th key={k} className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                      <th key={k} className="px-3 py-2 text-left text-[9px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
                         {sortable
                           ? <button onClick={() => toggleSort(k as SortKey)} className="flex items-center gap-1 hover:text-slate-600 transition-colors">{label}<SI k={k as SortKey} /></button>
                           : label}
                       </th>
                     ))}
-                    <th className="px-4 py-3 w-10" />
+                    <th className="px-3 py-2 w-8" />
                   </tr>
                 </thead>
                 <tbody>
                   <AnimatePresence initial={false}>
                     {filtered.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="px-4 py-14 text-center text-sm text-slate-400 font-medium">
+                        <td colSpan={9} className="px-3 py-10 text-center text-xs text-slate-400 font-medium">
                           No users found.
                         </td>
                       </tr>
                     ) : filtered.map((u, i) => (
                       <motion.tr key={u.id}
-                        initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                        transition={{ delay: i * 0.02 }}
+                        initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                        transition={{ delay: i * 0.015 }}
                         className={cn("border-b border-slate-100 last:border-0 hover:bg-slate-50/60 transition-colors cursor-pointer", !u.isVerified && "opacity-75")}
                         onClick={() => setDetail(u)}
                       >
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-3">
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-2.5">
                             <Avatar name={u.fullName} email={u.email} />
                             <div>
-                              <p className="font-semibold text-slate-800">{u.fullName || "—"}</p>
-                              {u.businessName && <p className="text-[10px] text-slate-400 font-medium">{u.businessName}</p>}
+                              <p className="font-semibold text-slate-800 text-xs">{u.fullName || "—"}</p>
+                              {u.businessName && <p className="text-[10px] text-slate-400">{u.businessName}</p>}
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-slate-600 max-w-[160px] truncate">{u.email}</td>
-                        <td className="px-4 py-3">
-                          <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border", PLAN_COLOR[u.plan] ?? PLAN_COLOR.free)}>
-                            {u.plan.toUpperCase()}
+                        <td className="px-3 py-2 text-slate-600 max-w-[160px] truncate text-[11px]">{u.email}</td>
+                        <td className="px-3 py-2">
+                          <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded uppercase border", PLAN_COLOR[u.plan] ?? PLAN_COLOR.free)}>
+                            {u.plan}
                           </span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-3 py-2">
                           {u.isVerified
-                            ? <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border bg-emerald-50 border-emerald-100 text-emerald-600"><CheckCircle className="size-2.5" />Active</span>
-                            : <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border bg-red-50 border-red-100 text-red-600"><XCircle className="size-2.5" />Blocked</span>
+                            ? <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded border bg-emerald-50 border-emerald-100 text-emerald-600"><CheckCircle className="size-2.5" />Active</span>
+                            : <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded border bg-red-50 border-red-100 text-red-600"><XCircle className="size-2.5" />Blocked</span>
                           }
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-3 py-2">
                           {u.waConnected
-                            ? <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border bg-emerald-50 border-emerald-100 text-emerald-600"><Wifi className="size-2.5" />Connected</span>
-                            : <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border bg-slate-50 border-slate-100 text-slate-400"><WifiOff className="size-2.5" />None</span>
+                            ? <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded border bg-emerald-50 border-emerald-100 text-emerald-600"><Wifi className="size-2.5" />Connected</span>
+                            : <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded border bg-slate-50 border-slate-100 text-slate-400"><WifiOff className="size-2.5" />None</span>
                           }
                         </td>
-                        <td className="px-4 py-3 text-slate-600 font-mono tabular-nums">{u.contacts}</td>
-                        <td className="px-4 py-3 text-slate-600 font-mono tabular-nums">{u.conversations}</td>
-                        <td className="px-4 py-3 text-slate-400 font-medium whitespace-nowrap">{fmt(u.createdAt)}</td>
-                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <td className="px-3 py-2 text-slate-600 font-mono tabular-nums text-[11px]">{u.contacts}</td>
+                        <td className="px-3 py-2 text-slate-600 font-mono tabular-nums text-[11px]">{u.conversations}</td>
+                        <td className="px-3 py-2 text-slate-400 font-medium whitespace-nowrap text-[10px]">{fmt(u.createdAt)}</td>
+                        <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={(e) => {
                               const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                              setMenuPos({ top: rect.bottom + 6, right: window.innerWidth - rect.right });
+                              setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
                               setOpenMenu(openMenu === u.id ? null : u.id);
                             }}
-                            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition-colors"
+                            className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition-colors"
                           >
-                            <MoreVertical className="size-4" />
+                            <MoreVertical className="size-3.5" />
                           </button>
                         </td>
                       </motion.tr>
@@ -586,10 +586,10 @@ export default function SuperAdminUsersPage() {
               </table>
             </div>
           )}
-          <div className="px-4 py-3 border-t border-slate-200 bg-slate-50/20 flex items-center justify-between text-xs text-slate-500 font-medium">
+          <div className="px-3 py-2 border-t border-slate-200 bg-slate-50/30 flex items-center justify-between text-[11px] text-slate-500 font-medium">
             <span>Showing {filtered.length} of {users.length} users</span>
             <button onClick={() => { setSearch(""); setStatusF("all"); setPlanF("all"); }} className="flex items-center gap-1 hover:text-slate-800 transition-colors">
-              <RefreshCw className="size-3" /> Reset filters
+              <RefreshCw className="size-2.5" /> Reset filters
             </button>
           </div>
         </div>
