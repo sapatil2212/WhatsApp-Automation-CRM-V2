@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { Sparkles, Calendar, BookOpen, ArrowRight } from "lucide-react";
 import { SpotlightCard } from "@/components/marketing/spotlight-card";
 
@@ -11,23 +12,26 @@ export default function BlogPage() {
     {
       title: "Five WhatsApp Business API Templates to Drive E-commerce Recoveries",
       cat: "marketing",
-      date: "May 24, 2026",
+      date: "May 2026",
       read: "4 min read",
       desc: "Learn how to optimize quick-reply configurations and variables to bypass customer inbox fatigue and boost returns.",
+      href: "/whatsapp-marketing",
     },
     {
-      title: "Avoiding Meta Number Bans: A Complete compliance Guideline",
+      title: "Avoiding Meta Number Bans: A Complete Compliance Guideline",
       cat: "api",
-      date: "May 18, 2026",
+      date: "May 2026",
       read: "6 min read",
       desc: "Understand high-quality template scores, opt-out triggers, and official Meta policies to keep your business account active.",
+      href: "/features",
     },
     {
-      title: "How to Fine-tune LLM Context for Inbound Intent Classification",
+      title: "How to Build Automated Flows for Inbound WhatsApp CRM",
       cat: "api",
-      date: "May 12, 2026",
+      date: "May 2026",
       read: "8 min read",
-      desc: "An engineering-first guide to training prompt memory, managing token boundaries, and handling hand-offs to human reps.",
+      desc: "An architectural guide to setting up webhooks, managing token boundaries, and handling hand-offs to human agents.",
+      href: "/crm",
     },
   ];
 
@@ -75,25 +79,27 @@ export default function BlogPage() {
       {/* Posts List */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {filtered.map((post) => (
-          <SpotlightCard key={post.title} interactive={true} className="flex flex-col justify-between min-h-[300px]">
-            <div className="space-y-4">
-              <div className="flex gap-3 text-[10px] text-[var(--m-text-muted)] font-semibold">
-                <span className="flex items-center gap-1"><Calendar className="size-3" /> {post.date}</span>
-                <span className="flex items-center gap-1"><BookOpen className="size-3" /> {post.read}</span>
+          <Link key={post.title} href={post.href} className="block group">
+            <SpotlightCard interactive={true} className="flex flex-col justify-between min-h-[300px] h-full">
+              <div className="space-y-4">
+                <div className="flex gap-3 text-[10px] text-[var(--m-text-muted)] font-semibold">
+                  <span className="flex items-center gap-1"><Calendar className="size-3" /> {post.date}</span>
+                  <span className="flex items-center gap-1"><BookOpen className="size-3" /> {post.read}</span>
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-[var(--m-text-secondary)] group-hover:text-emerald-400 transition-colors leading-snug">
+                    {post.title}
+                  </h4>
+                  <p className="text-xs text-[var(--m-text-tertiary)] mt-2 leading-relaxed">{post.desc}</p>
+                </div>
               </div>
-              <div>
-                <h4 className="text-sm font-bold text-[var(--m-text-secondary)] hover:text-emerald-400 transition-colors cursor-pointer leading-snug">
-                  {post.title}
-                </h4>
-                <p className="text-xs text-[var(--m-text-tertiary)] mt-2 leading-relaxed">{post.desc}</p>
-              </div>
-            </div>
 
-            <div className="pt-4 mt-4 border-t border-[var(--m-border-primary)] flex items-center justify-between text-xs font-bold text-[var(--m-text-tertiary)] hover:text-[var(--m-text-heading)] cursor-pointer group/link">
-              <span>Read Article</span>
-              <ArrowRight className="size-3.5 group-hover/link:translate-x-0.5 transition-transform" />
-            </div>
-          </SpotlightCard>
+              <div className="pt-4 mt-4 border-t border-[var(--m-border-primary)] flex items-center justify-between text-xs font-bold text-[var(--m-text-tertiary)] group-hover:text-[var(--m-text-heading)]">
+                <span>Explore Guide</span>
+                <ArrowRight className="size-3.5 group-hover:translate-x-1 transition-transform text-emerald-400" />
+              </div>
+            </SpotlightCard>
+          </Link>
         ))}
       </div>
     </div>

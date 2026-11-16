@@ -33,11 +33,11 @@ export default function EnterprisePage() {
         <h1 className="text-4xl sm:text-6xl font-extrabold text-[var(--m-text-heading)] tracking-tight leading-[1.1]">
           Scale Conversations <br />
           <span className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
-            with Global Safety.
+            with Enterprise Reliability.
           </span>
         </h1>
         <p className="text-sm text-[var(--m-text-tertiary)] max-w-xl mx-auto">
-          WA CRM powers billions of chat events for hyper-growth teams. Ensure 99.9% uptime, data privacy compliance, and dedicated engineering support.
+          ChatNexGen, operated by Brightwave Digital Products LLP, delivers enterprise-grade WhatsApp Cloud API integrations with high availability, tenant isolation, and direct technical support.
         </p>
       </div>
 
@@ -59,20 +59,20 @@ export default function EnterprisePage() {
         <div className="absolute inset-0 bg-gradient-to-r from-emerald-950/5 to-teal-950/5 pointer-events-none" />
         <div className="max-w-3xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8 relative z-10">
           <div className="space-y-2">
-            <span className="text-[10px] uppercase font-bold text-emerald-400">Guaranteed Service Levels</span>
-            <h3 className="text-xl sm:text-2xl font-extrabold text-[var(--m-text-primary)]">Uptime & Throughput SLA</h3>
+            <span className="text-[10px] uppercase font-bold text-emerald-400">High-Availability Architecture</span>
+            <h3 className="text-xl sm:text-2xl font-extrabold text-[var(--m-text-primary)]">Reliability &amp; Support SLA</h3>
             <p className="text-xs text-[var(--m-text-tertiary)] max-w-md">
-              We contractually guarantee 99.9% API uptime and dedicated sending rate capacity (up to 200 messages/sec).
+              Designed for 99.9% platform availability with direct webhook dispatch and priority engineer assistance.
             </p>
           </div>
           <div className="flex gap-4 shrink-0">
             <div className="bg-[var(--m-bg-secondary)] border border-[var(--m-border-primary)] px-4 py-3 rounded-xl text-center min-w-[100px]">
-              <span className="text-[9px] uppercase font-bold text-[var(--m-text-muted)]">Uptime</span>
-              <h4 className="text-lg font-black text-[var(--m-text-primary)] mt-1">99.99%</h4>
+              <span className="text-[9px] uppercase font-bold text-[var(--m-text-muted)]">Target SLA</span>
+              <h4 className="text-lg font-black text-[var(--m-text-primary)] mt-1">99.9%</h4>
             </div>
             <div className="bg-[var(--m-bg-secondary)] border border-[var(--m-border-primary)] px-4 py-3 rounded-xl text-center min-w-[100px]">
               <span className="text-[9px] uppercase font-bold text-[var(--m-text-muted)]">Support</span>
-              <h4 className="text-lg font-black text-emerald-400 mt-1">24/7</h4>
+              <h4 className="text-lg font-black text-emerald-400 mt-1">Priority</h4>
             </div>
           </div>
         </div>

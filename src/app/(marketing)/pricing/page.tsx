@@ -77,10 +77,10 @@ export default function PricingPage() {
     support: {
       title: "Support & Strategy",
       rows: [
-        { name: "Priority WhatsApp Support Group", starter: "check", growth: "check", managed: "check" },
-        { name: "Monthly Group Q&A with Lakshit", starter: "check", growth: "check", managed: "check" },
+        { name: "Priority Support Group", starter: "check", growth: "check", managed: "check" },
+        { name: "Monthly Product Strategy & Feature Q&A", starter: "check", growth: "check", managed: "check" },
         { name: "1-on-1 Strategy Call", starter: "DIY", growth: "Onboarding call included", managed: "Monthly deep-dive (60 min)" },
-        { name: "Meta Template Fast-Track Approvals", starter: "DIY", growth: "DIY", managed: "check" },
+        { name: "Meta Template Formatting & Compliance Review", starter: "DIY", growth: "DIY", managed: "check" },
         { name: "Dedicated Account Manager", starter: "DIY", growth: "DIY", managed: "check" }
       ]
     }

@@ -10,22 +10,22 @@ export default function CareersPage() {
 
   const jobs = [
     {
-      role: "Senior Frontend Engineer (Framer Motion / Motion Design)",
-      loc: "Remote (EU / US)",
-      sal: "$120k - $160k",
-      desc: "Architect next-generation interactive dashboards, 3D CSS structures, and luxury client pipelines.",
+      role: "Full Stack Software Engineer (Next.js & Node.js)",
+      loc: "Pune, India / Hybrid",
+      sal: "Competitive (Based on Experience)",
+      desc: "Build and optimize high-throughput multi-tenant SaaS features, WhatsApp Cloud API webhook pipelines, and responsive React interfaces.",
     },
     {
-      role: "Lead AI Researcher (Fine-tuning & RAG Weights)",
-      loc: "San Francisco, CA (Hybrid)",
-      sal: "$160k - $210k",
-      desc: "Implement custom LLM fine-tuning structures on sparse chat logs to classify user conversational budgets.",
+      role: "Technical Customer Success & Implementation Lead",
+      loc: "Pune, India / Remote (India)",
+      sal: "Competitive (Based on Experience)",
+      desc: "Guide business clients through Meta Business verification, WhatsApp Cloud API credential configuration, and template approval compliance.",
     },
     {
-      role: "Backend Engineer (Real-time WebSockets & Supabase)",
-      loc: "Remote (Global)",
-      sal: "$110k - $150k",
-      desc: "Build low-latency Meta Cloud API listeners, message collision locks, and real-time database feeds.",
+      role: "AI & Automation Workflow Specialist",
+      loc: "Remote (India)",
+      sal: "Competitive (Based on Experience)",
+      desc: "Design conversational workflows, prompt templates, and CRM integration blueprints for healthcare, e-commerce, and B2B clients.",
     },
   ];
 
@@ -43,20 +43,20 @@ export default function CareersPage() {
           <Sparkles className="size-3 animate-pulse" /> join us
         </div>
         <h1 className="text-4xl sm:text-6xl font-extrabold text-[var(--m-text-heading)] tracking-tight leading-[1.1]">
-          Build the Future of <br />
+          Careers at <br />
           <span className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
-            Conversational Commerce.
+            Brightwave Digital Products LLP.
           </span>
         </h1>
         <p className="text-sm text-[var(--m-text-tertiary)] max-w-xl mx-auto">
-          We're a design-first, engineering-led team looking for builders passionate about motion systems, real-time sync, and LLMs.
+          We are engineering the future of WhatsApp Business communication from Pune, India. Join us in building compliant, scalable multi-tenant SaaS tools.
         </p>
       </div>
 
       {/* Open roles */}
       <div className="space-y-6">
         <span className="text-[10px] uppercase font-bold tracking-widest text-[var(--m-text-muted)] block border-b border-[var(--m-border-primary)] pb-3">
-          CURRENT OPEN POSITIONINGS
+          CURRENT OPEN POSITIONS (INDIA)
         </span>
 
         <div className="space-y-4">
@@ -70,9 +70,12 @@ export default function CareersPage() {
                   <span className="flex items-center gap-1"><DollarSign className="size-3" /> {job.sal}</span>
                 </div>
               </div>
-              <button className="bg-[var(--m-bg-secondary)] hover:bg-[var(--m-bg-tertiary)] text-[var(--m-text-secondary)] text-xs font-bold px-4 py-2.5 rounded-lg border border-[var(--m-border-primary)] shrink-0 transition-colors flex items-center gap-1.5 cursor-pointer">
-                Apply Now <ArrowRight className="size-3.5" />
-              </button>
+              <a
+                href={`mailto:careers@chatnexgen.online?subject=Application:%20${encodeURIComponent(job.role)}`}
+                className="bg-[var(--m-bg-secondary)] hover:bg-[var(--m-bg-tertiary)] text-[var(--m-text-secondary)] text-xs font-bold px-4 py-2.5 rounded-lg border border-[var(--m-border-primary)] shrink-0 transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                Apply via Email <ArrowRight className="size-3.5" />
+              </a>
             </SpotlightCard>
           ))}
         </div>
@@ -81,28 +84,19 @@ export default function CareersPage() {
       {/* Speculative Application */}
       <div className="rounded-2xl border border-[var(--m-border-primary)] bg-[var(--m-bg-card)] p-8 backdrop-blur-md relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-emerald-950/5 to-teal-950/5 pointer-events-none" />
-        <div className="max-w-2xl mx-auto text-center space-y-6 relative z-10">
+        <div className="max-w-2xl mx-auto text-center space-y-4 relative z-10">
           <h3 className="text-xl sm:text-2xl font-extrabold text-[var(--m-text-primary)]">Don't see your specific role?</h3>
           <p className="text-xs text-[var(--m-text-tertiary)] max-w-md mx-auto leading-relaxed">
-            Drop your email address below. We'll verify alignment for custom roles as we scale.
+            We are always interested in connecting with passionate engineers and customer success leaders in India.
           </p>
-
-          <form onSubmit={handleApply} className="flex gap-2 max-w-sm mx-auto">
-            <input
-              type="email"
-              placeholder="Your email address"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="flex-1 bg-[var(--m-input-bg)] border border-[var(--m-input-border)] rounded-lg px-3.5 py-2.5 text-xs text-[var(--m-text-secondary)] focus:outline-none focus:border-emerald-500/50"
-            />
-            <button
-              type="submit"
-              className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+          <div className="pt-2">
+            <a
+              href="mailto:careers@chatnexgen.online?subject=General%20Inquiry%20-%20Brightwave%20Digital%20Products%20LLP"
+              className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold px-6 py-2.5 rounded-lg transition-colors cursor-pointer"
             >
-              {submitted ? "Resume Sent!" : <><Send className="size-3.5" /> Apply</>}
-            </button>
-          </form>
+              <Send className="size-3.5" /> Send Resume to careers@chatnexgen.online
+            </a>
+          </div>
         </div>
       </div>
     </div>

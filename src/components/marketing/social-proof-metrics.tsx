@@ -53,32 +53,32 @@ function Counter({ value, suffix = "", decimals = 0, duration = 2 }: MetricProps
 export function SocialProofMetrics() {
   const stats = [
     {
-      value: 10000,
-      suffix: "+",
-      label: "Businesses Served",
+      value: 100,
+      suffix: "%",
+      label: "Official Meta API",
       decimals: 0,
       glowColor: "var(--color-m-glow-emerald)"
     },
     {
-      value: 50,
-      suffix: "M+",
-      label: "Messages Sent",
+      value: 1,
+      suffix: "s",
+      label: "Webhook Sync Latency",
       decimals: 0,
-      glowColor: "rgba(20, 184, 166, 0.1)" // Teal glow
+      glowColor: "rgba(20, 184, 166, 0.1)"
     },
     {
-      value: 98,
+      value: 99.9,
       suffix: "%",
-      label: "Uptime Guarantee",
-      decimals: 0,
-      glowColor: "var(--color-m-glow-emerald)" // Emerald glow
+      label: "Target Architecture Uptime",
+      decimals: 1,
+      glowColor: "var(--color-m-glow-emerald)"
     },
     {
-      value: 4.9,
-      suffix: "/5",
-      label: "Customer Rating",
-      decimals: 1,
-      glowColor: "rgba(20, 184, 166, 0.1)" // Teal glow
+      value: 24,
+      suffix: "/7",
+      label: "Always-On Auto-Replies",
+      decimals: 0,
+      glowColor: "rgba(20, 184, 166, 0.1)"
     }
   ];
 

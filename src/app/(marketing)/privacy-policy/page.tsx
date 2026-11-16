@@ -14,15 +14,15 @@ export default function PrivacyPolicyPage() {
           Privacy Policy
         </h1>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--m-text-muted)]">
-          <p>Last updated: June 23, 2026</p>
+          <p>Last updated: November 2026</p>
           <span>•</span>
-          <p className="font-medium text-[var(--m-text-secondary)]">A product of Brightwave Digital Products LLP.</p>
+          <p className="font-medium text-[var(--m-text-secondary)]">Operated by Brightwave Digital Products LLP (India)</p>
         </div>
       </div>
 
       <div className="space-y-8 text-xs sm:text-sm text-[var(--m-text-secondary)] leading-relaxed">
         <p>
-          This Privacy Policy (the &quot;Policy&quot;) describes how ChatNexGen Technologies (A product of Brightwave Digital Products LLP, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) collects, uses, maintains, and discloses information from users of our Platform. By accessing or using the ChatNexGen SaaS platform, you consent to the practices described in this Policy. If you do not agree, please do not use the Platform.
+          This Privacy Policy (the &quot;Policy&quot;) describes how ChatNexGen, a multi-tenant WhatsApp communication SaaS platform operated by <strong className="text-[var(--m-text-secondary)]">Brightwave Digital Products LLP</strong> (&quot;we&quot;, &quot;us&quot;, or &quot;our&quot;), collects, uses, maintains, and discloses information from users of our Platform. By accessing or using the ChatNexGen SaaS platform, you consent to the practices described in this Policy. If you do not agree, please do not use the Platform.
         </p>
 
         <section className="space-y-3">
@@ -96,15 +96,15 @@ export default function PrivacyPolicyPage() {
         <section className="space-y-3 text-center pt-8 border-t border-[var(--m-border-primary)]/50">
           <h3 className="text-lg font-bold text-[var(--m-text-heading)]">10. Contact & Regulatory Information</h3>
           <p>
-            For questions or requests regarding your data, contact ChatNexGen Technologies:
+            For questions, compliance requests, or grievance redressal regarding your data, contact our operations team:
           </p>
           <div className="text-xs text-[var(--m-text-tertiary)] mt-3 space-y-1">
-            <p className="font-bold text-[var(--m-text-primary)]">ChatNexGen Technologies</p>
-            <p className="text-[var(--m-text-secondary)] font-medium">A product of Brightwave Digital Products LLP.</p>
-            <p>Compliance Department</p>
+            <p className="font-bold text-[var(--m-text-primary)]">Brightwave Digital Products LLP</p>
+            <p className="text-[var(--m-text-secondary)] font-medium">Operators of ChatNexGen (chatnexgen.online)</p>
+            <p>Compliance &amp; Data Privacy Department</p>
             <p>Pune, Maharashtra, India</p>
             <p>
-              Email: <a href="mailto:chatnexgen@gmail.com" className="text-emerald-400 hover:underline">chatnexgen@gmail.com</a>
+              Email: <a href="mailto:support@chatnexgen.online" className="text-emerald-400 hover:underline">support@chatnexgen.online</a>
             </p>
           </div>
         </section>

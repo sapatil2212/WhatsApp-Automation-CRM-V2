@@ -33,7 +33,7 @@ export default function FeaturesPage() {
     },
     {
       name: "Drip Campaigns",
-      desc: "Set it once, sell forever. Automated sequences nurture leads, re-engage dormant contacts, and deliver your pitch — on schedule, without your team lifting a finger.",
+      desc: "Set it once, run consistently. Automated sequences nurture opted-in leads, deliver timely follow-ups, and share relevant product updates on schedule.",
       icon: <RefreshCw className="size-5 text-teal-400" />
     },
     {
@@ -58,7 +58,7 @@ export default function FeaturesPage() {
     },
     {
       name: "Projects & Tasks",
-      desc: "Stay organized without switching tools. Create, assign, and track follow-up tasks inside ChatNexGen Ai — so nothing slips, no matter how fast your business moves.",
+      desc: "Stay organized without switching tools. Create, assign, and track follow-up tasks inside ChatNexGen — so nothing slips, no matter how fast your business moves.",
       icon: <CheckSquare className="size-5 text-amber-400" />
     },
     {
@@ -76,7 +76,7 @@ export default function FeaturesPage() {
   const metaIntegrations = [
     {
       title: "Official WhatsApp Business API",
-      desc: "Direct connection through Meta Business — enterprise-grade delivery, full compliance, and 99.9% message reliability. Your messages arrive, every time.",
+      desc: "Direct connection through Meta Cloud API — enterprise-grade delivery, full compliance, and direct message status receipts for your verified numbers.",
       icon: "🔗"
     },
     {

@@ -7,18 +7,18 @@ import { SpotlightCard } from "@/components/marketing/spotlight-card";
 export default function SecurityPage() {
   const compliance = [
     {
-      title: "GDPR Compliant",
-      desc: "Fully compliant with European data privacy rules. Request data purges, access audits, and control region storage.",
+      title: "Data Privacy & Governance",
+      desc: "Built to support data protection principles. Easily process data deletion requests, audit logs, and maintain tenant boundary isolation.",
       icon: <CheckCircle className="size-4 text-emerald-400" />,
     },
     {
-      title: "End-to-End Encryption",
-      desc: "Data in transit is encrypted using TLS 1.3, and data at rest utilizes standard AES-256 block formats.",
+      title: "In-Transit & At-Rest Encryption",
+      desc: "Messages travel over Meta's secure network. CRM database records are encrypted at rest with AES-256 and protected in transit via TLS 1.3 (HTTPS).",
       icon: <Lock className="size-4 text-teal-400" />,
     },
     {
-      title: "Uptime Auditing",
-      desc: "Real-time audit log feeds register every API key update, webhook dispatch, and user console entry.",
+      title: "Access & Audit Controls",
+      desc: "Granular role-based access controls (RBAC) ensure team members only access conversations and settings appropriate to their permissions.",
       icon: <FileText className="size-4 text-emerald-400" />,
     },
   ];
@@ -58,14 +58,17 @@ export default function SecurityPage() {
       <div className="rounded-2xl border border-[var(--m-border-primary)] bg-[var(--m-bg-card)] p-8 backdrop-blur-md relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-emerald-950/5 to-teal-950/5 pointer-events-none" />
         <div className="max-w-2xl mx-auto space-y-6 relative z-10 text-center">
-          <h3 className="text-xl sm:text-2xl font-extrabold text-[var(--m-text-primary)]">Need our Security Whitepaper?</h3>
+          <h3 className="text-xl sm:text-2xl font-extrabold text-[var(--m-text-primary)]">Enterprise Security Inquiries</h3>
           <p className="text-xs text-[var(--m-text-tertiary)] leading-relaxed max-w-md mx-auto">
-            Get access to our complete SOC2 type-II audit logs, compliance document packages, and threat model reports.
+            Need custom data processing agreements, technical architecture reviews, or security questionnaire responses for Brightwave Digital Products LLP?
           </p>
           <div className="pt-2">
-            <button className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold px-6 py-3 rounded-xl transition-colors cursor-pointer">
-              Download Security Bundle
-            </button>
+            <a
+              href="mailto:support@chatnexgen.online?subject=Security%20Architecture%20Inquiry"
+              className="inline-block bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold px-6 py-3 rounded-xl transition-colors cursor-pointer"
+            >
+              Contact Security Team
+            </a>
           </div>
         </div>
       </div>

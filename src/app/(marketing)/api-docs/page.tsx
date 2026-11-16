@@ -8,40 +8,52 @@ export default function APIDocsLanding() {
   const [lang, setLang] = useState<"curl" | "node" | "python">("curl");
 
   const codes = {
-    curl: `curl -X POST https://api.chatnexgenai.com/v1/messages \\
-  -H "Authorization: Bearer chatnexgenai_sec_live_..." \\
+    curl: `curl -X POST https://chatnexgen.online/api/v1/messages \\
+  -H "Authorization: Bearer cng_live_sec_..." \\
   -H "Content-Type: application/json" \\
   -d '{
-    "to": "+15550199",
-    "template_name": "welcome_alert",
+    "to": "+919999999999",
+    "template_name": "order_update",
     "language": "en",
-    "components": [
-      {
-        "type": "body",
-        "parameters": [
-          { "type": "text", "text": "Acme Partner" }
-        ]
-      }
+    "parameters": [
+      { "type": "text", "text": "Customer Name" },
+      { "type": "text", "text": "#ORD-1092" }
     ]
   }'`,
-    node: `const client = require('@chatnexgenai/sdk')('chatnexgenai_sec_live_...');
+    node: `// Native Node.js / Next.js Fetch API
+const response = await fetch("https://chatnexgen.online/api/v1/messages", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer cng_live_sec_...",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    to: "+919999999999",
+    template_name: "order_update",
+    language: "en",
+    parameters: [{ type: "text", text: "Customer Name" }]
+  })
+});
 
-await client.messages.sendTemplate({
-  to: '+15550199',
-  templateName: 'welcome_alert',
-  languageCode: 'en',
-  bodyParameters: ['Acme Partner']
-});`,
-    python: `import chatnexgenai
+const data = await response.json();
+console.log("Message status:", data);`,
+    python: `# Python 3 with requests
+import requests
 
-client = chatnexgenai.Client(api_key='chatnexgenai_sec_live_...')
+url = "https://chatnexgen.online/api/v1/messages"
+headers = {
+    "Authorization": "Bearer cng_live_sec_...",
+    "Content-Type": "application/json"
+}
+payload = {
+    "to": "+919999999999",
+    "template_name": "order_update",
+    "language": "en",
+    "parameters": [{"type": "text", "text": "Customer Name"}]
+}
 
-client.messages.send_template(
-    to='+15550199',
-    template_name='welcome_alert',
-    language_code='en',
-    body_parameters=['Acme Partner']
-)`,
+response = requests.post(url, json=payload, headers=headers)
+print(response.json())`,
   };
 
   return (

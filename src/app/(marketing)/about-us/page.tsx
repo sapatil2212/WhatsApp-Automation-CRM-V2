@@ -61,8 +61,29 @@ export default function AboutUsPage() {
           About <span className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">ChatNexGen</span>
         </h1>
         <p className="text-sm text-[var(--m-text-tertiary)] max-w-xl mx-auto leading-relaxed mt-4">
-          ChatNexGen is an AI-powered WhatsApp CRM platform helping businesses automate customer communication, manage leads, improve customer support, and streamline operations using the official WhatsApp Business API in accordance with Meta guidelines.
+          ChatNexGen is a WhatsApp Business communication and automation SaaS platform operated by <strong className="text-[var(--m-text-secondary)] font-semibold">Brightwave Digital Products LLP</strong>. We empower modern businesses to connect their own WhatsApp Business Accounts via Meta Cloud API for customer support, CRM, and consent-based messaging.
         </p>
+      </div>
+
+      {/* Corporate Identity & Governance Banner */}
+      <div className="rounded-2xl border border-[var(--m-border-primary)] bg-[var(--m-bg-glass)] p-6 md:p-8 backdrop-blur-md">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div>
+            <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-400">Legal Entity</span>
+            <h3 className="text-base font-bold text-[var(--m-text-secondary)] mt-1">Brightwave Digital Products LLP</h3>
+            <p className="text-xs text-[var(--m-text-tertiary)] mt-1">Incorporated &amp; registered in India. ChatNexGen is a proprietary SaaS product owned and operated by Brightwave Digital Products LLP.</p>
+          </div>
+          <div>
+            <span className="text-[10px] uppercase font-bold tracking-wider text-teal-400">Architecture</span>
+            <h3 className="text-base font-bold text-[var(--m-text-secondary)] mt-1">Multi-Tenant Meta Cloud API</h3>
+            <p className="text-xs text-[var(--m-text-tertiary)] mt-1">Every business connects and authorizes their own WhatsApp Business Account (WABA). Customer data, contacts, and message history remain strictly segregated.</p>
+          </div>
+          <div>
+            <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-400">Compliance First</span>
+            <h3 className="text-base font-bold text-[var(--m-text-secondary)] mt-1">Meta Policy Compliant</h3>
+            <p className="text-xs text-[var(--m-text-tertiary)] mt-1">Strict adherence to Meta WhatsApp Business Messaging &amp; Commerce Policies. Built-in opt-in management, opt-out keyword handling, and verified template syncing.</p>
+          </div>
+        </div>
       </div>
 
       {/* Core values block */}

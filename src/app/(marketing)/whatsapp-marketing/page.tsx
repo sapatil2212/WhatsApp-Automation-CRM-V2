@@ -24,10 +24,18 @@ export default function WhatsAppMarketingPage() {
               Actually Gets Read.
             </span>
           </h1>
-          <p className="text-sm text-[var(--m-text-tertiary)] leading-relaxed">
-            Emails end up in spam folders. WhatsApp broadcasts reach screens instantly, generating an average 98% open rate. Send templates, personalization variables, and quick-reply buttons with compliance safety.
-          </p>
-        </div>
+            <p className="text-sm text-[var(--m-text-tertiary)] leading-relaxed">
+              Emails end up in spam folders. WhatsApp broadcasts reach screens instantly with industry-leading read rates. Send Meta-approved templates, personalization variables, and quick-reply buttons with built-in consent protection.
+            </p>
+
+            {/* Compliance Callout Banner */}
+            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 space-y-1.5 text-xs">
+              <span className="font-bold text-emerald-400 uppercase text-[10px] tracking-wider block">Meta Consent Requirement</span>
+              <p className="text-[var(--m-text-tertiary)] leading-relaxed">
+                Prior explicit user opt-in is required before dispatching marketing broadcasts. All broadcasts must include opt-out mechanisms (<code className="text-emerald-300">STOP</code> keyword or quick reply). Unsolicited cold messaging is strictly prohibited.
+              </p>
+            </div>
+          </div>
 
         {/* Visual Broadcast Simulator card */}
         <div className="relative">

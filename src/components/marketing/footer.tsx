@@ -88,7 +88,8 @@ export function Footer() {
         <div className="col-span-1 space-y-4">
           <h6 className="text-[10px] uppercase font-bold tracking-wider text-[var(--m-text-tertiary)]">Contact Us</h6>
           <ul className="space-y-2.5 text-xs text-[var(--m-text-muted)]">
-            <li>{branding.siteName || "ChatNexGen"}</li>
+            <li className="font-semibold text-[var(--m-text-secondary)]">{branding.siteName || "ChatNexGen"}</li>
+            <li className="text-[11px] text-[var(--m-text-tertiary)]">{footer.companyName || "Brightwave Digital Products LLP"}</li>
             <li>{contact.address}</li>
             {contact.phone && <li>Phone: {contact.phone}</li>}
             <li className="pt-1">

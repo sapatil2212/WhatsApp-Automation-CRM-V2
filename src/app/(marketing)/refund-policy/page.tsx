@@ -14,15 +14,15 @@ export default function RefundPolicyPage() {
           Subscription & Refund Policy
         </h1>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--m-text-muted)]">
-          <p>Last updated: June 23, 2026</p>
+          <p>Last updated: November 2026</p>
           <span>•</span>
-          <p className="font-medium text-[var(--m-text-secondary)]">A product of Brightwave Digital Products LLP.</p>
+          <p className="font-medium text-[var(--m-text-secondary)]">Operated by Brightwave Digital Products LLP (India)</p>
         </div>
       </div>
 
       <div className="space-y-8 text-xs sm:text-sm text-[var(--m-text-secondary)] leading-relaxed">
         <p>
-          At ChatNexGen (A product of Brightwave Digital Products LLP), we deliver professional WhatsApp CRM and communication automation services. This policy clarifies terms regarding recurring subscriptions, setup configurations, custom developments, consulting sessions, and billing queries.
+          At ChatNexGen, operated by <strong className="text-[var(--m-text-secondary)] font-semibold">Brightwave Digital Products LLP</strong>, we deliver enterprise-grade WhatsApp CRM and communication automation services. This policy clarifies terms regarding recurring subscriptions, setup configurations, custom developments, consulting sessions, and billing queries.
         </p>
 
         <section className="space-y-3">
@@ -81,10 +81,12 @@ export default function RefundPolicyPage() {
             For any queries regarding billing, invoice breakdowns, or cancellations, please contact our support desk:
           </p>
           <div className="text-xs text-[var(--m-text-tertiary)] mt-3 space-y-1">
-            <p className="font-bold text-[var(--m-text-primary)]">ChatNexGen Technologies</p>
-            <p className="text-[var(--m-text-secondary)] font-medium">A product of Brightwave Digital Products LLP.</p>
+            <p className="font-bold text-[var(--m-text-primary)]">Brightwave Digital Products LLP</p>
+            <p className="text-[var(--m-text-secondary)] font-medium">Operators of ChatNexGen (chatnexgen.online)</p>
+            <p>Billing &amp; Customer Success Team</p>
+            <p>Pune, Maharashtra, India</p>
             <p>
-              Email: <a href="mailto:chatnexgen@gmail.com" className="text-emerald-400 hover:underline">chatnexgen@gmail.com</a>
+              Email: <a href="mailto:support@chatnexgen.online" className="text-emerald-400 hover:underline">support@chatnexgen.online</a>
             </p>
           </div>
         </section>

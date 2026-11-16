@@ -63,16 +63,16 @@ export function AnimatedMetrics() {
         className="rounded-2xl border border-[var(--m-border-primary)] bg-[var(--m-bg-glass)] p-6 backdrop-blur-md relative overflow-hidden flex flex-col justify-between"
       >
         <div className="flex items-center justify-between mb-4">
-          <span className="text-xs uppercase font-bold text-[var(--m-text-tertiary)]">Deliverability</span>
+          <span className="text-xs uppercase font-bold text-[var(--m-text-tertiary)]">Cloud API Latency</span>
           <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400">
             <CheckCheck className="size-4" />
           </div>
         </div>
         <div>
           <h3 className="text-3xl sm:text-4xl font-extrabold text-[var(--m-text-primary)] flex items-baseline gap-0.5">
-            <Counter value={99.8} suffix="%" decimals={1} />
+            <Counter value={99.9} suffix="%" decimals={1} />
           </h3>
-          <p className="text-xs text-[var(--m-text-tertiary)] mt-2">Guaranteed throughput via WhatsApp Meta Business API Cloud hosts.</p>
+          <p className="text-xs text-[var(--m-text-tertiary)] mt-2">Target uptime and direct event dispatch via Meta WhatsApp Cloud API webhooks.</p>
         </div>
         <div className="absolute -bottom-8 -right-8 w-24 h-24 rounded-full bg-emerald-500/5 blur-2xl" />
       </motion.div>
@@ -86,16 +86,16 @@ export function AnimatedMetrics() {
         className="rounded-2xl border border-[var(--m-border-primary)] bg-[var(--m-bg-glass)] p-6 backdrop-blur-md relative overflow-hidden flex flex-col justify-between"
       >
         <div className="flex items-center justify-between mb-4">
-          <span className="text-xs uppercase font-bold text-[var(--m-text-tertiary)]">Broadcast Capacity</span>
+          <span className="text-xs uppercase font-bold text-[var(--m-text-tertiary)]">Rate-Limit Protection</span>
           <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center text-teal-400">
             <Zap className="size-4" />
           </div>
         </div>
         <div>
           <h3 className="text-3xl sm:text-4xl font-extrabold text-[var(--m-text-primary)] flex items-baseline gap-0.5">
-            <Counter value={24.2} suffix="M+" decimals={1} />
+            <Counter value={100} suffix="%" decimals={0} />
           </h3>
-          <p className="text-xs text-[var(--m-text-tertiary)] mt-2">Millions of monthly triggered follow-ups, payment confirmations, & templates.</p>
+          <p className="text-xs text-[var(--m-text-tertiary)] mt-2">Intelligent queue pacing to strictly conform to Meta tier limits and protect phone quality.</p>
         </div>
         <div className="absolute -bottom-8 -right-8 w-24 h-24 rounded-full bg-teal-500/5 blur-2xl" />
       </motion.div>
@@ -109,16 +109,16 @@ export function AnimatedMetrics() {
         className="rounded-2xl border border-[var(--m-border-primary)] bg-[var(--m-bg-glass)] p-6 backdrop-blur-md relative overflow-hidden flex flex-col justify-between"
       >
         <div className="flex items-center justify-between mb-4">
-          <span className="text-xs uppercase font-bold text-[var(--m-text-tertiary)]">AI Automation Rate</span>
+          <span className="text-xs uppercase font-bold text-[var(--m-text-tertiary)]">AI &amp; Team Inbox</span>
           <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400">
             <Sparkles className="size-4" />
           </div>
         </div>
         <div>
           <h3 className="text-3xl sm:text-4xl font-extrabold text-[var(--m-text-primary)] flex items-baseline gap-0.5">
-            <Counter value={86.4} suffix="%" decimals={1} />
+            <Counter value={24} suffix="/7" decimals={0} />
           </h3>
-          <p className="text-xs text-[var(--m-text-tertiary)] mt-2">Chat conversations handled completely autonomously without human intervention.</p>
+          <p className="text-xs text-[var(--m-text-tertiary)] mt-2">Automated context understanding with instant 1-click fallback to human customer support agents.</p>
         </div>
         <div className="absolute -bottom-8 -right-8 w-24 h-24 rounded-full bg-emerald-500/5 blur-2xl" />
       </motion.div>

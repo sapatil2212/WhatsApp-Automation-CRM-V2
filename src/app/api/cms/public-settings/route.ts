@@ -14,12 +14,12 @@ const DEFAULT_BRANDING = {
 
 const DEFAULT_FOOTER = {
   companyName: "Brightwave Digital Products LLP",
-  attributionText: "A product of Brightwave Digital Products LLP.",
-  copyrightText: "© 2026 ChatNexGen Technologies. All rights reserved.",
+  attributionText: "ChatNexGen is a product operated by Brightwave Digital Products LLP.",
+  copyrightText: "© 2026 Brightwave Digital Products LLP. All rights reserved.",
   footerDescription:
-    "ChatNexGen is a premium AI-powered WhatsApp CRM and customer support automation platform. Automate business communication, configure smart chatbots, organize leads, and sync calendar reminders using the official WhatsApp Business API.",
+    "ChatNexGen is a WhatsApp Business communication and automation SaaS platform operated by Brightwave Digital Products LLP. We enable businesses to connect their own WhatsApp Business Accounts via Meta Cloud API for customer support, CRM, and consent-based messaging.",
   disclaimerText:
-    "\"ChatNexGen uses WhatsApp Business API solutions in accordance with Meta and WhatsApp Business policies. Businesses are responsible for obtaining user consent before initiating communication.\"",
+    "ChatNexGen is an independent software application operated by Brightwave Digital Products LLP. ChatNexGen is not affiliated with, endorsed by, or sponsored by Meta Platforms, Inc. or WhatsApp Inc. WhatsApp is a registered trademark of Meta Platforms, Inc. Businesses are strictly required to obtain prior explicit user opt-in before initiating any WhatsApp communications.",
   socialLinks: {
     linkedin: "https://linkedin.com",
     twitter: "https://twitter.com",
@@ -29,10 +29,10 @@ const DEFAULT_FOOTER = {
 };
 
 const DEFAULT_CONTACT = {
-  supportEmail: "chatnexgen@gmail.com",
-  salesEmail: "sales@chatnexgen.com",
+  supportEmail: "support@chatnexgen.online",
+  salesEmail: "sales@chatnexgen.online",
   phone: "+91 98765 43210",
-  address: "Pune, Maharashtra, India",
+  address: "Registered Office: India",
   businessHours: "Monday - Saturday, 9:00 AM - 6:00 PM IST",
   helpDeskUrl: "/contact-us",
 };

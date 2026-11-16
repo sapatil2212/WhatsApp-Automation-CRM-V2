@@ -16,13 +16,13 @@ export default function DataDeletionPage() {
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--m-text-muted)]">
           <p>ChatNexGen Platform Guidelines</p>
           <span>•</span>
-          <p className="font-medium text-[var(--m-text-secondary)]">A product of Brightwave Digital Products LLP.</p>
+          <p className="font-medium text-[var(--m-text-secondary)]">Operated by Brightwave Digital Products LLP (India)</p>
         </div>
       </div>
 
       <div className="space-y-8 text-xs sm:text-sm text-[var(--m-text-secondary)] leading-relaxed">
         <p>
-          If you want to delete your personal data from the ChatNexGen platform (A product of Brightwave Digital Products LLP), you can request data deletion using the steps below.
+          If you want to delete your personal data from the ChatNexGen platform, operated by <strong className="text-[var(--m-text-secondary)]">Brightwave Digital Products LLP</strong>, you can request data deletion using the steps below.
         </p>
 
         <section className="space-y-3">
@@ -41,8 +41,8 @@ export default function DataDeletionPage() {
             <div className="bg-[var(--m-bg-secondary)] border border-[var(--m-border-primary)] rounded-xl p-4 text-center space-y-2">
               <span className="text-[10px] uppercase font-bold text-[var(--m-text-muted)]">Support Email</span>
               <p className="font-semibold text-[var(--m-text-primary)]">
-                <a href="mailto:chatnexgen@gmail.com" className="text-emerald-400 hover:underline">
-                  chatnexgen@gmail.com
+                <a href="mailto:support@chatnexgen.online" className="text-emerald-400 hover:underline">
+                  support@chatnexgen.online
                 </a>
               </p>
             </div>
@@ -57,7 +57,7 @@ export default function DataDeletionPage() {
             Once we receive your request, your data will be permanently deleted from our system within 7 working days.
           </p>
           <p className="text-[11px] text-[var(--m-text-tertiary)] text-center">
-            ChatNexGen is a product of Brightwave Digital Products LLP.
+            ChatNexGen is operated by Brightwave Digital Products LLP (India). All trademarks belong to their respective owners.
           </p>
         </section>
       </div>

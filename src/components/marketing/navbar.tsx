@@ -72,12 +72,12 @@ export function GlassNavbar() {
     { name: "Shared Inbox", href: "/shared-team-inbox" },
     { name: "CRM Engine", href: "/crm" },
     { name: "Analytics Dashboard", href: "/analytics" },
-    { name: "Enterprise SaaS", href: "/enterprise" },
-    { name: "Security & GDPR", href: "/security" },
-    { name: "Customer Stories", href: "/customer-stories" },
+    { name: "Enterprise Readiness", href: "/enterprise" },
+    { name: "Security & Compliance", href: "/security" },
+    { name: "Workflow Blueprints", href: "/customer-stories" },
     { name: "About Us", href: "/about-us" },
     { name: "Careers", href: "/careers" },
-    { name: "Blog Hacks", href: "/blog" },
+    { name: "Guides & Insights", href: "/blog" },
   ];
 
   const maxWidth    = lerp(1152, 920,  progress);

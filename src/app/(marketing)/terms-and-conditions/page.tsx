@@ -14,15 +14,15 @@ export default function TermsAndConditionsPage() {
           Terms & Conditions
         </h1>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--m-text-muted)]">
-          <p>Last updated: June 23, 2026</p>
+          <p>Last updated: November 2026</p>
           <span>•</span>
-          <p className="font-medium text-[var(--m-text-secondary)]">A product of Brightwave Digital Products LLP.</p>
+          <p className="font-medium text-[var(--m-text-secondary)]">Operated by Brightwave Digital Products LLP (India)</p>
         </div>
       </div>
 
       <div className="space-y-8 text-xs sm:text-sm text-[var(--m-text-secondary)] leading-relaxed">
         <p>
-          Welcome to ChatNexGen. These Terms & Conditions (&quot;Terms&quot;) govern your access to and use of the website, SaaS dashboard, automation engines, APIs, and customer relationship interfaces provided by ChatNexGen Technologies (A product of Brightwave Digital Products LLP, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;). By subscribing to or utilizing our Platform, you agree to comply with and be bound by these Terms.
+          Welcome to ChatNexGen. These Terms &amp; Conditions (&quot;Terms&quot;) govern your access to and use of the website, SaaS dashboard, automation engines, APIs, and customer relationship interfaces of ChatNexGen, operated by <strong className="text-[var(--m-text-secondary)] font-semibold">Brightwave Digital Products LLP</strong> (&quot;we&quot;, &quot;us&quot;, or &quot;our&quot;). By subscribing to or utilizing our Platform, you agree to comply with and be bound by these Terms.
         </p>
 
         <section className="space-y-3">
@@ -77,7 +77,7 @@ export default function TermsAndConditionsPage() {
         <section className="space-y-3">
           <h3 className="text-lg font-bold text-[var(--m-text-heading)]">5. Intellectual Property</h3>
           <p>
-            All technology, graphic user interfaces, chatbot designs, workflow visualizations, logos, and custom code modules remain the exclusive intellectual property of ChatNexGen Technologies (A product of Brightwave Digital Products LLP) or its licensors. You may not distribute or copy any portion of our software.
+            All technology, graphic user interfaces, chatbot designs, workflow visualizations, logos, and custom code modules remain the exclusive intellectual property of Brightwave Digital Products LLP or its licensors. You may not distribute, reproduce, or reverse engineer any portion of our software.
           </p>
         </section>
 
@@ -102,14 +102,14 @@ export default function TermsAndConditionsPage() {
         <section className="space-y-3 text-center pt-8 border-t border-[var(--m-border-primary)]/50">
           <h3 className="text-lg font-bold text-[var(--m-text-heading)]">8. Contact Us</h3>
           <p>
-            If you have questions regarding these Terms & Conditions, contact ChatNexGen Technologies:
+            If you have questions regarding these Terms &amp; Conditions, contact our operations desk:
           </p>
           <div className="text-xs text-[var(--m-text-tertiary)] mt-3 space-y-1">
-            <p className="font-bold text-[var(--m-text-primary)]">ChatNexGen Technologies</p>
-            <p className="text-[var(--m-text-secondary)] font-medium">A product of Brightwave Digital Products LLP.</p>
+            <p className="font-bold text-[var(--m-text-primary)]">Brightwave Digital Products LLP</p>
+            <p className="text-[var(--m-text-secondary)] font-medium">Operators of ChatNexGen (chatnexgen.online)</p>
             <p>Pune, Maharashtra, India</p>
             <p>
-              Email: <a href="mailto:chatnexgen@gmail.com" className="text-emerald-400 hover:underline">chatnexgen@gmail.com</a>
+              Email: <a href="mailto:support@chatnexgen.online" className="text-emerald-400 hover:underline">support@chatnexgen.online</a>
             </p>
           </div>
         </section>

@@ -12,15 +12,37 @@ export default function ContactUsPage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [msg, setMsg] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
-    setName("");
-    setEmail("");
-    setPhone("");
-    setMsg("");
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, phone, msg }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to submit inquiry. Please try again.");
+      }
+
+      setSubmitted(true);
+      setName("");
+      setEmail("");
+      setPhone("");
+      setMsg("");
+    } catch (err: any) {
+      setError(err.message || "An unexpected error occurred.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -37,7 +59,7 @@ export default function ContactUsPage() {
           </span>
         </h1>
         <p className="text-sm text-[var(--m-text-tertiary)] leading-relaxed">
-          Submit details below to query enterprise plans, custom chatbot integrations, template verification workflows, or platform setup parameters.
+          ChatNexGen is operated by <strong className="text-[var(--m-text-secondary)] font-semibold">Brightwave Digital Products LLP</strong>. Connect with our product and engineering specialists to discuss enterprise plans, WhatsApp Cloud API setup, or custom integration parameters.
         </p>
 
         {/* Corporate contact cards */}
@@ -45,16 +67,16 @@ export default function ContactUsPage() {
           <div className="flex items-center gap-3.5 text-xs text-[var(--m-text-tertiary)]">
             <Building className="size-4 text-emerald-400 shrink-0" />
             <div>
-              <span className="block font-bold text-[var(--m-text-primary)]">Company</span>
-              <span>ChatNexGen Technologies</span>
+              <span className="block font-bold text-[var(--m-text-primary)]">Operating Entity</span>
+              <span>Brightwave Digital Products LLP (India)</span>
             </div>
           </div>
           <div className="flex items-center gap-3.5 text-xs text-[var(--m-text-tertiary)]">
             <Mail className="size-4 text-emerald-400 shrink-0" />
             <div>
               <span className="block font-bold text-[var(--m-text-primary)]">Email Support</span>
-              <a href="mailto:chatnexgen@gmail.com" className="hover:text-emerald-400 transition-colors">
-                chatnexgen@gmail.com
+              <a href="mailto:support@chatnexgen.online" className="hover:text-emerald-400 transition-colors">
+                support@chatnexgen.online
               </a>
             </div>
           </div>
@@ -69,13 +91,13 @@ export default function ContactUsPage() {
             <Clock className="size-4 text-emerald-400 shrink-0" />
             <div>
               <span className="block font-bold text-[var(--m-text-primary)]">Business Hours</span>
-              <span>Monday - Saturday | 10:00 AM - 7:00 PM</span>
+              <span>Monday - Saturday | 10:00 AM - 7:00 PM IST</span>
             </div>
           </div>
           <div className="flex items-center gap-3.5 text-xs text-[var(--m-text-tertiary)]">
             <Building className="size-4 text-teal-400 shrink-0" />
             <div>
-              <span className="block font-bold text-[var(--m-text-primary)]">Address</span>
+              <span className="block font-bold text-[var(--m-text-primary)]">Registered Office</span>
               <span>Pune, Maharashtra, India</span>
             </div>
           </div>
@@ -94,13 +116,26 @@ export default function ContactUsPage() {
               </div>
               <h3 className="text-lg font-bold text-[var(--m-text-heading)]">Inquiry Received</h3>
               <p className="text-xs text-[var(--m-text-tertiary)] leading-relaxed max-w-sm mx-auto">
-                Thank you for contacting us! Our team will review your parameters and follow up via email within 2 hours.
+                Thank you for contacting Brightwave Digital Products LLP! Our team has received your inquiry and will follow up with you within 1 business day.
               </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSubmitted(false)}
+                className="text-xs border-[var(--m-border-primary)]"
+              >
+                Send Another Message
+              </Button>
             </CardContent>
           </Card>
         ) : (
           <Card className="border-[var(--m-border-primary)] bg-[var(--m-bg-glass)] p-2 backdrop-blur relative z-10 shadow-2xl">
             <CardContent className="pt-4">
+              {error && (
+                <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-400">
+                  {error}
+                </div>
+              )}
               <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="name" className="text-xs font-bold text-[var(--m-text-tertiary)]">Full Name</Label>
@@ -156,9 +191,10 @@ export default function ContactUsPage() {
 
                 <Button
                   type="submit"
-                  className="mt-2 h-10 w-full bg-emerald-500 text-slate-950 hover:bg-emerald-400 font-bold text-xs shadow-[0_0_12px_rgba(16,185,129,0.2)]"
+                  disabled={loading}
+                  className="mt-2 h-10 w-full bg-emerald-500 text-slate-950 hover:bg-emerald-400 font-bold text-xs shadow-[0_0_12px_rgba(16,185,129,0.2)] disabled:opacity-60"
                 >
-                  Submit Inquiry
+                  {loading ? "Submitting..." : "Submit Inquiry"}
                 </Button>
               </form>
             </CardContent>
