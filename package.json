@@ -29,7 +29,8 @@
   },
   "scripts": {
     "dev": "node server.js",
-    "build": "next build",
+    "postinstall": "prisma generate",
+    "build": "prisma generate && next build",
     "start": "node server.js",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
