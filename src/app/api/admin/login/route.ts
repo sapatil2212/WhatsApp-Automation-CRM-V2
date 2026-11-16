@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { generateSuperAdminToken } from "@/lib/auth";
 
-const ADMIN_USER = (process.env.SUPER_ADMIN_USERNAME ?? process.env.ADMIN_EMAIL    ?? "admin@agency.com");
+const ADMIN_USER = (process.env.SUPER_ADMIN_USERNAME ?? process.env.ADMIN_EMAIL ?? "admin@agency.com");
 const ADMIN_PASS = (process.env.SUPER_ADMIN_PASSWORD ?? process.env.ADMIN_PASSWORD ?? "admin123");
 const SESSION_TOKEN = "admin_session";
 
@@ -18,8 +19,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   }
 
+  const token = generateSuperAdminToken(submitted_user);
+
   const cookieStore = await cookies();
-  cookieStore.set(SESSION_TOKEN, "authenticated", {
+  cookieStore.set(SESSION_TOKEN, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

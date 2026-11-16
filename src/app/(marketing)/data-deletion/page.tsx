@@ -13,12 +13,16 @@ export default function DataDeletionPage() {
         <h1 className="text-3xl sm:text-5xl font-extrabold text-[var(--m-text-heading)] tracking-tight">
           User Data Deletion Instructions
         </h1>
-        <p className="text-xs text-[var(--m-text-muted)]">ChatNexGen Platform Guidelines</p>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--m-text-muted)]">
+          <p>ChatNexGen Platform Guidelines</p>
+          <span>•</span>
+          <p className="font-medium text-[var(--m-text-secondary)]">A product of Brightwave Digital Products LLP.</p>
+        </div>
       </div>
 
       <div className="space-y-8 text-xs sm:text-sm text-[var(--m-text-secondary)] leading-relaxed">
         <p>
-          If you want to delete your personal data from the ChatNexGen platform, you can request data deletion using the steps below.
+          If you want to delete your personal data from the ChatNexGen platform (A product of Brightwave Digital Products LLP), you can request data deletion using the steps below.
         </p>
 
         <section className="space-y-3">
@@ -51,6 +55,9 @@ export default function DataDeletionPage() {
           </div>
           <p className="text-xs text-[var(--m-text-muted)] text-center pt-4">
             Once we receive your request, your data will be permanently deleted from our system within 7 working days.
+          </p>
+          <p className="text-[11px] text-[var(--m-text-tertiary)] text-center">
+            ChatNexGen is a product of Brightwave Digital Products LLP.
           </p>
         </section>
       </div>

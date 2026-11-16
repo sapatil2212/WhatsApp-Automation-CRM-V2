@@ -23,19 +23,19 @@ const ACTIONS: Action[] = [
 
 export function QuickActions() {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
       {ACTIONS.map((a) => {
         const Icon = a.icon
         return (
           <Link
             key={a.href}
             href={a.href}
-            className="group flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 transition-colors hover:border-border hover:bg-accent"
+            className="group flex items-center gap-2.5 rounded-lg border border-border/70 bg-card/60 px-3 py-2 shadow-xs transition-all hover:border-border hover:bg-accent/60"
           >
-            <div className={`flex h-9 w-9 items-center justify-center rounded-lg bg-muted ${a.tint}`}>
-              <Icon className="h-4 w-4" />
+            <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted/70 ${a.tint}`}>
+              <Icon className="h-3.5 w-3.5" />
             </div>
-            <span className="text-sm font-medium text-foreground">{a.label}</span>
+            <span className="truncate text-xs font-medium text-foreground">{a.label}</span>
           </Link>
         )
       })}

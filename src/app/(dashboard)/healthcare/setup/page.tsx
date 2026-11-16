@@ -51,6 +51,9 @@ export default function ClinicSetupWizard() {
     state: "",
     pincode: "",
     google_map_link: "",
+    instagram_url: "",
+    facebook_url: "",
+    ai_knowledge_base: "",
   });
 
   // --- Step 2 State: Working Hours & Exceptions ---
@@ -185,6 +188,9 @@ export default function ClinicSetupWizard() {
             state: clinic.state || "",
             pincode: clinic.pincode || "",
             google_map_link: clinic.google_map_link || "",
+            instagram_url: clinic.instagram_url || "",
+            facebook_url: clinic.facebook_url || "",
+            ai_knowledge_base: clinic.ai_knowledge_base || "",
           });
           setClinicExceptions(clinic.date_exceptions || []);
 
@@ -844,14 +850,60 @@ export default function ClinicSetupWizard() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="google_map_link" className="text-slate-300">Google Map Link</Label>
+                <Label htmlFor="google_map_link" className="text-slate-300">Google Business / Maps Link (GMB)</Label>
                 <Input
                   id="google_map_link"
                   name="google_map_link"
                   value={clinicInfo.google_map_link}
                   onChange={handleClinicInfoChange}
                   className="bg-slate-950 border-slate-800 text-white"
-                  placeholder="https://goo.gl/maps/..."
+                  placeholder="https://g.page/... or https://goo.gl/maps/..."
+                />
+              </div>
+
+              {/* AI Training Sources */}
+              <div className="md:col-span-2 mt-2 pt-4 border-t border-slate-800/80">
+                <div className="flex items-center gap-2 mb-1">
+                  <Sparkles className="h-4 w-4 text-emerald-400" />
+                  <h3 className="text-sm font-bold text-white tracking-wide">AI Training Sources</h3>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Add your public links so the AI can reference them and answer customers like an expert about your business.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="instagram_url" className="text-slate-300">Instagram Profile</Label>
+                <Input
+                  id="instagram_url"
+                  name="instagram_url"
+                  value={clinicInfo.instagram_url}
+                  onChange={handleClinicInfoChange}
+                  className="bg-slate-950 border-slate-800 text-white"
+                  placeholder="https://instagram.com/yourbusiness"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="facebook_url" className="text-slate-300">Facebook Page</Label>
+                <Input
+                  id="facebook_url"
+                  name="facebook_url"
+                  value={clinicInfo.facebook_url}
+                  onChange={handleClinicInfoChange}
+                  className="bg-slate-950 border-slate-800 text-white"
+                  placeholder="https://facebook.com/yourbusiness"
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="ai_knowledge_base" className="text-slate-300">
+                  Expert Knowledge for AI <span className="text-slate-500 font-normal">(optional)</span>
+                </Label>
+                <Textarea
+                  id="ai_knowledge_base"
+                  name="ai_knowledge_base"
+                  value={clinicInfo.ai_knowledge_base}
+                  onChange={handleClinicInfoChange}
+                  className="bg-slate-950 border-slate-800 text-white min-h-[100px]"
+                  placeholder="Paste anything the AI should know to answer like an expert: specialties, unique selling points, policies, common customer concerns, awards, experience, etc."
                 />
               </div>
             </div>

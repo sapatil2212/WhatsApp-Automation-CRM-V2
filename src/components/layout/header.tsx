@@ -73,43 +73,43 @@ export function Header({ onOpenSidebar }: HeaderProps) {
         >
           <Menu className="h-5 w-5" />
         </button>
-        <h1 className="truncate text-base font-semibold text-foreground sm:text-lg">
+        <h1 className="truncate text-sm font-semibold text-foreground sm:text-base">
           {title}
         </h1>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5">
         {/* Sun / Moon Toggle */}
         <button
           type="button"
           onClick={() => setMode(mode === "light" ? "dark" : "light")}
           aria-label={`Switch to ${mode === "light" ? "dark" : "light"} mode`}
-          className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-all hover:bg-accent hover:text-foreground"
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-all hover:bg-accent hover:text-foreground"
         >
           {mode === "light" ? (
-            <Moon className="h-4.5 w-4.5 transition-transform duration-300 hover:rotate-12" />
+            <Moon className="h-4 w-4 transition-transform duration-300 hover:rotate-12" />
           ) : (
-            <Sun className="h-4.5 w-4.5 transition-transform duration-300 hover:rotate-45" />
+            <Sun className="h-4 w-4 transition-transform duration-300 hover:rotate-45" />
           )}
         </button>
 
         <DropdownMenu>
           <DropdownMenuTrigger
-            className="flex items-center gap-2 rounded-md px-1 py-1 transition-colors hover:bg-accent focus:bg-accent focus:outline-none data-[state=open]:bg-accent sm:gap-3 sm:pl-1 sm:pr-3"
+            className="flex items-center gap-2 rounded-lg px-1.5 py-1 transition-colors hover:bg-accent focus:bg-accent focus:outline-none data-[state=open]:bg-accent sm:gap-2.5 sm:pl-1.5 sm:pr-2.5"
             aria-label="Open account menu"
           >
-            <Avatar className="size-8">
+            <Avatar className="size-7">
               {profile?.avatar_url ? (
                 <AvatarImage
                   src={profile.avatar_url}
                   alt={profile.full_name ?? "Avatar"}
                 />
               ) : null}
-              <AvatarFallback className="bg-primary/10 text-sm font-medium text-primary">
+              <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
                 {initial}
               </AvatarFallback>
             </Avatar>
-            <span className="hidden text-sm font-medium text-foreground sm:inline">
+            <span className="hidden text-xs font-medium text-foreground sm:inline">
               {profile?.full_name ?? "User"}
             </span>
           </DropdownMenuTrigger>

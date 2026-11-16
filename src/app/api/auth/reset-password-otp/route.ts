@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import nodemailer from "nodemailer";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
+import { emailLayout, emailHeading, emailSubtitle, emailOtp, emailText, emailTokens } from "@/lib/email/template";
 
 interface OtpEntry {
   code: string;
@@ -77,11 +78,22 @@ export async function POST(req: NextRequest) {
       });
 
       await transporter.sendMail({
-        from: `"ChatNexGen Triage" <${smtpUser}>`,
+        from: `"ChatNexGen Support" <${smtpUser}>`,
         to: email,
-        subject: "ChatNexGen Password Reset Verification Code",
+        subject: "ChatNexGen Password Reset Code",
         text: `Your password reset code is: ${code}. It expires in 10 minutes.`,
-        html: `<p>Your password reset code is: <strong>${code}</strong>.</p><p>It expires in 10 minutes.</p>`,
+        html: emailLayout({
+          title: "Reset your ChatNexGen password",
+          preview: `Your password reset code is ${code}`,
+          contentHtml:
+            emailHeading("Reset your password") +
+            emailSubtitle("Use the 6-digit code below to reset your password.") +
+            emailOtp(code) +
+            emailText(
+              "This code is valid for <strong>10 minutes</strong>. If you didn't request a password reset, you can safely ignore this email.",
+              { size: 12, color: emailTokens.muted }
+            ),
+        }),
       });
 
       return NextResponse.json({ success: true });

@@ -11,10 +11,10 @@ export function Skeleton({ className }: { className?: string }) {
 
 export function SkeletonCard({ className }: { className?: string }) {
   return (
-    <div className={cn('rounded-xl border border-border bg-card p-5', className)}>
-      <Skeleton className="h-4 w-32" />
-      <Skeleton className="mt-4 h-8 w-20" />
-      <Skeleton className="mt-2 h-3 w-16" />
+    <div className={cn('rounded-xl border border-border/70 bg-card/60 p-4 shadow-xs', className)}>
+      <Skeleton className="h-3.5 w-28" />
+      <Skeleton className="mt-3 h-7 w-20" />
+      <Skeleton className="mt-2 h-2.5 w-16" />
     </div>
   )
 }

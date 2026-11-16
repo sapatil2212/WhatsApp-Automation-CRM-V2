@@ -4,13 +4,30 @@ import crypto from 'crypto'
 import { cookies } from 'next/headers'
 import { prisma } from './prisma'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'default_jwt_secret_key_change_me'
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'default_jwt_refresh_secret_key_change_me'
+function getSecret(name: string, fallbackDev: string): string {
+  const secret = process.env[name]
+  if (!secret) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(`[Security] Critical environment variable ${name} is missing in production.`)
+    }
+    return fallbackDev
+  }
+  return secret
+}
+
+const JWT_SECRET = getSecret('JWT_SECRET', 'dev_jwt_access_secret_key_change_me')
+const JWT_REFRESH_SECRET = getSecret('JWT_REFRESH_SECRET', 'dev_jwt_refresh_secret_key_change_me')
+const SUPER_ADMIN_SECRET = getSecret('SUPER_ADMIN_SECRET', 'dev_super_admin_jwt_secret_key_change_me')
 
 export interface TokenPayload {
   userId: string
   email: string
   role: string
+}
+
+export interface SuperAdminTokenPayload {
+  email: string
+  role: 'super_admin'
 }
 
 /**
@@ -40,6 +57,28 @@ export function generateAccessToken(payload: TokenPayload): string {
  */
 export function generateRefreshToken(payload: TokenPayload): string {
   return jwt.sign({ ...payload, jti: crypto.randomUUID() }, JWT_REFRESH_SECRET, { expiresIn: '7d' })
+}
+
+/**
+ * Generate Super Admin Token (8 hours)
+ */
+export function generateSuperAdminToken(email: string): string {
+  return jwt.sign({ email, role: 'super_admin' }, SUPER_ADMIN_SECRET, { expiresIn: '8h' })
+}
+
+/**
+ * Verify Super Admin Token
+ */
+export function verifySuperAdminToken(token: string): SuperAdminTokenPayload | null {
+  try {
+    const payload = jwt.verify(token, SUPER_ADMIN_SECRET) as any
+    if (payload && payload.role === 'super_admin' && payload.email) {
+      return payload as SuperAdminTokenPayload
+    }
+    return null
+  } catch {
+    return null
+  }
 }
 
 /**

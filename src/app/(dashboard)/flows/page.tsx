@@ -18,6 +18,10 @@ import {
   FileText,
   Copy,
   Zap,
+  CalendarClock,
+  BedDouble,
+  GraduationCap,
+  Sparkles,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -32,13 +36,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { RoutingModeCard } from "@/components/flows/routing-mode-card";
 
 /**
  * Flows list page.
  *
- * Open to every authenticated user. Flows is in soft-GA — the "Beta"
- * chip in the header is the only remaining signal that the surface
- * is new. The previous per-account beta gate was removed in PR #134.
+ * Open to every authenticated user. Lists the account's flows, lets you
+ * create from a (business-tailored) template or from scratch, activate /
+ * pause a flow inline, and configure how inbound messages are routed
+ * between Flows and the AI assistant.
  */
 
 interface FlowRow {
@@ -70,15 +76,28 @@ interface TemplateSummary {
   slug: string;
   name: string;
   description: string;
-  icon: "MessageSquare" | "HelpCircle" | "UserPlus";
+  icon:
+    | "MessageSquare"
+    | "HelpCircle"
+    | "UserPlus"
+    | "CalendarClock"
+    | "FileText"
+    | "BedDouble"
+    | "GraduationCap";
   trigger_type: string;
   node_count: number;
+  recommended?: boolean;
+  generic?: boolean;
 }
 
 const TEMPLATE_ICONS = {
   MessageSquare,
   HelpCircle,
   UserPlus,
+  CalendarClock,
+  FileText,
+  BedDouble,
+  GraduationCap,
 } as const;
 
 export default function FlowsPage() {
@@ -196,6 +215,35 @@ export default function FlowsPage() {
     }
   }
 
+  async function handleToggleStatus(flow: FlowRow) {
+    const next = flow.status === "active" ? "draft" : "active";
+    try {
+      const res = await fetch(`/api/flows/${flow.id}/activate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: next }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // 422 = validation blockers; send the user to the editor to fix them.
+        if (res.status === 422) {
+          toast.error(
+            "This flow has issues to fix before it can go live. Opening the editor…",
+          );
+          router.push(`/flows/${flow.id}`);
+          return;
+        }
+        throw new Error(json.error ?? `Status update failed: ${res.status}`);
+      }
+      setFlows((prev) =>
+        prev.map((f) => (f.id === flow.id ? { ...f, status: next } : f)),
+      );
+      toast.success(next === "active" ? "Flow activated." : "Flow paused.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Status update failed");
+    }
+  }
+
   async function handleDelete(flow: FlowRow) {
     const yes = window.confirm(
       `Delete "${flow.name}"? Any active runs will end immediately.`,
@@ -224,15 +272,11 @@ export default function FlowsPage() {
     <div className="space-y-6 p-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold text-white">Flows</h1>
-            <span className="inline-flex items-center rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
-              Beta
-            </span>
-          </div>
-          <p className="mt-1 text-sm text-slate-400">
-            Build branching, button-driven WhatsApp conversations. Useful for
-            menus, FAQs, and triage before a human steps in.
+          <h1 className="text-2xl font-semibold text-white">Flows</h1>
+          <p className="mt-1 max-w-2xl text-sm text-slate-400">
+            Design automated, button-driven WhatsApp conversations — welcome
+            menus, bookings, FAQs, and lead capture — that guide customers and
+            hand off to your team at the right moment.
           </p>
         </div>
         <Button onClick={() => setCreateOpen(true)}>
@@ -240,6 +284,17 @@ export default function FlowsPage() {
           New flow
         </Button>
       </header>
+
+      <RoutingModeCard />
+
+      {flows.length > 0 && (
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-white">
+            Your flows{" "}
+            <span className="font-normal text-slate-500">({flows.length})</span>
+          </h2>
+        </div>
+      )}
 
       {flows.length === 0 ? (
         <EmptyState
@@ -257,6 +312,7 @@ export default function FlowsPage() {
               onEdit={() => router.push(`/flows/${flow.id}`)}
               onDelete={() => handleDelete(flow)}
               onDuplicate={() => handleDuplicate(flow)}
+              onToggleStatus={() => handleToggleStatus(flow)}
             />
           ))}
         </div>
@@ -278,7 +334,9 @@ export default function FlowsPage() {
           {templates.length > 0 && (
             <div className="space-y-3">
               <p className="text-xs uppercase tracking-wide text-slate-500">
-                Start from a template
+                {templates.some((t) => t.recommended)
+                  ? "Recommended for your business"
+                  : "Start from a template"}
               </p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {templates.map((t) => {
@@ -289,8 +347,19 @@ export default function FlowsPage() {
                       type="button"
                       onClick={() => handleUseTemplate(t.slug)}
                       disabled={creating}
-                      className="flex flex-col gap-2.5 rounded-lg border border-slate-800 bg-slate-950 p-4 text-left transition-colors hover:border-primary/40 hover:bg-slate-800 disabled:opacity-50"
+                      className={cn(
+                        "relative flex flex-col gap-2.5 rounded-lg border bg-slate-950 p-4 text-left transition-colors hover:bg-slate-800 disabled:opacity-50",
+                        t.recommended
+                          ? "border-primary/50 hover:border-primary"
+                          : "border-slate-800 hover:border-primary/40",
+                      )}
                     >
+                      {t.recommended && (
+                        <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-primary">
+                          <Sparkles className="h-2.5 w-2.5" />
+                          For you
+                        </span>
+                      )}
                       <Icon className="h-5 w-5 text-primary" />
                       <span className="text-sm font-semibold text-white">
                         {t.name}
@@ -413,11 +482,13 @@ function FlowCard({
   onEdit,
   onDelete,
   onDuplicate,
+  onToggleStatus,
 }: {
   flow: FlowRow;
   onEdit: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
+  onToggleStatus: () => void;
 }) {
   const triggerSummary = describeTrigger(flow);
   const StatusIcon =
@@ -426,6 +497,7 @@ function FlowCard({
       : flow.status === "archived"
         ? Archive
         : PauseCircle;
+  const isActive = flow.status === "active";
   return (
     <div className="flex flex-col rounded-lg border border-slate-800 bg-slate-900 p-4 transition-colors hover:border-slate-700">
       <div className="flex items-start justify-between gap-2">
@@ -451,29 +523,69 @@ function FlowCard({
         {flow.description || triggerSummary}
       </p>
 
-      <div className="mt-4 flex items-center gap-3 text-[11px] text-slate-500">
+      <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
         <span className="inline-flex items-center gap-1">
           <MessageSquare className="h-3 w-3" />
           {flow.execution_count} {flow.execution_count === 1 ? "run" : "runs"}
         </span>
+        <span className="inline-flex items-center gap-1 truncate">
+          <Zap className="h-3 w-3" />
+          <span className="truncate">{triggerSummary}</span>
+        </span>
       </div>
 
-      <div className="mt-4 flex items-center justify-end gap-2 border-t border-slate-800 pt-3">
-        <Button variant="ghost" size="sm" onClick={onEdit}>
-          <Pencil className="h-3.5 w-3.5" />
-          Edit
-        </Button>
-        <Button variant="ghost" size="sm" onClick={onDuplicate} title="Duplicate flow">
-          <Copy className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onDelete}
-          className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
+      <div className="mt-4 flex items-center justify-between gap-2 border-t border-slate-800 pt-3">
+        {flow.status !== "archived" ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onToggleStatus}
+            className={cn(
+              "gap-1.5",
+              isActive
+                ? "border-amber-600/40 text-amber-300 hover:bg-amber-500/10"
+                : "border-emerald-600/40 text-emerald-300 hover:bg-emerald-500/10",
+            )}
+          >
+            {isActive ? (
+              <>
+                <PauseCircle className="h-3.5 w-3.5" />
+                Pause
+              </>
+            ) : (
+              <>
+                <PlayCircle className="h-3.5 w-3.5" />
+                Activate
+              </>
+            )}
+          </Button>
+        ) : (
+          <span className="text-[11px] text-slate-500">Archived</span>
+        )}
+
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" onClick={onEdit}>
+            <Pencil className="h-3.5 w-3.5" />
+            Edit
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onDuplicate}
+            title="Duplicate flow"
+          >
+            <Copy className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onDelete}
+            title="Delete flow"
+            className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
       </div>
     </div>
   );

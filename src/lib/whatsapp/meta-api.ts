@@ -119,6 +119,79 @@ export async function sendTextMessage(
   return { messageId: data.messages[0].id }
 }
 
+export interface SendMediaMessageArgs {
+  phoneNumberId: string
+  accessToken: string
+  to: string
+  contentType: 'image' | 'document' | 'audio' | 'video'
+  mediaUrl: string
+  caption?: string
+  filename?: string
+  /** Meta's message_id of the message being replied to. */
+  contextMessageId?: string
+}
+
+/**
+ * Send an outbound media message (image, document, audio, video)
+ * with optional caption, filename, and context quoting.
+ */
+export async function sendMediaMessage(
+  args: SendMediaMessageArgs
+): Promise<MetaSendResult> {
+  const {
+    phoneNumberId,
+    accessToken,
+    to,
+    contentType,
+    mediaUrl,
+    caption,
+    filename,
+    contextMessageId,
+  } = args
+
+  const url = `${META_API_BASE}/${phoneNumberId}/messages`
+
+  const mediaPayload: Record<string, unknown> = {
+    link: mediaUrl,
+  }
+
+  if (caption && (contentType === 'image' || contentType === 'video' || contentType === 'document')) {
+    mediaPayload.caption = caption
+  }
+
+  if (filename && contentType === 'document') {
+    mediaPayload.filename = filename
+  }
+
+  const body: Record<string, unknown> = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: contentType,
+    [contentType]: mediaPayload,
+  }
+
+  if (contextMessageId) {
+    body.context = { message_id: contextMessageId }
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(body),
+  })
+
+  if (!response.ok) {
+    await throwMetaError(response, `Meta API error: ${response.status}`)
+  }
+
+  const data = await response.json()
+  return { messageId: data.messages[0].id }
+}
+
 export interface SendTemplateMessageArgs {
   phoneNumberId: string
   accessToken: string
@@ -338,6 +411,74 @@ export async function deleteMessageTemplate(
   if (!response.ok) {
     await throwMetaError(response, `Meta API error: ${response.status}`)
   }
+}
+
+export interface ListMessageTemplatesArgs {
+  wabaId: string
+  accessToken: string
+  /** Opaque cursor from a previous page's `nextCursor`. */
+  after?: string
+  /** Meta caps this at 100. */
+  limit?: number
+}
+
+export interface MetaTemplateListEntry {
+  id: string
+  name: string
+  language: string
+  status: string
+  category: string
+  components?: unknown[]
+}
+
+export interface ListMessageTemplatesResult {
+  templates: MetaTemplateListEntry[]
+  /** Cursor for the next page, or null when the listing is complete. */
+  nextCursor: string | null
+}
+
+/**
+ * One page of a WABA's message templates.
+ *
+ * Meta is authoritative for template status, so this is what a local catalog
+ * sync reads. Previously this call was a raw `fetch` inline in
+ * `api/whatsapp/templates/sync/route.ts` with its own pagination loop and
+ * its own error handling; it belongs beside the other Meta helpers so
+ * everything shares `throwMetaError` and the pinned API version.
+ *
+ * Pagination is exposed as a cursor rather than followed internally: the
+ * caller owns the page cap, which keeps a misbehaving upstream from looping
+ * forever inside a library function.
+ */
+export async function listMessageTemplates(
+  args: ListMessageTemplatesArgs,
+): Promise<ListMessageTemplatesResult> {
+  const { wabaId, accessToken, after, limit = 100 } = args
+  const params = new URLSearchParams({
+    limit: String(Math.min(limit, 100)),
+    fields: 'id,name,language,status,category,components',
+  })
+  if (after) params.set('after', after)
+
+  const response = await fetch(
+    `${META_API_BASE}/${wabaId}/message_templates?${params.toString()}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  )
+  if (!response.ok) {
+    await throwMetaError(response, `Meta API error: ${response.status}`)
+  }
+
+  const body = (await response.json()) as {
+    data?: MetaTemplateListEntry[]
+    paging?: { cursors?: { after?: string }; next?: string }
+  }
+
+  // `paging.next` present means more pages exist; the cursor itself lives in
+  // `paging.cursors.after`. Both are required — a cursor with no `next` is
+  // the last page.
+  const nextCursor = body.paging?.next ? (body.paging.cursors?.after ?? null) : null
+
+  return { templates: body.data ?? [], nextCursor }
 }
 
 // ============================================================

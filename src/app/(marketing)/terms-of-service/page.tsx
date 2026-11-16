@@ -13,12 +13,16 @@ export default function TermsOfServicePage() {
         <h1 className="text-3xl sm:text-5xl font-extrabold text-[var(--m-text-heading)] tracking-tight">
           Terms of Service
         </h1>
-        <p className="text-xs text-[var(--m-text-muted)]">Last updated: March 10, 2026</p>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--m-text-muted)]">
+          <p>Last updated: March 10, 2026</p>
+          <span>•</span>
+          <p className="font-medium text-[var(--m-text-secondary)]">A product of Brightwave Digital Products LLP.</p>
+        </div>
       </div>
 
       <div className="space-y-8 text-xs sm:text-sm text-[var(--m-text-secondary)] leading-relaxed">
         <p>
-          These Terms of Service (&quot;Terms&quot;) govern your use of ChatNexGen Ai (the &quot;Platform&quot;), a WhatsApp automation SaaS, and any content, services, or features offered on or through the Platform. By accessing or using ChatNexGen Ai, you agree to be bound by these Terms, our Privacy Policy, and any other policies referenced herein. If you do not agree, please do not use the Platform.
+          These Terms of Service (&quot;Terms&quot;) govern your use of ChatNexGen Ai (the &quot;Platform&quot;), a WhatsApp automation SaaS and A product of Brightwave Digital Products LLP, and any content, services, or features offered on or through the Platform. By accessing or using ChatNexGen Ai, you agree to be bound by these Terms, our Privacy Policy, and any other policies referenced herein. If you do not agree, please do not use the Platform.
         </p>
 
         <section className="space-y-3">
@@ -101,8 +105,15 @@ export default function TermsOfServicePage() {
         <section className="space-y-3 text-center pt-8 border-t border-[var(--m-border-primary)]/50">
           <h3 className="text-lg font-bold text-[var(--m-text-heading)]">11. Contact</h3>
           <p>
-            For questions or concerns about these Terms, please contact us at <a href="mailto:chatnexgenai@gmail.com" className="text-emerald-400 hover:underline">chatnexgenai@gmail.com</a>.
+            For questions or concerns about these Terms, please contact us:
           </p>
+          <div className="text-xs text-[var(--m-text-tertiary)] mt-3 space-y-1">
+            <p className="font-bold text-[var(--m-text-primary)]">ChatNexGen</p>
+            <p className="text-[var(--m-text-secondary)] font-medium">A product of Brightwave Digital Products LLP.</p>
+            <p>
+              Email: <a href="mailto:chatnexgenai@gmail.com" className="text-emerald-400 hover:underline">chatnexgenai@gmail.com</a>
+            </p>
+          </div>
         </section>
       </div>
     </div>

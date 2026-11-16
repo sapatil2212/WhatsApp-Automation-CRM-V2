@@ -3,6 +3,7 @@ import {
   INTERACTIVE_LIMITS,
   sendInteractiveButtons,
   sendInteractiveList,
+  sendMediaMessage,
 } from "./meta-api";
 
 // All assertions in this file run BEFORE the network call. We stub fetch
@@ -263,6 +264,93 @@ describe("sendInteractiveList — validation", () => {
             },
           ],
         },
+      },
+    });
+  });
+});
+
+describe("sendMediaMessage", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn(neverFetch));
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("sends an image with caption and returns messageId", async () => {
+    let captured: { body: unknown } | null = null;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: RequestInit) => {
+        captured = { body: JSON.parse(String(init.body)) };
+        return new Response(
+          JSON.stringify({ messages: [{ id: "wamid.IMG123" }] }),
+          { status: 200 },
+        );
+      }),
+    );
+
+    const result = await sendMediaMessage({
+      phoneNumberId: "phone-1",
+      accessToken: "token-1",
+      to: "919876543210",
+      contentType: "image",
+      mediaUrl: "https://example.com/photo.jpg",
+      caption: "Look at this photo",
+    });
+
+    expect(result).toEqual({ messageId: "wamid.IMG123" });
+    expect(captured).not.toBeNull();
+    expect(captured!.body).toEqual({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to: "919876543210",
+      type: "image",
+      image: {
+        link: "https://example.com/photo.jpg",
+        caption: "Look at this photo",
+      },
+    });
+  });
+
+  it("sends a document with filename and context quote", async () => {
+    let captured: { body: unknown } | null = null;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: RequestInit) => {
+        captured = { body: JSON.parse(String(init.body)) };
+        return new Response(
+          JSON.stringify({ messages: [{ id: "wamid.DOC456" }] }),
+          { status: 200 },
+        );
+      }),
+    );
+
+    const result = await sendMediaMessage({
+      phoneNumberId: "phone-1",
+      accessToken: "token-1",
+      to: "919876543210",
+      contentType: "document",
+      mediaUrl: "https://example.com/invoice.pdf",
+      filename: "Invoice_2026.pdf",
+      caption: "Here is your invoice",
+      contextMessageId: "wamid.ORIGINAL",
+    });
+
+    expect(result).toEqual({ messageId: "wamid.DOC456" });
+    expect(captured).not.toBeNull();
+    expect(captured!.body).toEqual({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to: "919876543210",
+      type: "document",
+      document: {
+        link: "https://example.com/invoice.pdf",
+        caption: "Here is your invoice",
+        filename: "Invoice_2026.pdf",
+      },
+      context: {
+        message_id: "wamid.ORIGINAL",
       },
     });
   });

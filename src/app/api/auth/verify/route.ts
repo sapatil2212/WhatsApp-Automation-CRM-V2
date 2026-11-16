@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import nodemailer from 'nodemailer'
+import { emailLayout, emailHeading, emailSubtitle, emailDetails, emailButton, emailText } from '@/lib/email/template'
 
 export async function POST(req: NextRequest) {
   try {
@@ -80,56 +81,26 @@ export async function POST(req: NextRequest) {
           },
         });
 
-        const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <style>
-            body { font-family: Arial, sans-serif; background-color: #f8fafc; color: #0f172a; margin: 0; padding: 20px; }
-            .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 30px; }
-            h2 { color: #4f46e5; margin-top: 0; }
-            .detail-row { display: flex; margin-bottom: 10px; font-size: 14px; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px; }
-            .detail-label { font-weight: bold; width: 150px; color: #475569; }
-            .detail-val { color: #0f172a; }
-            .btn { display: inline-block; background-color: #10b981; color: #ffffff !important; text-decoration: none; font-weight: bold; font-size: 14px; padding: 12px 24px; border-radius: 8px; margin-top: 20px; text-align: center; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <h2>New User Registration Awaiting Payment & Approval</h2>
-            <p>A new tenant has registered, completed OTP email verification, and requires payment review:</p>
-            
-            <div class="detail-row">
-              <div class="detail-label">Name:</div>
-              <div class="detail-val">${user.profile?.fullName || 'N/A'}</div>
-            </div>
-            <div class="detail-row">
-              <div class="detail-label">Email:</div>
-              <div class="detail-val">${user.email}</div>
-            </div>
-            <div class="detail-row">
-              <div class="detail-label">Phone:</div>
-              <div class="detail-val">${(user.profile as any)?.phoneNumber || 'N/A'}</div>
-            </div>
-            <div class="detail-row">
-              <div class="detail-label">Selected Plan:</div>
-              <div class="detail-val" style="text-transform: uppercase; font-weight: bold; color: #059669;">${user.selectedPlan || 'starter'}</div>
-            </div>
-            <div class="detail-row">
-              <div class="detail-label">Business Name:</div>
-              <div class="detail-val">${user.profile?.businessName || 'N/A'}</div>
-            </div>
-
-            <a href="${approveUrl}" class="btn">Approve Access & Activate Subscription</a>
-            
-            <p style="font-size: 12px; color: #64748b; margin-top: 30px;">
-              You can also approve this user from the "New Users" menu inside the Super Admin Dashboard.
-            </p>
-          </div>
-        </body>
-        </html>
-        `;
+        const htmlContent = emailLayout({
+          title: "New user awaiting approval",
+          preview: `${user.profile?.fullName || user.email} is awaiting approval`,
+          center: false,
+          contentHtml:
+            emailHeading("New user awaiting approval") +
+            emailSubtitle("A new tenant registered, completed OTP verification, and needs a payment review.") +
+            emailDetails([
+              { label: "Name", value: user.profile?.fullName || "N/A" },
+              { label: "Email", value: user.email },
+              { label: "Phone", value: (user.profile as any)?.phoneNumber || "N/A" },
+              { label: "Selected plan", value: (user.selectedPlan || "starter").toUpperCase(), highlight: true },
+              { label: "Business", value: user.profile?.businessName || "N/A" },
+            ]) +
+            emailButton(approveUrl, "Approve access & activate") +
+            emailText(
+              'You can also approve this user from the "New Users" menu in the Super Admin dashboard.',
+              { size: 11 }
+            ),
+        });
 
         await transporter.sendMail({
           from: `"ChatNexGen Notification" <${smtpUser}>`,

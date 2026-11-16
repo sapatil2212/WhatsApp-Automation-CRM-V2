@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, ArrowRight, Eye, Loader2, FileText } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Eye, Loader2, FileText, Sparkles } from 'lucide-react';
 
 type VariableType = 'static' | 'field' | 'custom_field';
 
@@ -250,21 +250,26 @@ export function Step3Personalize({
     return (
       <div
         key={key}
-        className="rounded-xl border border-slate-800 bg-slate-900/50 p-4"
+        className="rounded-xl border border-border/70 bg-card/60 p-3.5 space-y-2.5 transition-all hover:border-border"
       >
-        <div className="mb-3 flex items-center gap-2">
-          <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-0.5 text-xs font-mono font-medium text-primary">
-            {placeholder}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center rounded-md border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs font-mono font-bold text-primary">
+              {placeholder}
+            </span>
+            {labelPrefix && (
+              <span className="text-xs text-muted-foreground font-medium">{labelPrefix}</span>
+            )}
+          </div>
+          <span className="text-[10px] uppercase font-semibold tracking-wider text-muted-foreground">
+            {mapping.type.replace('_', ' ')}
           </span>
-          {labelPrefix && (
-            <span className="text-xs text-slate-400 font-medium">{labelPrefix}</span>
-          )}
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-slate-400">
-              Mapping Type
+            <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+              Mapping Source
             </label>
             <Select
               value={mapping.type}
@@ -275,22 +280,20 @@ export function Step3Personalize({
                 })
               }
             >
-              <SelectTrigger className="w-full border-slate-700 bg-slate-800 text-white">
+              <SelectTrigger className="w-full h-8 text-xs border-border/80 bg-background text-foreground">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="border-slate-700 bg-slate-800">
-                <SelectItem value="static">Static Value</SelectItem>
-                <SelectItem value="field">Contact Field</SelectItem>
-                <SelectItem value="custom_field">
-                  Custom Field
-                </SelectItem>
+              <SelectContent className="border-border bg-popover text-popover-foreground">
+                <SelectItem value="field" className="text-xs">Contact Field</SelectItem>
+                <SelectItem value="custom_field" className="text-xs">Custom Field</SelectItem>
+                <SelectItem value="static" className="text-xs">Static Text Value</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-slate-400">
-              {mapping.type === 'static' ? 'Value' : 'Field'}
+            <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+              {mapping.type === 'static' ? 'Static Value' : 'Select Target Property'}
             </label>
             {mapping.type === 'static' ? (
               <Input
@@ -298,8 +301,8 @@ export function Step3Personalize({
                 onChange={(e) =>
                   updateVariable(key, { value: e.target.value })
                 }
-                placeholder="Enter value..."
-                className="border-slate-700 bg-slate-800 text-white placeholder:text-slate-500"
+                placeholder="Enter value…"
+                className="h-8 text-xs border-border/80 bg-background text-foreground placeholder:text-muted-foreground"
               />
             ) : mapping.type === 'field' ? (
               <Select
@@ -308,12 +311,12 @@ export function Step3Personalize({
                   updateVariable(key, { value: val || '' })
                 }
               >
-                <SelectTrigger className="w-full border-slate-700 bg-slate-800 text-white">
-                  <SelectValue placeholder="Select field..." />
+                <SelectTrigger className="w-full h-8 text-xs border-border/80 bg-background text-foreground">
+                  <SelectValue placeholder="Choose contact property…" />
                 </SelectTrigger>
-                <SelectContent className="border-slate-700 bg-slate-800">
+                <SelectContent className="border-border bg-popover text-popover-foreground">
                   {contactFields.map((field) => (
-                    <SelectItem key={field.value} value={field.value}>
+                    <SelectItem key={field.value} value={field.value} className="text-xs">
                       {field.label}
                     </SelectItem>
                   ))}
@@ -326,7 +329,7 @@ export function Step3Personalize({
                   updateVariable(key, { value: val || '' })
                 }
               >
-                <SelectTrigger className="w-full border-slate-700 bg-slate-800 text-white">
+                <SelectTrigger className="w-full h-8 text-xs border-border/80 bg-background text-foreground">
                   <SelectValue
                     placeholder={
                       loadingFields
@@ -337,9 +340,9 @@ export function Step3Personalize({
                     }
                   />
                 </SelectTrigger>
-                <SelectContent className="border-slate-700 bg-slate-800">
+                <SelectContent className="border-border bg-popover text-popover-foreground">
                   {customFields.map((f) => (
-                    <SelectItem key={f.id} value={f.id}>
+                    <SelectItem key={f.id} value={f.id} className="text-xs">
                       {f.field_name}
                     </SelectItem>
                   ))}
@@ -354,159 +357,185 @@ export function Step3Personalize({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold text-white">Personalize Message</h2>
-        <p className="mt-1 text-sm text-slate-400">
-          Map template variables to contact fields, custom fields, or static values.
+      {/* Header */}
+      <div className="flex flex-col gap-1">
+        <h2 className="text-base font-semibold text-foreground sm:text-lg">
+          Personalize Dynamic Variables
+        </h2>
+        <p className="text-xs text-muted-foreground">
+          Map template placeholders like {'{{1}}'}, {'{{2}}'} to recipient properties or static text.
         </p>
       </div>
 
-      {!hasAnyPlaceholders ? (
-        <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-6 text-center">
-          <p className="text-sm text-slate-400">
-            This template has no variables to personalize.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {headerPlaceholders.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-primary" /> Header Personalization
-              </h3>
-              {headerPlaceholders.map((placeholder: string) => {
-                const key = `header_${placeholder.replace(/^\{\{|\}\}$/g, '')}`;
-                return renderPlaceholderRow(placeholder, key);
-              })}
-            </div>
-          )}
-
-          {bodyPlaceholders.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-primary" /> Body Personalization
-              </h3>
-              {bodyPlaceholders.map((placeholder: string) => {
-                const num = placeholder.replace(/^\{\{|\}\}$/g, '');
-                const key = `body_${num}`;
-                return renderPlaceholderRow(placeholder, key);
-              })}
-            </div>
-          )}
-
-          {buttonPlaceholders.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-primary" /> Button Personalization
-              </h3>
-              {buttonPlaceholders.map((btn) => {
-                const num = btn.placeholder.replace(/^\{\{|\}\}$/g, '');
-                const key = `button_${btn.buttonIndex}_${num}`;
-                return renderPlaceholderRow(btn.placeholder, key, `For button "${btn.buttonText}" link suffix`);
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
-        <div className="mb-3 flex items-center gap-2">
-          <Eye className="h-4 w-4 text-primary" />
-          <p className="text-sm font-medium text-white">Live Preview</p>
-          <span className="text-xs text-slate-500">({previewLabel})</span>
-          {loadingPreview && (
-            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-          )}
-        </div>
-        <div className="rounded-lg bg-[#0e1a12] p-3.5 border border-[#1e2d24]">
-          <div className="ml-auto max-w-[85%] rounded-2xl bg-[#0b3c2a] text-[#e3fdf5] px-3.5 py-2.5 shadow-sm space-y-1.5">
-            {template.header_type === 'text' && previewHeaderText && (
-              <p className="font-extrabold text-sm text-white tracking-wide border-b border-[#124d37] pb-1">
-                {previewHeaderText}
+      {/* 2-Column Responsive Layout */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
+        {/* Left Column: Variable Configuration Form */}
+        <div className="space-y-5 lg:col-span-7">
+          {!hasAnyPlaceholders ? (
+            <div className="rounded-xl border border-border/70 bg-card/60 p-6 text-center">
+              <Sparkles className="h-6 w-6 text-primary mx-auto mb-2" />
+              <h3 className="text-xs font-bold text-foreground">Static Template</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                This template has no dynamic variable placeholders. You can proceed directly to the final review.
               </p>
-            )}
-            {template.header_type && template.header_type !== 'text' && (
-              <div className="flex items-center gap-2 bg-[#062c1e] text-xs font-semibold text-teal-400 p-2 rounded-xl border border-[#0d3c2b]">
-                <FileText className="size-4 shrink-0" />
-                <span className="capitalize">{template.header_type} Header Attachment</span>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              {headerPlaceholders.length > 0 && (
+                <div className="space-y-2.5">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary" /> Header Variables
+                  </h3>
+                  {headerPlaceholders.map((placeholder: string) => {
+                    const key = `header_${placeholder.replace(/^\{\{|\}\}$/g, '')}`;
+                    return renderPlaceholderRow(placeholder, key);
+                  })}
+                </div>
+              )}
+
+              {bodyPlaceholders.length > 0 && (
+                <div className="space-y-2.5">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary" /> Body Variables
+                  </h3>
+                  {bodyPlaceholders.map((placeholder: string) => {
+                    const num = placeholder.replace(/^\{\{|\}\}$/g, '');
+                    const key = `body_${num}`;
+                    return renderPlaceholderRow(placeholder, key);
+                  })}
+                </div>
+              )}
+
+              {buttonPlaceholders.length > 0 && (
+                <div className="space-y-2.5">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary" /> Button Link Suffix
+                  </h3>
+                  {buttonPlaceholders.map((btn) => {
+                    const num = btn.placeholder.replace(/^\{\{|\}\}$/g, '');
+                    const key = `button_${btn.buttonIndex}_${num}`;
+                    return renderPlaceholderRow(btn.placeholder, key, `Button "${btn.buttonText}" link`);
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {unmappedKeys.length > 0 && (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-500 dark:text-amber-300">
+              <span className="font-semibold block mb-0.5">Missing Required Mappings:</span>
+              Please assign values for:{' '}
+              <span className="font-mono font-semibold">
+                {unmappedKeys.join(', ')}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Right Column: Sticky Live WhatsApp Preview */}
+        <div className="lg:col-span-5 lg:sticky lg:top-6">
+          <div className="rounded-2xl border border-border/80 bg-card/60 p-4 shadow-sm backdrop-blur-xs space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-border/60">
+              <div className="flex items-center gap-2">
+                <Eye className="h-3.5 w-3.5 text-primary" />
+                <span className="text-xs font-bold text-foreground">Live Message Preview</span>
               </div>
-            )}
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#c3fae8]">
-              {previewText}
-            </p>
-            {template.footer_text && (
-              <p className="text-[10px] text-teal-500/70 italic mt-1 font-medium">
-                {template.footer_text}
-              </p>
-            )}
-          </div>
-          {template.buttons && Array.isArray(template.buttons) && template.buttons.length > 0 && (
-            <div className="ml-auto max-w-[85%] mt-1 space-y-1">
-              {template.buttons.map((btn: any, idx: number) => {
-                let dynamicUrlSuffix = '';
-                if (btn.type === 'URL' && btn.url) {
-                  const matches = btn.url.match(/\{\{(\d+)\}\}/g);
-                  if (matches) {
-                    const contact = firstContact ?? SAMPLE_CONTACT;
-                    const customValues = firstContact
-                      ? firstContactCustomValues
-                      : new Map<string, string>();
-                    
-                    dynamicUrlSuffix = ' 🔗 ' + btn.url;
-                    matches.forEach((m: string) => {
-                      const num = m.replace(/^\{\{|\}\}$/g, '');
-                      const key = `button_${idx}_${num}`;
-                      const mapping = variables[key];
-                      const val = resolveMappingValue(mapping, contact, customValues) || m;
-                      dynamicUrlSuffix = dynamicUrlSuffix.replaceAll(m, val);
-                    });
-                  }
-                }
-                return (
-                  <div
-                    key={idx}
-                    className="bg-[#1e2f26] border border-[#2b3f33] text-teal-300 rounded-xl py-2 px-3 text-center text-xs font-semibold hover:bg-[#25392e] transition-colors cursor-default"
-                  >
-                    {btn.text}
-                    {dynamicUrlSuffix && (
-                      <span className="text-[10px] text-teal-500 block font-normal truncate mt-0.5">
-                        {dynamicUrlSuffix}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
+              <span className="text-[10px] text-muted-foreground">
+                Using {previewLabel}
+              </span>
             </div>
-          )}
+
+            {/* WhatsApp Chat Bubbles Background */}
+            <div className="rounded-xl bg-[#0b141a] p-3.5 border border-[#1f2c34] shadow-inner">
+              <div className="ml-auto max-w-[92%] rounded-xl bg-[#005c4b] text-[#e9edef] px-3.5 py-2.5 shadow-sm space-y-1.5">
+                {template.header_type === 'text' && previewHeaderText && (
+                  <p className="font-bold text-xs text-white pb-1 border-b border-[#00473a]">
+                    {previewHeaderText}
+                  </p>
+                )}
+                {template.header_type && template.header_type !== 'text' && (
+                  <div className="flex items-center gap-2 bg-[#025142] text-[11px] font-medium text-emerald-200 p-2 rounded-lg border border-[#046c58]">
+                    <FileText className="size-3.5 shrink-0" />
+                    <span className="capitalize">{template.header_type} Attachment</span>
+                  </div>
+                )}
+                <p className="whitespace-pre-wrap text-xs leading-relaxed text-[#e9edef]">
+                  {previewText}
+                </p>
+                {template.footer_text && (
+                  <p className="text-[10px] text-[#8696a0] italic mt-1 font-medium">
+                    {template.footer_text}
+                  </p>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              {template.buttons && Array.isArray(template.buttons) && template.buttons.length > 0 && (
+                <div className="ml-auto max-w-[92%] mt-1.5 space-y-1">
+                  {template.buttons.map((btn: any, idx: number) => {
+                    let dynamicUrlSuffix = '';
+                    if (btn.type === 'URL' && btn.url) {
+                      const matches = btn.url.match(/\{\{(\d+)\}\}/g);
+                      if (matches) {
+                        const contact = firstContact ?? SAMPLE_CONTACT;
+                        const customValues = firstContact
+                          ? firstContactCustomValues
+                          : new Map<string, string>();
+                        
+                        dynamicUrlSuffix = ' 🔗 ' + btn.url;
+                        matches.forEach((m: string) => {
+                          const num = m.replace(/^\{\{|\}\}$/g, '');
+                          const key = `button_${idx}_${num}`;
+                          const mapping = variables[key];
+                          const val = resolveMappingValue(mapping, contact, customValues) || m;
+                          dynamicUrlSuffix = dynamicUrlSuffix.replaceAll(m, val);
+                        });
+                      }
+                    }
+                    return (
+                      <div
+                        key={idx}
+                        className="bg-[#202c33] border border-[#2a3942] text-[#00a884] rounded-lg py-1.5 px-3 text-center text-xs font-medium cursor-default shadow-xs"
+                      >
+                        {btn.text}
+                        {dynamicUrlSuffix && (
+                          <span className="text-[10px] text-[#8696a0] block font-normal truncate mt-0.5">
+                            {dynamicUrlSuffix}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <p className="text-[10px] text-muted-foreground text-center">
+              Recipients will see dynamic parameters populated with their personal data.
+            </p>
+          </div>
         </div>
       </div>
 
-      {unmappedKeys.length > 0 && (
-        <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
-          Map every placeholder before continuing — still missing{' '}
-          <span className="font-mono font-semibold">
-            {unmappedKeys.join(', ')}
-          </span>
-          .
-        </div>
-      )}
-
-      <div className="flex items-center justify-between border-t border-slate-800 pt-4">
+      {/* Navigation Buttons */}
+      <div className="flex items-center justify-between border-t border-border/70 pt-4">
         <Button
           variant="outline"
+          size="sm"
           onClick={onBack}
-          className="border-slate-700 text-slate-300"
+          className="gap-1.5 text-xs"
         >
-          <ArrowLeft className="h-4 w-4" />
-          Back
+          <ArrowLeft className="h-3.5 w-3.5" />
+          <span>Back to Audience</span>
         </Button>
         <Button
+          size="sm"
           onClick={onNext}
           disabled={unmappedKeys.length > 0}
-          className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          className="gap-1.5 text-xs shadow-xs"
         >
-          Next
-          <ArrowRight className="h-4 w-4" />
+          <span>Review & Send</span>
+          <ArrowRight className="h-3.5 w-3.5" />
         </Button>
       </div>
     </div>

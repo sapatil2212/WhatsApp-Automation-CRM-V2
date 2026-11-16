@@ -66,10 +66,30 @@ app.prepare().then(() => {
     }
   }, 60 * 1000); // 1 minute
 
+  const allowedOrigins = [
+    process.env.NEXT_PUBLIC_SITE_URL,
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://localhost:3002",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001",
+    "http://127.0.0.1:3002",
+  ].filter(Boolean);
+
   const io = new Server(httpServer, {
     cors: {
-      origin: "*",
-      methods: ["GET", "POST"]
+      origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps, curl, server-to-server) or in development
+        if (!origin || dev) {
+          return callback(null, true);
+        }
+        if (allowedOrigins.some((allowed) => origin === allowed || origin.startsWith(allowed))) {
+          return callback(null, true);
+        }
+        return callback(new Error("[Socket.io] CORS policy violation: origin not allowed"), false);
+      },
+      methods: ["GET", "POST"],
+      credentials: true,
     }
   });
 

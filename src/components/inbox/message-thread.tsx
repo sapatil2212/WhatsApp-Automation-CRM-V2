@@ -517,15 +517,44 @@ export function MessageThread({
     async (status: ConversationStatus) => {
       if (!conversation) return;
 
-      const supabase = createClient();
-      await supabase
-        .from("conversations")
-        .update({ status })
-        .eq("id", conversation.id);
+      try {
+        await fetch(`/api/conversations/${conversation.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status }),
+        });
+      } catch (err) {
+        console.error("Failed to update status on server:", err);
+      }
 
       onStatusChange(conversation.id, status);
     },
     [conversation, onStatusChange]
+  );
+
+  const handleAssignChange = useCallback(
+    async (agentId: string | null) => {
+      if (!conversation) return;
+
+      try {
+        const res = await fetch(`/api/conversations/${conversation.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ assignedAgentId: agentId }),
+        });
+
+        if (res.ok) {
+          toast.success(agentId ? "Conversation assigned" : "Conversation unassigned");
+          onRefresh?.();
+        } else {
+          const body = await res.json();
+          toast.error(body.error?.message || body.message || "Failed to update assignment");
+        }
+      } catch (err) {
+        toast.error("Failed to update assignment");
+      }
+    },
+    [conversation, onRefresh]
   );
 
   const handleOpenTemplates = useCallback(() => {
@@ -690,27 +719,6 @@ export function MessageThread({
       }
     },
     [conversation, user?.id],
-  );
-
-  const handleAssignChange = useCallback(
-    async (agentId: string | null) => {
-      if (!conversation) return;
-
-      const supabase = createClient();
-      const { error } = await supabase
-        .from("conversations")
-        .update({ assigned_agent_id: agentId })
-        .eq("id", conversation.id);
-
-      if (error) {
-        console.error("Failed to update assignment:", error);
-        toast.error("Failed to update assignment");
-        return;
-      }
-
-      onAssignChange(conversation.id, agentId);
-    },
-    [conversation, onAssignChange],
   );
 
   // Empty state — same WhatsApp-style doodle background as the active
@@ -1028,6 +1036,10 @@ export function MessageThread({
         onOpenTemplates={handleOpenTemplates}
         replyTo={replyTo}
         onClearReply={() => setReplyTo(null)}
+        recentMessages={messages.slice(-6).map((m) => ({
+          senderType: m.sender_type === "customer" ? ("customer" as const) : ("agent" as const),
+          text: m.content_text || "",
+        }))}
       />
 
       <TemplatePicker

@@ -14,7 +14,18 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { ArrowLeft, Send, Loader2, Users, Save } from 'lucide-react';
+import {
+  ArrowLeft,
+  Send,
+  Loader2,
+  Users,
+  Save,
+  FileText,
+  Sparkles,
+  ShieldCheck,
+  CheckCircle2,
+  AlertTriangle,
+} from 'lucide-react';
 
 interface AudienceConfig {
   type: string;
@@ -83,152 +94,222 @@ export function Step4ScheduleSend({
 
   const audienceLabel =
     audience.type === 'all'
-      ? 'All Contacts'
+      ? 'All Contacts in Database'
       : audience.type === 'tags'
-        ? `Tags (${audience.tagIds?.length ?? 0} selected)`
+        ? `Segmented by Tags (${audience.tagIds?.length ?? 0} active)`
         : audience.type === 'csv'
-          ? 'CSV Upload'
-          : 'Custom';
+          ? 'Uploaded CSV File'
+          : 'Custom Field Segment';
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold text-white">Review & Send</h2>
-        <p className="mt-1 text-sm text-slate-400">
-          Name your broadcast, review the details, and send.
+      {/* Header */}
+      <div className="flex flex-col gap-1">
+        <h2 className="text-base font-semibold text-foreground sm:text-lg">
+          Review & Launch Campaign
+        </h2>
+        <p className="text-xs text-muted-foreground">
+          Confirm your campaign setup, name your broadcast, and initiate delivery.
         </p>
       </div>
 
-      {/* Broadcast Name */}
-      <div>
-        <label className="mb-1.5 block text-sm font-medium text-white">Broadcast Name</label>
+      {/* Broadcast Name Card */}
+      <div className="rounded-xl border border-border/70 bg-card/60 p-4 space-y-2">
+        <label className="block text-xs font-bold text-foreground">
+          Campaign Name <span className="text-primary">*</span>
+        </label>
         <Input
           value={name}
           onChange={(e) => onNameChange(e.target.value)}
-          placeholder="e.g. Summer Sale Announcement"
-          className="border-slate-700 bg-slate-800 text-white placeholder:text-slate-500"
+          placeholder="e.g. Black Friday Early Access VIP"
+          className="h-10 text-xs border-border/80 bg-background text-foreground placeholder:text-muted-foreground focus-visible:ring-primary/20"
         />
+        <p className="text-[11px] text-muted-foreground">
+          Give your campaign an identifiable internal title for metrics tracking in Analytics.
+        </p>
       </div>
 
-      {/* Summary Card */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4 space-y-3">
-        <p className="text-sm font-medium text-white">Summary</p>
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div>
-            <p className="text-xs text-slate-400">Template</p>
-            <p className="text-white">{template.name}</p>
+      {/* Campaign Blueprint Grid */}
+      <div className="rounded-xl border border-border/70 bg-card/60 p-5 space-y-4 shadow-xs">
+        <div className="flex items-center justify-between pb-2 border-b border-border/60">
+          <span className="text-xs font-bold text-foreground">Campaign Summary</span>
+          <span className="inline-flex items-center gap-1 text-[10px] text-primary font-semibold">
+            <CheckCircle2 className="h-3 w-3" /> Ready to Launch
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Template
+            </span>
+            <div className="flex items-center gap-1.5 pt-0.5">
+              <FileText className="h-3.5 w-3.5 text-primary shrink-0" />
+              <p className="text-xs font-bold text-foreground truncate">{template.name}</p>
+            </div>
+            <p className="text-[10px] text-muted-foreground capitalize">{template.category || 'Standard'}</p>
           </div>
-          <div>
-            <p className="text-xs text-slate-400">Audience</p>
-            <p className="text-white">{audienceLabel}</p>
+
+          <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Target Audience
+            </span>
+            <div className="flex items-center gap-1.5 pt-0.5">
+              <Users className="h-3.5 w-3.5 text-teal-400 shrink-0" />
+              <p className="text-xs font-bold text-foreground truncate">{audienceLabel}</p>
+            </div>
+            <p className="text-[10px] text-muted-foreground capitalize">{audience.type} mode</p>
           </div>
-          <div>
-            <p className="text-xs text-slate-400">Estimated Reach</p>
-            <div className="flex items-center gap-1.5">
+
+          <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Estimated Reach
+            </span>
+            <div className="flex items-center gap-1.5 pt-0.5">
               {loadingReach ? (
-                <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
               ) : (
-                <>
-                  <Users className="h-3.5 w-3.5 text-primary" />
-                  <p className="font-medium text-white">{estimatedReach.toLocaleString()}</p>
-                </>
+                <span className="text-base font-extrabold text-foreground tabular-nums">
+                  {estimatedReach.toLocaleString()}
+                </span>
               )}
             </div>
+            <p className="text-[10px] text-muted-foreground">recipients queued</p>
           </div>
-          <div>
-            <p className="text-xs text-slate-400">Language</p>
-            <p className="text-white">{template.language ?? 'en_US'}</p>
+
+          <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Language & Platform
+            </span>
+            <div className="flex items-center gap-1.5 pt-0.5">
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+              <p className="text-xs font-bold text-foreground truncate">{template.language ?? 'en_US'}</p>
+            </div>
+            <p className="text-[10px] text-muted-foreground">Cloud API Direct</p>
           </div>
+        </div>
+      </div>
+
+      {/* Meta Compliance Pill */}
+      <div className="flex items-start gap-2.5 rounded-xl border border-primary/20 bg-primary/5 p-3.5 text-xs">
+        <Sparkles className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+        <div className="space-y-0.5 text-muted-foreground leading-relaxed">
+          <p className="font-semibold text-foreground text-xs">Meta Business API Protection</p>
+          <p className="text-[11px]">
+            Messages will be delivered safely with automatic rate-limit throttling in accordance with Meta Business platform guidelines.
+          </p>
         </div>
       </div>
 
       {/* Processing overlay */}
       {isProcessing && (
-        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-          <div className="mb-2 flex items-center justify-between">
+        <div className="rounded-xl border border-primary/30 bg-primary/10 p-4 space-y-2.5">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin text-primary" />
-              <p className="text-sm font-medium text-white">Sending broadcast...</p>
+              <p className="text-xs font-bold text-foreground">Broadcasting messages via Meta Cloud API…</p>
             </div>
-            <span className="text-xs font-medium text-primary">{progress}%</span>
+            <span className="text-xs font-bold text-primary tabular-nums">{progress}%</span>
           </div>
-          <div className="h-1.5 w-full rounded-full bg-slate-800">
+          <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
             <div
-              className="h-1.5 rounded-full bg-primary transition-all duration-300"
+              className="h-full rounded-full bg-primary transition-all duration-300"
               style={{ width: `${progress}%` }}
             />
           </div>
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-800 pt-4">
+      {/* Navigation and Launch Actions */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-4">
         <Button
           variant="outline"
+          size="sm"
           onClick={onBack}
           disabled={isProcessing}
-          className="border-slate-700 text-slate-300"
+          className="gap-1.5 text-xs"
         >
-          <ArrowLeft className="h-4 w-4" />
-          Back
+          <ArrowLeft className="h-3.5 w-3.5" />
+          <span>Back to Personalize</span>
         </Button>
 
         <div className="flex items-center gap-2">
           {onSaveDraft && (
             <Button
               variant="outline"
+              size="sm"
               onClick={onSaveDraft}
               disabled={!name.trim() || isProcessing}
-              className="border-slate-700 text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+              className="gap-1.5 text-xs"
             >
-              <Save className="h-4 w-4" />
-              Save as Draft
+              <Save className="h-3.5 w-3.5" />
+              <span>Save as Draft</span>
             </Button>
           )}
 
           <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
-          <DialogTrigger
-            render={
-              <Button
-                disabled={!name.trim() || isProcessing}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-              />
-            }
-          >
-            <Send className="h-4 w-4" />
-            Send Broadcast
-          </DialogTrigger>
-          <DialogContent className="border-slate-700 bg-slate-900 sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle className="text-white">Confirm Broadcast</DialogTitle>
-              <DialogDescription className="text-slate-400">
-                You are about to send this broadcast to{' '}
-                <span className="font-medium text-white">{estimatedReach.toLocaleString()}</span>{' '}
-                contacts using the{' '}
-                <span className="font-medium text-white">{template.name}</span> template.
-                This action cannot be undone.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setShowConfirm(false)}
-                className="border-slate-700 text-slate-300"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  setShowConfirm(false);
-                  onSend();
-                }}
-                className="bg-primary text-primary-foreground hover:bg-primary/90"
-              >
-                <Send className="h-4 w-4" />
-                Confirm & Send
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            <DialogTrigger
+              render={
+                <Button
+                  size="sm"
+                  disabled={!name.trim() || isProcessing || estimatedReach === 0}
+                  className="gap-2 text-xs shadow-xs"
+                />
+              }
+            >
+              <Send className="h-3.5 w-3.5" />
+              <span>Send Broadcast Now</span>
+            </DialogTrigger>
+            <DialogContent className="border-border bg-popover text-popover-foreground sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-base text-foreground">
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  Confirm Broadcast Dispatch
+                </DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground pt-1.5 leading-relaxed">
+                  You are about to send{' '}
+                  <span className="font-bold text-foreground">
+                    {estimatedReach.toLocaleString()}
+                  </span>{' '}
+                  WhatsApp messages using the{' '}
+                  <span className="font-bold text-foreground">{template.name}</span> template. Once triggered, delivery commences immediately.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="rounded-lg border border-border/70 bg-muted/30 p-3 text-xs space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Campaign:</span>
+                  <span className="font-semibold text-foreground">{name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Recipients:</span>
+                  <span className="font-semibold text-foreground">{estimatedReach.toLocaleString()}</span>
+                </div>
+              </div>
+
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowConfirm(false)}
+                  className="text-xs"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setShowConfirm(false);
+                    onSend();
+                  }}
+                  className="gap-1.5 text-xs"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  <span>Confirm & Send</span>
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </div>

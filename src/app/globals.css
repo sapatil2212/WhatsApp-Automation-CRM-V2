@@ -308,6 +308,33 @@ html[data-theme="rose"] {
   ::-webkit-scrollbar-thumb:hover {
     background: var(--muted-foreground);
   }
+
+  /* Sidebar / Container scrollbar: hidden by default, smoothly appears on hover */
+  .scrollbar-hover {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-hover::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  .scrollbar-hover::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-hover::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 9999px;
+  }
+  .scrollbar-hover:hover {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .scrollbar-hover:hover::-webkit-scrollbar-thumb {
+    background: var(--border);
+  }
+  .scrollbar-hover:hover::-webkit-scrollbar-thumb:hover {
+    background: var(--muted-foreground);
+  }
 }
 
 /* ============================================================

@@ -55,16 +55,33 @@ export interface FlowTemplateNode {
     | Record<string, unknown>;
 }
 
+/** lucide-react icon names the gallery knows how to render. */
+export type FlowTemplateIcon =
+  | "MessageSquare"
+  | "HelpCircle"
+  | "UserPlus"
+  | "CalendarClock"
+  | "FileText"
+  | "BedDouble"
+  | "GraduationCap";
+
 export interface FlowTemplate {
   slug: string;
   name: string;
   description: string;
   /** Used by the gallery to surface a relevant icon. lucide-react name. */
-  icon: "MessageSquare" | "HelpCircle" | "UserPlus";
+  icon: FlowTemplateIcon;
   trigger_type: "keyword" | "first_inbound_message" | "manual";
   trigger_config: KeywordTriggerConfig | Record<string, unknown>;
   entry_node_id: string;
   nodes: FlowTemplateNode[];
+  /**
+   * Business segments this template is tailored for (see
+   * `getBusinessSegment`). When omitted, the template is generic and
+   * shown to every business. When set, the flows gallery marks it as
+   * "recommended" for matching businesses and surfaces it first.
+   */
+  segments?: string[];
 }
 
 // ============================================================
@@ -286,6 +303,249 @@ const LEAD_CAPTURE: FlowTemplate = {
 };
 
 // ============================================================
+// 4. Appointment booking — service businesses that take bookings
+// ============================================================
+const APPOINTMENT_BOOKING: FlowTemplate = {
+  slug: "appointment_booking",
+  name: "Appointment booking",
+  description:
+    "Let customers request an appointment on WhatsApp — capture their name, the service they want, and a preferred time, then hand off to your team to confirm.",
+  icon: "CalendarClock",
+  segments: ["beauty", "wellness", "healthcare", "automotive", "pet", "professional"],
+  trigger_type: "keyword",
+  trigger_config: {
+    keywords: ["book", "appointment", "booking", "slot", "schedule"],
+    match_type: "contains",
+  },
+  entry_node_id: "start",
+  nodes: [
+    { node_key: "start", node_type: "start", config: { next_node_key: "intro" } },
+    {
+      node_key: "intro",
+      node_type: "send_message",
+      config: {
+        text: "Hi! 👋 I can help you book an appointment. Just a few quick details.",
+        next_node_key: "ask_name",
+      } as SendMessageNodeConfig,
+    },
+    {
+      node_key: "ask_name",
+      node_type: "collect_input",
+      config: {
+        prompt_text: "What's your full name?",
+        var_key: "name",
+        next_node_key: "ask_service",
+      } as CollectInputNodeConfig,
+    },
+    {
+      node_key: "ask_service",
+      node_type: "collect_input",
+      config: {
+        prompt_text: "Thanks {{vars.name}}! Which service would you like to book?",
+        var_key: "service",
+        next_node_key: "ask_time",
+      } as CollectInputNodeConfig,
+    },
+    {
+      node_key: "ask_time",
+      node_type: "collect_input",
+      config: {
+        prompt_text: "What day and time works best for you?",
+        var_key: "preferred_time",
+        next_node_key: "handoff",
+      } as CollectInputNodeConfig,
+    },
+    {
+      node_key: "handoff",
+      node_type: "handoff",
+      config: {
+        note: "Booking request — name={{vars.name}}, service={{vars.service}}, preferred={{vars.preferred_time}}. Please confirm availability.",
+      } as HandoffNodeConfig,
+    },
+  ],
+};
+
+// ============================================================
+// 5. Quote request — trades / professional / automotive
+// ============================================================
+const QUOTE_REQUEST: FlowTemplate = {
+  slug: "quote_request",
+  name: "Quote request",
+  description:
+    "Capture the details of a job — what the customer needs, where, and when — then hand off so you can send an accurate quote.",
+  icon: "FileText",
+  segments: ["trades", "professional", "automotive"],
+  trigger_type: "keyword",
+  trigger_config: {
+    keywords: ["quote", "estimate", "price", "cost", "enquiry", "inquiry"],
+    match_type: "contains",
+  },
+  entry_node_id: "start",
+  nodes: [
+    { node_key: "start", node_type: "start", config: { next_node_key: "intro" } },
+    {
+      node_key: "intro",
+      node_type: "send_message",
+      config: {
+        text: "Happy to prepare a quote for you. 📋 A few quick questions first.",
+        next_node_key: "ask_job",
+      } as SendMessageNodeConfig,
+    },
+    {
+      node_key: "ask_job",
+      node_type: "collect_input",
+      config: {
+        prompt_text: "What work do you need done? Please describe it briefly.",
+        var_key: "job",
+        next_node_key: "ask_location",
+      } as CollectInputNodeConfig,
+    },
+    {
+      node_key: "ask_location",
+      node_type: "collect_input",
+      config: {
+        prompt_text: "Where is the job located (area / pincode)?",
+        var_key: "location",
+        next_node_key: "ask_timing",
+      } as CollectInputNodeConfig,
+    },
+    {
+      node_key: "ask_timing",
+      node_type: "collect_input",
+      config: {
+        prompt_text: "When would you like this done?",
+        var_key: "timing",
+        next_node_key: "handoff",
+      } as CollectInputNodeConfig,
+    },
+    {
+      node_key: "handoff",
+      node_type: "handoff",
+      config: {
+        note: "Quote request — job={{vars.job}}, location={{vars.location}}, timing={{vars.timing}}. Prepare and send an estimate.",
+      } as HandoffNodeConfig,
+    },
+  ],
+};
+
+// ============================================================
+// 6. Room reservation — hospitality
+// ============================================================
+const ROOM_RESERVATION: FlowTemplate = {
+  slug: "room_reservation",
+  name: "Room reservation",
+  description:
+    "Take reservation enquiries — check-in / check-out dates, number of guests, and room type — then hand off to confirm availability.",
+  icon: "BedDouble",
+  segments: ["hospitality"],
+  trigger_type: "keyword",
+  trigger_config: {
+    keywords: ["book", "room", "reservation", "stay", "availability"],
+    match_type: "contains",
+  },
+  entry_node_id: "start",
+  nodes: [
+    { node_key: "start", node_type: "start", config: { next_node_key: "intro" } },
+    {
+      node_key: "intro",
+      node_type: "send_message",
+      config: {
+        text: "Welcome! 🏨 I can help with your reservation. A few quick details, please.",
+        next_node_key: "ask_dates",
+      } as SendMessageNodeConfig,
+    },
+    {
+      node_key: "ask_dates",
+      node_type: "collect_input",
+      config: {
+        prompt_text: "What are your check-in and check-out dates?",
+        var_key: "dates",
+        next_node_key: "ask_guests",
+      } as CollectInputNodeConfig,
+    },
+    {
+      node_key: "ask_guests",
+      node_type: "collect_input",
+      config: {
+        prompt_text: "How many guests will be staying?",
+        var_key: "guests",
+        next_node_key: "ask_room",
+      } as CollectInputNodeConfig,
+    },
+    {
+      node_key: "ask_room",
+      node_type: "collect_input",
+      config: {
+        prompt_text: "Which room type would you prefer (e.g. Standard, Deluxe, Suite)?",
+        var_key: "room_type",
+        next_node_key: "handoff",
+      } as CollectInputNodeConfig,
+    },
+    {
+      node_key: "handoff",
+      node_type: "handoff",
+      config: {
+        note: "Reservation enquiry — dates={{vars.dates}}, guests={{vars.guests}}, room={{vars.room_type}}. Confirm availability and rate.",
+      } as HandoffNodeConfig,
+    },
+  ],
+};
+
+// ============================================================
+// 7. Course enquiry — education
+// ============================================================
+const COURSE_ENQUIRY: FlowTemplate = {
+  slug: "course_enquiry",
+  name: "Course enquiry",
+  description:
+    "Handle admission and course enquiries — capture the student's name, the course they're interested in, and hand off with the details.",
+  icon: "GraduationCap",
+  segments: ["education"],
+  trigger_type: "keyword",
+  trigger_config: {
+    keywords: ["course", "admission", "enroll", "class", "fees", "join"],
+    match_type: "contains",
+  },
+  entry_node_id: "start",
+  nodes: [
+    { node_key: "start", node_type: "start", config: { next_node_key: "intro" } },
+    {
+      node_key: "intro",
+      node_type: "send_message",
+      config: {
+        text: "Hello! 🎓 Happy to help with your course enquiry. Just a couple of details.",
+        next_node_key: "ask_name",
+      } as SendMessageNodeConfig,
+    },
+    {
+      node_key: "ask_name",
+      node_type: "collect_input",
+      config: {
+        prompt_text: "What's the student's name?",
+        var_key: "name",
+        next_node_key: "ask_course",
+      } as CollectInputNodeConfig,
+    },
+    {
+      node_key: "ask_course",
+      node_type: "collect_input",
+      config: {
+        prompt_text: "Which course or program are you interested in?",
+        var_key: "course",
+        next_node_key: "handoff",
+      } as CollectInputNodeConfig,
+    },
+    {
+      node_key: "handoff",
+      node_type: "handoff",
+      config: {
+        note: "Course enquiry — student={{vars.name}}, course={{vars.course}}. Share fees, schedule, and next steps.",
+      } as HandoffNodeConfig,
+    },
+  ],
+};
+
+// ============================================================
 // Registry
 // ============================================================
 
@@ -293,6 +553,10 @@ const TEMPLATES: Record<string, FlowTemplate> = {
   welcome_menu: WELCOME_MENU,
   faq_bot: FAQ_BOT,
   lead_capture: LEAD_CAPTURE,
+  appointment_booking: APPOINTMENT_BOOKING,
+  quote_request: QUOTE_REQUEST,
+  room_reservation: ROOM_RESERVATION,
+  course_enquiry: COURSE_ENQUIRY,
 };
 
 export function getFlowTemplate(slug: string): FlowTemplate | null {

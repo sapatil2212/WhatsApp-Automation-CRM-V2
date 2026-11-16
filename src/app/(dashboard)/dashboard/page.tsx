@@ -31,6 +31,7 @@ import { ConversationsChart } from '@/components/dashboard/conversations-chart'
 import { PipelineDonut } from '@/components/dashboard/pipeline-donut'
 import { ResponseTimeChart } from '@/components/dashboard/response-time-chart'
 import { ActivityFeed } from '@/components/dashboard/activity-feed'
+import { TenantAnnouncements } from '@/components/dashboard/tenant-announcements'
 
 type RangeDays = 7 | 30 | 90
 
@@ -116,17 +117,20 @@ export default function DashboardPage() {
   )
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h1 className="text-lg font-bold tracking-tight text-foreground sm:text-xl">Dashboard</h1>
+        <p className="mt-0.5 text-xs text-muted-foreground">
           Live analytics across conversations, contacts, deals, broadcasts, and automations.
         </p>
       </div>
 
+      {/* In-app Super Admin Announcements */}
+      <TenantAnnouncements />
+
       {/* Metric cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {metricsLoading || !metrics ? (
           Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
         ) : (
@@ -186,7 +190,7 @@ export default function DashboardPage() {
           stretched height so their rounded borders line up. Without
           this, the pipeline card rendered at its natural (shorter)
           height while the line chart drove the row height. */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-5">
         <div className="h-full lg:col-span-3">
           <ConversationsChart
             series={series}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { verifyAccessToken, rotateRefreshToken } from '@/lib/auth'
+import { invalidateClinicCache } from '@/lib/healthcare/clinic-cache'
 
 // ─── Auth helper ────────────────────────────────────────────────────────────
 async function getAuthContext() {
@@ -58,6 +59,9 @@ export async function GET(_req: NextRequest) {
         state: clinic.state,
         pincode: clinic.pincode,
         google_map_link: clinic.googleMapLink,
+        instagram_url: clinic.instagramUrl,
+        facebook_url: clinic.facebookUrl,
+        ai_knowledge_base: clinic.aiKnowledgeBase,
         date_exceptions: clinic.dateExceptions ?? [],
       },
       timings: clinic.timings.map(t => ({
@@ -148,6 +152,9 @@ export async function POST(req: NextRequest) {
           state: data.state ?? null,
           pincode: data.pincode ?? null,
           googleMapLink: data.google_map_link ?? null,
+          instagramUrl: data.instagram_url ?? null,
+          facebookUrl: data.facebook_url ?? null,
+          aiKnowledgeBase: data.ai_knowledge_base ?? null,
         },
         update: {
           clinicName: data.clinic_name,
@@ -162,8 +169,14 @@ export async function POST(req: NextRequest) {
           state: data.state ?? null,
           pincode: data.pincode ?? null,
           googleMapLink: data.google_map_link ?? null,
+          instagramUrl: data.instagram_url ?? null,
+          facebookUrl: data.facebook_url ?? null,
+          aiKnowledgeBase: data.ai_knowledge_base ?? null,
         },
       })
+
+      // Refresh cached clinic context so AI picks up new info without waiting for TTL
+      invalidateClinicCache(ctx.userId)
 
       return NextResponse.json({ success: true, clinic_id: clinic.id })
     }
@@ -335,9 +348,7 @@ export async function POST(req: NextRequest) {
       })
 
       // Invalidate cache
-      await fetch(`${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/api/healthcare/invalidate-cache`, {
-        method: 'POST',
-      }).catch(() => {})
+      invalidateClinicCache(ctx.userId)
 
       return NextResponse.json({ success: true })
     }

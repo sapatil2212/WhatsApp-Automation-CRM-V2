@@ -251,9 +251,13 @@ model Contact {
   intakes      PatientIntake[]
   feedback     PatientFeedback[]
   enquiries    BusinessEnquiry[]
-  aiLogs       BusinessAILog[]
   aiChatLogs   AiChatLog[]
+  aiLogs       BusinessAILog[]
 
+  // A phone number identifies one person within a workspace. Enforced at the
+  // database level so a race between two concurrent creates cannot produce a
+  // duplicate that the application-level check would have caught.
+  @@unique([tenantId, phone])
   @@index([tenantId])
   @@index([userId])
   @@index([phone])
@@ -372,6 +376,11 @@ model Message {
   messageId          String?      // Meta message_id
   status             String       @default("sent") // sending, sent, delivered, read, failed
   interactiveReplyId String?      // Target button/list selection payload
+  // Quoted message (WhatsApp reply-with-context). SetNull rather than
+  // Cascade: deleting the quoted message must not delete the reply.
+  replyToMessageId   String?
+  replyTo            Message?     @relation("MessageReplies", fields: [replyToMessageId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  replies            Message[]    @relation("MessageReplies")
   createdAt          DateTime     @default(now())
 
   lastPromptForRuns  FlowRun[]    @relation("LastPromptMessage")
@@ -379,6 +388,9 @@ model Message {
 
   @@index([conversationId])
   @@index([messageId])
+  @@index([replyToMessageId])
+  // Supports the thread read: newest-first page within one conversation.
+  @@index([conversationId, createdAt(sort: Desc)])
 }
 
 model WhatsappConfig {
@@ -526,9 +538,17 @@ model BroadcastRecipient {
   readAt       DateTime?
   repliedAt    DateTime?
   errorMessage String?   @db.Text
+  // Meta's `wamid.…`, recorded when the send is accepted. Without this the
+  // delivery webhook has nothing to correlate a status callback against, so
+  // delivered/read/replied reporting is impossible.
+  whatsappMessageId String? @db.VarChar(191)
   createdAt    DateTime  @default(now())
 
   @@index([broadcastId])
+  // The sender claims the next pending batch for one campaign.
+  @@index([broadcastId, status])
+  // The webhook resolves a recipient from Meta's message id.
+  @@index([whatsappMessageId])
 }
 
 // ==========================================
@@ -731,6 +751,9 @@ model Clinic {
   state             String?
   pincode           String?
   googleMapLink     String?
+  instagramUrl      String?         // Instagram profile URL (AI grounding)
+  facebookUrl       String?         // Facebook page URL (AI grounding)
+  aiKnowledgeBase   String?         @db.Text // Extra expert context to train AI replies
   dateExceptions    Json?           // Holidays / exceptions context
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
@@ -828,6 +851,8 @@ model AISettings {
   escalationKeywords    Json?    // e.g. ["agent", "human"]
   emergencyKeywords     Json?    // e.g. ["heart attack", "accident"]
   humanHandoverEnabled  Boolean  @default(true)
+  // How inbound WhatsApp messages are routed: ai_first | flows_first | flows_only | ai_only
+  inboundRoutingMode    String   @default("ai_first")
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
@@ -924,6 +949,9 @@ model BusinessProfile {
   state           String?
   pincode         String?
   googleMapLink   String?
+  instagramUrl    String?           // Instagram profile URL (AI grounding)
+  facebookUrl     String?           // Facebook page URL (AI grounding)
+  aiKnowledgeBase String?           @db.Text // Extra expert context to train AI replies
   description     String?           @db.Text
   institutionType String?           // Education spec
   propertyType    String?           // Hotel spec
@@ -995,6 +1023,8 @@ model BusinessAISettings {
   afterHoursMessage    String?         @db.Text
   escalationKeywords   Json?
   humanHandoverEnabled Boolean         @default(true)
+  // How inbound WhatsApp messages are routed: ai_first | flows_first | flows_only | ai_only
+  inboundRoutingMode   String          @default("ai_first")
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
 
@@ -1086,3 +1116,59 @@ model MessageReaction {
   @@index([conversationId])
   @@index([messageId])
 }
+
+// ==========================================
+// SUPER ADMIN CMS (Content Management System)
+// ==========================================
+
+model CmsAnnouncement {
+  id             String    @id @default(uuid())
+  title          String
+  content        String    @db.Text
+  type           String    @default("info") // info, warning, success, alert, maintenance
+  priority       String    @default("normal") // low, normal, urgent
+  targetPlan     String    @default("all") // all, free, starter, pro, enterprise
+  targetAudience String    @default("all") // all, verified_only, unverified_only
+  isActive       Boolean   @default(true)
+  isDismissible  Boolean   @default(true)
+  actionLabel    String?
+  actionUrl      String?
+  startDate      DateTime? @default(now())
+  endDate        DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([isActive])
+}
+
+model CmsArticle {
+  id        String   @id @default(uuid())
+  title     String
+  slug      String   @unique
+  category  String   @default("general") // general, whatsapp, automations, billing, api
+  excerpt   String?  @db.Text
+  content   String   @db.Text
+  status    String   @default("published") // draft, published, archived
+  author    String   @default("ChatNexGen Team")
+  views     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([category])
+}
+
+model CmsChangelog {
+  id          String   @id @default(uuid())
+  version     String
+  title       String
+  tag         String   @default("feature") // feature, improvement, fix, security
+  content     String   @db.Text
+  publishedAt DateTime @default(now())
+  isPublished Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isPublished])
+}
+

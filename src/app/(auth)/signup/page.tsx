@@ -9,6 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  Combobox, ComboboxClear, ComboboxContent, ComboboxEmpty,
+  ComboboxInput, ComboboxInputGroup, ComboboxItem, ComboboxList, ComboboxTrigger,
+} from "@/components/ui/combobox";
+import {
   ArrowLeft, CheckCircle, Eye, EyeOff,
   QrCode, Loader2, PartyPopper, Paperclip,
   Zap, TrendingUp, Crown, Check,
@@ -18,8 +22,35 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const WHATSAPP_CONTACT = "917745868073";
 
+// ─── Business Categories ──────────────────────────────────────────────────────
+const BUSINESS_CATEGORIES = [
+  "Beauty & Personal Care",
+  "Health & Wellness",
+  "Trades & Home Services",
+  "Professional Services",
+  "Automotive Services",
+  "Medical & Allied Health",
+  "Education & Training",
+  "Hospitality",
+  "Pet Services",
+  "Other",
+];
+
 // ─── Pricing Plans ────────────────────────────────────────────────────────────
-const PLANS = [
+type Plan = {
+  id: string;
+  name: string;
+  tagline: string;
+  price: string;
+  period: string;
+  renewal: string | null;
+  icon: typeof Zap;
+  color: string;
+  popular: boolean;
+  features: string[];
+};
+
+const PLANS: Plan[] = [
   {
     id: "starter",
     name: "Starter",
@@ -273,44 +304,68 @@ export default function SignupPage() {
                     {/* Business Category */}
                     <div className="flex flex-col gap-1.2">
                       <Label htmlFor="businessCategory" className="text-[11px] font-semibold text-[var(--m-text-secondary)]/90">Business Category</Label>
-                      <div className="relative">
-                        <select id="businessCategory" value={businessCategory} onChange={(e) => setBusinessCategory(e.target.value)} required
-                          className="h-9 w-full rounded-md border border-[var(--m-input-border)] bg-[var(--m-input-bg)] px-3 text-[11px] text-[var(--m-text-primary)] focus-visible:border-emerald-500/70 focus-visible:ring-emerald-500/10 transition-all duration-200 outline-none cursor-pointer appearance-none pr-8 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_10px_center] bg-no-repeat"
-                        >
-                          <option value="" disabled className="bg-slate-900 text-slate-400">Select business category</option>
-                          <option value="Beauty & Personal Care" className="bg-slate-900">Beauty & Personal Care</option>
-                          <option value="Health & Wellness" className="bg-slate-900">Health & Wellness</option>
-                          <option value="Trades & Home Services" className="bg-slate-900">Trades & Home Services</option>
-                          <option value="Professional Services" className="bg-slate-900">Professional Services</option>
-                          <option value="Automotive Services" className="bg-slate-900">Automotive Services</option>
-                          <option value="Medical & Allied Health" className="bg-slate-900">Medical & Allied Health</option>
-                          <option value="Education & Training" className="bg-slate-900">Education & Training</option>
-                          <option value="Hospitality" className="bg-slate-900">Hospitality</option>
-                          <option value="Pet Services" className="bg-slate-900">Pet Services</option>
-                          <option value="Other" className="bg-slate-900">Other</option>
-                        </select>
-                      </div>
+                      <Combobox
+                        items={BUSINESS_CATEGORIES}
+                        value={businessCategory || null}
+                        onValueChange={(value) => setBusinessCategory((value as string) ?? "")}
+                      >
+                        <ComboboxInputGroup>
+                          <ComboboxInput
+                            id="businessCategory"
+                            placeholder="Search business category"
+                            required
+                            className="h-9 px-3 border-[var(--m-input-border)] bg-[var(--m-input-bg)] text-[11px] text-[var(--m-text-primary)] placeholder:text-[var(--m-text-muted)]/50 focus-visible:border-emerald-500/70 focus-visible:ring-emerald-500/10"
+                          />
+                          {businessCategory && <ComboboxClear />}
+                          <ComboboxTrigger />
+                        </ComboboxInputGroup>
+                        <ComboboxContent className="border border-[var(--m-border-glass)]/40 bg-[var(--m-bg-secondary)] text-[11px]">
+                          <ComboboxEmpty>No category found.</ComboboxEmpty>
+                          <ComboboxList>
+                            {(item: string) => (
+                              <ComboboxItem key={item} value={item} className="text-[11px] text-[var(--m-text-primary)]">
+                                {item}
+                              </ComboboxItem>
+                            )}
+                          </ComboboxList>
+                        </ComboboxContent>
+                      </Combobox>
                     </div>
 
                     {/* Pricing Plan Field */}
                     <div className="flex flex-col gap-1.2 sm:col-span-2">
                       <Label htmlFor="selectedPlan" className="text-[11px] font-semibold text-[var(--m-text-secondary)]/90">Select Plan</Label>
-                      <div className="relative">
-                        <select
-                          id="selectedPlan"
-                          value={selectedPlan.id}
-                          onChange={(e) => {
-                            const plan = PLANS.find((p) => p.id === e.target.value)!;
-                            setSelectedPlan(plan);
-                          }}
-                          required
-                          className="h-9 w-full rounded-md border border-[var(--m-input-border)] bg-[var(--m-input-bg)] px-3 text-[11px] text-[var(--m-text-primary)] focus-visible:border-emerald-500/70 focus-visible:ring-emerald-500/10 transition-all duration-200 outline-none cursor-pointer appearance-none pr-8 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_10px_center] bg-no-repeat"
-                        >
-                          <option value="starter" className="bg-slate-900">Starter (₹799/month)</option>
-                          <option value="growth" className="bg-slate-900">Growth (₹1,499 first month, ₹799/mo after)</option>
-                          <option value="managed" className="bg-slate-900">Managed (₹2,999 pilot month, ₹799/mo after)</option>
-                        </select>
-                      </div>
+                      <Combobox
+                        items={PLANS}
+                        value={selectedPlan}
+                        itemToStringLabel={(plan) =>
+                          `${plan.name} (${plan.price}${plan.period}${plan.renewal ? `, ${plan.renewal}` : ""})`
+                        }
+                        isItemEqualToValue={(item, value) => item.id === value.id}
+                        onValueChange={(plan) => {
+                          if (plan) setSelectedPlan(plan);
+                        }}
+                      >
+                        <ComboboxInputGroup>
+                          <ComboboxInput
+                            id="selectedPlan"
+                            placeholder="Search plan"
+                            required
+                            className="h-9 px-3 border-[var(--m-input-border)] bg-[var(--m-input-bg)] text-[11px] text-[var(--m-text-primary)] placeholder:text-[var(--m-text-muted)]/50 focus-visible:border-emerald-500/70 focus-visible:ring-emerald-500/10"
+                          />
+                          <ComboboxTrigger />
+                        </ComboboxInputGroup>
+                        <ComboboxContent className="border border-[var(--m-border-glass)]/40 bg-[var(--m-bg-secondary)] text-[11px]">
+                          <ComboboxEmpty>No plan found.</ComboboxEmpty>
+                          <ComboboxList>
+                            {(plan: (typeof PLANS)[0]) => (
+                              <ComboboxItem key={plan.id} value={plan} className="text-[11px] text-[var(--m-text-primary)]">
+                                {plan.name} ({plan.price}{plan.period}{plan.renewal ? `, ${plan.renewal}` : ""})
+                              </ComboboxItem>
+                            )}
+                          </ComboboxList>
+                        </ComboboxContent>
+                      </Combobox>
                     </div>
 
                     {/* Password */}

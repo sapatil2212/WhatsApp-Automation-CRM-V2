@@ -33,6 +33,7 @@ import {
   Search,
   Plus,
   Upload,
+  Download,
   MoreHorizontal,
   Pencil,
   Trash2,
@@ -219,6 +220,17 @@ export default function ContactsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              window.open('/api/contacts/export', '_blank');
+              toast.success('Downloading contacts export...');
+            }}
+            className="border-slate-700 text-slate-300 hover:bg-slate-800"
+          >
+            <Download className="size-4" />
+            Export CSV
+          </Button>
           <Button
             variant="outline"
             onClick={() => setImportOpen(true)}

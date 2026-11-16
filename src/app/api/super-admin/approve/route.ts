@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import nodemailer from "nodemailer";
-import path from "path";
+import { emailLayout, emailHeading, emailSubtitle, emailText, emailButton, emailDivider, emailTokens } from "@/lib/email/template";
 
 export async function GET(req: NextRequest) {
   try {
@@ -92,45 +92,22 @@ export async function GET(req: NextRequest) {
           },
         });
 
-        const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <style>
-            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #0f172a; margin: 0; padding: 0; text-align: center; }
-            .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 40px 30px; text-align: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-            .logo-text { font-size: 24px; font-weight: 800; color: #4f46e5; margin-bottom: 25px; letter-spacing: -0.025em; }
-            h1 { font-size: 26px; font-weight: 700; color: #059669; margin: 0 0 10px 0; }
-            p.subtitle { font-size: 16px; color: #475569; margin: 0 0 30px 0; }
-            .divider { height: 1px; background-color: #e2e8f0; margin: 30px 0; }
-            p.body-text { font-size: 15px; color: #334155; margin: 0 0 30px 0; line-height: 1.6; }
-            .btn { display: inline-block; background-color: #10b981; color: #ffffff !important; text-decoration: none; font-weight: bold; font-size: 14px; padding: 14px 32px; border-radius: 8px; margin-bottom: 30px; }
-            .footer { font-size: 12px; color: #64748b; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="logo-text">ChatNexGen</div>
-            <h1>Account Activated! 🎉</h1>
-            <p class="subtitle">Welcome to ChatNexGen, ${fullName}!</p>
-            <div class="divider"></div>
-            <p class="body-text">
-              Great news! Your payment has been confirmed, and your 1-month active subscription has started. Your workspace is fully active and ready to use.
-            </p>
-            <p class="body-text" style="font-size: 13px; color: #ef4444; font-weight: bold;">
-              Subscription Active Until: ${subscriptionExpiresAt.toLocaleDateString()}
-            </p>
-            <a href="${dashboardUrl}" class="btn">Log In to Dashboard</a>
-            <div class="divider"></div>
-            <p class="footer">
-              This is an automated confirmation email from ChatNexGen.<br>
-              Need help? Contact support at <a href="mailto:chatnexgen@gmail.com" style="color:#059669;">chatnexgen@gmail.com</a>.
-            </p>
-          </div>
-        </body>
-        </html>
-        `;
+        const htmlContent = emailLayout({
+          title: "Your ChatNexGen account is activated",
+          preview: "Your workspace is active and ready to use.",
+          contentHtml:
+            emailHeading("Account activated 🎉") +
+            emailSubtitle(`Welcome to ChatNexGen, ${fullName}!`) +
+            emailDivider() +
+            emailText(
+              "Your payment has been confirmed and your 1-month subscription has started. Your workspace is fully active and ready to use."
+            ) +
+            emailText(`Subscription active until <strong>${subscriptionExpiresAt.toLocaleDateString()}</strong>.`, {
+              size: 12,
+              color: emailTokens.muted,
+            }) +
+            emailButton(dashboardUrl, "Log in to dashboard"),
+        });
 
         await transporter.sendMail({
           from: `"ChatNexGen Support" <${smtpUser}>`,

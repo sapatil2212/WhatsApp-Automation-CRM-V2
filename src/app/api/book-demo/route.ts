@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
+import { emailLayout, emailHeading, emailSubtitle, emailText, emailDetails } from "@/lib/email/template";
 
 export async function POST(req: NextRequest) {
   try {
@@ -45,20 +46,20 @@ Notification sent to Super Admin: ${superAdmin}
         to: email,
         subject: "ChatNexGen Product Demo Confirmed!",
         text: `Hi ${name},\n\nYour ChatNexGen product walkthrough has been scheduled for ${date} at ${time}.\n\nMeeting link: Google Meet (the link will be attached to your calendar invite).\n\nBest regards,\nThe ChatNexGen Team`,
-        html: `
-          <div style="font-family: Arial, sans-serif; padding: 24px; color: #1e293b; max-width: 500px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
-            <h2 style="color: #10b981; margin-top: 0;">ChatNexGen Demo Confirmed!</h2>
-            <p>Hi <strong>${name}</strong>,</p>
-            <p>Your product walkthrough has been successfully booked. Here are your details:</p>
-            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 16px; border-radius: 8px; margin: 20px 0; font-size: 14px; line-height: 1.5;">
-              <p style="margin: 0 0 8px 0;"><strong>Date:</strong> ${date}</p>
-              <p style="margin: 0 0 8px 0;"><strong>Time Slot:</strong> ${time}</p>
-              <p style="margin: 0;"><strong>Location:</strong> Google Meet (invite attached to calendar)</p>
-            </div>
-            <p>If you need to reschedule or have any questions, please reply directly to this email.</p>
-            <p style="margin-top: 30px; font-size: 14px; color: #64748b; border-t: 1px solid #e2e8f0; pt-15;">Best regards,<br>The ChatNexGen Team</p>
-          </div>
-        `,
+        html: emailLayout({
+          title: "Your ChatNexGen demo is confirmed",
+          preview: `Your demo is booked for ${date} at ${time}`,
+          center: false,
+          contentHtml:
+            emailHeading("Demo confirmed 🎉") +
+            emailSubtitle(`Hi ${name}, your product walkthrough is booked. Here are your details:`) +
+            emailDetails([
+              { label: "Date", value: date },
+              { label: "Time slot", value: time, highlight: true },
+              { label: "Location", value: "Google Meet (invite attached to calendar)" },
+            ]) +
+            emailText("Need to reschedule or have questions? Just reply to this email.", { size: 12 }),
+        }),
       };
 
       // 2. Notification Email to the Super Admin
@@ -67,35 +68,21 @@ Notification sent to Super Admin: ${superAdmin}
         to: superAdmin,
         subject: `New Demo Walkthrough Booked: ${name}`,
         text: `New ChatNexGen product demo booking.\n\nDetails:\nName: ${name}\nEmail: ${email}\nPhone: ${phone}\nSlot: ${date} at ${time}`,
-        html: `
-          <div style="font-family: Arial, sans-serif; padding: 24px; color: #1e293b; max-width: 500px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
-            <h2 style="color: #4f46e5; margin-top: 0;">New Demo Booking</h2>
-            <p>A client has scheduled a ChatNexGen product walkthrough. Lead details:</p>
-            <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px;">
-              <tr>
-                <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: bold; width: 120px;">Name:</td>
-                <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: 500; color: #0f172a;">${name}</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: bold;">Email:</td>
-                <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: 500;"><a href="mailto:${email}" style="color: #4f46e5; text-decoration: none;">${email}</a></td>
-              </tr>
-              <tr>
-                <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: bold;">Phone Number:</td>
-                <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: 500; color: #0f172a;">${phone}</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: bold;">Date:</td>
-                <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: 500; color: #0f172a;">${date}</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; font-weight: bold;">Time Slot:</td>
-                <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: 500; color: #10b981;">${time}</td>
-              </tr>
-            </table>
-            <p style="margin-top: 30px; font-size: 12px; color: #94a3b8; border-t: 1px solid #e2e8f0; pt-15;">ChatNexGen Notification Engine</p>
-          </div>
-        `,
+        html: emailLayout({
+          title: "New demo booking",
+          preview: `${name} booked a demo for ${date} at ${time}`,
+          center: false,
+          contentHtml:
+            emailHeading("New demo booking") +
+            emailSubtitle("A client scheduled a ChatNexGen product walkthrough. Lead details:") +
+            emailDetails([
+              { label: "Name", value: name },
+              { label: "Email", value: `<a href="mailto:${email}" style="color:#059669;text-decoration:none;">${email}</a>` },
+              { label: "Phone", value: phone },
+              { label: "Date", value: date },
+              { label: "Time slot", value: time, highlight: true },
+            ]),
+        }),
       };
 
       try {

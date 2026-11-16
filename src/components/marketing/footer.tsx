@@ -41,7 +41,9 @@ export function Footer() {
           <p className="text-xs text-[var(--m-text-tertiary)] leading-relaxed max-w-sm">
             ChatNexGen is a premium AI-powered WhatsApp CRM and customer support automation platform. Automate business communication, configure smart chatbots, organize leads, and sync calendar reminders using the official WhatsApp Business API.
           </p>
-
+          <p className="text-xs font-medium text-[var(--m-text-secondary)]">
+            A product of Brightwave Digital Products LLP.
+          </p>
         </div>
 
         {/* Product Column */}
@@ -79,6 +81,7 @@ export function Footer() {
             <li>ChatNexGen Technologies</li>
             <li>Pune, Maharashtra, India</li>
             <li className="pt-1">
+              <span className="block text-[11px] text-[var(--m-text-tertiary)] font-medium">Help &amp; Support:</span>
               <a href="mailto:chatnexgen@gmail.com" className="text-emerald-400 hover:underline">
                 chatnexgen@gmail.com
               </a>
@@ -104,8 +107,11 @@ export function Footer() {
         <p className="text-[10px] leading-relaxed text-[var(--m-text-muted)] max-w-3xl mx-auto">
           "ChatNexGen uses WhatsApp Business API solutions in accordance with Meta and WhatsApp Business policies. Businesses are responsible for obtaining user consent before initiating communication."
         </p>
-        <div className="text-[10px] text-[var(--m-text-muted)] pt-2">
-          © 2026 ChatNexGen Technologies. All rights reserved.
+        <div className="text-[10px] text-[var(--m-text-muted)] pt-2 space-y-1">
+          <p>© 2026 ChatNexGen Technologies. All rights reserved.</p>
+          <p className="text-xs font-medium text-[var(--m-text-secondary)]">
+            A product of Brightwave Digital Products LLP.
+          </p>
         </div>
       </div>
     </footer>

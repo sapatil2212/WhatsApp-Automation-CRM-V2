@@ -5,15 +5,17 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Shield, Users, BarChart2, Settings, LogOut,
-  Menu, X, ChevronRight, Building2, Loader2, UserPlus
+  Menu, X, ChevronRight, Building2, Loader2, UserPlus,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "/super-admin",           label: "Overview",   icon: BarChart2 },
-  { href: "/super-admin/new-users", label: "New Users",  icon: UserPlus  },
-  { href: "/super-admin/users",     label: "Users",      icon: Users     },
-  { href: "/super-admin/settings",  label: "Settings",   icon: Settings  },
+  { href: "/super-admin",           label: "Overview",      icon: BarChart2 },
+  { href: "/super-admin/new-users", label: "New Users",     icon: UserPlus  },
+  { href: "/super-admin/users",     label: "Users & Tenants", icon: Users   },
+  { href: "/super-admin/cms",       label: "CMS & Content", icon: FileText  },
+  { href: "/super-admin/settings",  label: "Settings",      icon: Settings  },
 ];
 
 function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -135,11 +137,11 @@ export function SuperAdminShell({ children }: { children: React.ReactNode }) {
       const res = await fetch("/api/super-admin/auth");
       if (!res.ok) {
         router.replace("/super-admin/login");
+        return;
       }
+      setChecking(false);
     } catch {
       router.replace("/super-admin/login");
-    } finally {
-      setChecking(false);
     }
   }, [pathname, router]);
 

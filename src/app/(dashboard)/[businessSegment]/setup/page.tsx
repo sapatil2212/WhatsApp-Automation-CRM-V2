@@ -53,6 +53,10 @@ export default function BusinessSetupWizard() {
     city: "",
     state: "",
     pincode: "",
+    google_map_link: "",
+    instagram_url: "",
+    facebook_url: "",
+    ai_knowledge_base: "",
   });
 
   // --- Step 2 State: Working Hours ---
@@ -110,6 +114,10 @@ export default function BusinessSetupWizard() {
             city: business.city || "",
             state: business.state || "",
             pincode: business.pincode || "",
+            google_map_link: business.google_map_link || "",
+            instagram_url: business.instagram_url || "",
+            facebook_url: business.facebook_url || "",
+            ai_knowledge_base: business.ai_knowledge_base || "",
           });
 
           if (business.working_hours) {
@@ -181,6 +189,10 @@ export default function BusinessSetupWizard() {
         city: businessInfo.city,
         state: businessInfo.state,
         pincode: businessInfo.pincode,
+        google_map_link: businessInfo.google_map_link,
+        instagram_url: businessInfo.instagram_url,
+        facebook_url: businessInfo.facebook_url,
+        ai_knowledge_base: businessInfo.ai_knowledge_base,
         working_hours: workingHours,
       };
 
@@ -411,6 +423,73 @@ export default function BusinessSetupWizard() {
                   onChange={(e) => setBusinessInfo({ ...businessInfo, address: e.target.value })}
                   placeholder="Address"
                   className="h-9 border-slate-800 bg-slate-950 text-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Email</Label>
+                <Input
+                  value={businessInfo.email}
+                  onChange={(e) => setBusinessInfo({ ...businessInfo, email: e.target.value })}
+                  placeholder="info@business.com"
+                  className="h-9 border-slate-800 bg-slate-950 text-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Website URL</Label>
+                <Input
+                  value={businessInfo.website}
+                  onChange={(e) => setBusinessInfo({ ...businessInfo, website: e.target.value })}
+                  placeholder="https://yourbusiness.com"
+                  className="h-9 border-slate-800 bg-slate-950 text-xs"
+                />
+              </div>
+
+              {/* AI Training Sources */}
+              <div className="md:col-span-2 mt-2 pt-4 border-t border-slate-800/80">
+                <div className="flex items-center gap-2 mb-1">
+                  <Sparkles className="h-4 w-4 text-emerald-400" />
+                  <h3 className="text-sm font-bold text-white tracking-wide">AI Training Sources</h3>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Add your public links so the AI can reference them and answer customers like an expert about your business.
+                </p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Google Business / Maps Link (GMB)</Label>
+                <Input
+                  value={businessInfo.google_map_link}
+                  onChange={(e) => setBusinessInfo({ ...businessInfo, google_map_link: e.target.value })}
+                  placeholder="https://g.page/... or https://goo.gl/maps/..."
+                  className="h-9 border-slate-800 bg-slate-950 text-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Instagram Profile</Label>
+                <Input
+                  value={businessInfo.instagram_url}
+                  onChange={(e) => setBusinessInfo({ ...businessInfo, instagram_url: e.target.value })}
+                  placeholder="https://instagram.com/yourbusiness"
+                  className="h-9 border-slate-800 bg-slate-950 text-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Facebook Page</Label>
+                <Input
+                  value={businessInfo.facebook_url}
+                  onChange={(e) => setBusinessInfo({ ...businessInfo, facebook_url: e.target.value })}
+                  placeholder="https://facebook.com/yourbusiness"
+                  className="h-9 border-slate-800 bg-slate-950 text-xs"
+                />
+              </div>
+              <div className="space-y-1 md:col-span-2">
+                <Label className="text-xs">
+                  Expert Knowledge for AI <span className="text-slate-500">(optional)</span>
+                </Label>
+                <Textarea
+                  value={businessInfo.ai_knowledge_base}
+                  onChange={(e) => setBusinessInfo({ ...businessInfo, ai_knowledge_base: e.target.value })}
+                  placeholder="Paste anything the AI should know to answer like an expert: specialties, unique selling points, policies, common customer concerns, awards, experience, etc."
+                  className="min-h-[100px] border-slate-800 bg-slate-950 text-xs"
                 />
               </div>
             </div>

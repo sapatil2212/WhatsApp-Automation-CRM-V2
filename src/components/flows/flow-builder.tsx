@@ -67,6 +67,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { AiCheckPanel } from "@/components/flows/ai-check-panel";
 import {
   validateFlowForActivation,
   type ValidationIssue,
@@ -908,6 +909,17 @@ export function FlowBuilder({ initialFlow, initialNodes }: FlowBuilderProps) {
           dashboard shell is the scroll container; this stays pinned
           to the viewport bottom (with a 1rem gap) until the page
           naturally ends, at which point it falls back into flow. */}
+      {/* AI review of the whole conversation — advisory, never blocks. */}
+      <AiCheckPanel
+        flow={{
+          name: state.name,
+          trigger_type: state.trigger_type,
+          trigger_config: state.trigger_config,
+          entry_node_id: state.entry_node_id,
+        }}
+        nodes={state.nodes}
+      />
+
       <div className="sticky bottom-4 z-10 shadow-xl shadow-slate-950/60">
         <ValidationPanel issues={issues} onJump={jumpToNode} />
       </div>

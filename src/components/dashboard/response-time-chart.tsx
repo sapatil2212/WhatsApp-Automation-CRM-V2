@@ -25,18 +25,18 @@ export function ResponseTimeChart({
   const hasData = data?.buckets.some((b) => b.avgMinutes != null) ?? false
 
   return (
-    <section className="rounded-xl border border-border bg-card">
-      <header className="flex items-center justify-between border-b border-border px-5 py-4">
+    <section className="rounded-xl border border-border/70 bg-card/60 shadow-xs">
+      <header className="flex items-center justify-between border-b border-border/70 px-4 py-3">
         <div>
-          <h2 className="text-sm font-semibold text-foreground">
+          <h2 className="text-xs font-semibold text-foreground">
             Average First Response Time
           </h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
             Minutes to reply to a customer&apos;s first unreplied message, by weekday
           </p>
         </div>
         {data && (data.thisWeekAvg != null || data.lastWeekAvg != null) && (
-          <div className="text-right text-xs">
+          <div className="text-right text-[11px]">
             <div className="text-muted-foreground">
               This week:{' '}
               <span className="font-medium text-foreground tabular-nums">
@@ -51,7 +51,7 @@ export function ResponseTimeChart({
         )}
       </header>
 
-      <div className="p-5">
+      <div className="p-4">
         {loading || !data ? (
           <Skeleton className="h-[220px] w-full" />
         ) : !hasData ? (

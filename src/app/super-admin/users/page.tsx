@@ -7,7 +7,7 @@ import {
   Users, Search, MoreVertical, Trash2, CheckCircle, XCircle,
   X, Loader2, ChevronUp, ChevronDown, RefreshCw, Plus,
   Wifi, WifiOff, ShieldCheck, ShieldOff, Eye, EyeOff,
-  Edit2, MessageSquare, Radio, Zap, Crown,
+  Edit2, MessageSquare, Radio, Zap, Crown, LogIn, Sliders, Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SuperAdminShell } from "../super-admin-shell";
@@ -31,6 +31,7 @@ interface User {
   conversations: number;
   broadcasts: number;
   automations: number;
+  betaFeatures?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -234,6 +235,118 @@ function UserModal({
   );
 }
 
+// ─── Feature Flags Modal ───────────────────────────────────────────────────
+const AVAILABLE_FEATURES = [
+  { id: "ai_healthcare", name: "AI Healthcare & Clinic Automation", desc: "Automated patient triage, booking agent, and clinic logs" },
+  { id: "deals_pipeline", name: "CRM Deals & Pipelines", desc: "Visual Kanban pipeline and lead value tracking" },
+  { id: "flow_builder", name: "Visual Flow Builder", desc: "Interactive WhatsApp bot flow designer" },
+  { id: "broadcast_campaigns", name: "WhatsApp Campaigns", desc: "Bulk outbound messaging and scheduled broadcasts" },
+  { id: "multi_agent", name: "Multi-Agent Routing", desc: "Advanced round-robin and teammate conversation assignment" },
+];
+
+function FeatureFlagsModal({
+  user,
+  onSave,
+  onClose,
+}: {
+  user: User;
+  onSave: () => void;
+  onClose: () => void;
+}) {
+  const [selected, setSelected] = useState<string[]>(user.betaFeatures || []);
+  const [loading, setLoading] = useState(false);
+
+  const toggle = (id: string) => {
+    setSelected((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await fetch("/api/super-admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: user.id,
+          betaFeatures: selected,
+        }),
+      });
+      onSave();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 space-y-5"
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
+              <Sparkles className="size-5 text-violet-600" /> Feature Flags
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">Toggle workspace features for {user.fullName || user.email}</p>
+          </div>
+          <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg">
+            <X className="size-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSave} className="space-y-3">
+          {AVAILABLE_FEATURES.map((f) => {
+            const active = selected.includes(f.id);
+            return (
+              <div
+                key={f.id}
+                onClick={() => toggle(f.id)}
+                className={cn(
+                  "p-3 rounded-xl border cursor-pointer transition-all flex items-start gap-3 select-none",
+                  active ? "bg-violet-50/50 border-violet-300" : "bg-slate-50/50 border-slate-200 hover:border-slate-300"
+                )}
+              >
+                <input
+                  type="checkbox"
+                  checked={active}
+                  onChange={() => {}}
+                  className="mt-0.5 accent-violet-600 rounded"
+                />
+                <div>
+                  <p className="text-xs font-bold text-slate-800">{f.name}</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">{f.desc}</p>
+                </div>
+              </div>
+            );
+          })}
+
+          <div className="flex gap-3 pt-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold shadow-md shadow-violet-500/20 flex items-center justify-center gap-2"
+            >
+              {loading ? <Loader2 className="size-4 animate-spin" /> : "Save Feature Flags"}
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function SuperAdminUsersPage() {
   const [users,    setUsers]    = useState<User[]>([]);
@@ -246,9 +359,32 @@ export default function SuperAdminUsersPage() {
   const [detail,   setDetail]   = useState<User | null>(null);
   const [delId,    setDelId]    = useState<string | null>(null);
   const [editUser, setEditUser] = useState<User | null | "new">(null);
+  const [flagsUser, setFlagsUser] = useState<User | null>(null);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [menuPos,  setMenuPos]  = useState<{ top: number; right: number }>({ top: 0, right: 0 });
   const [toggling, setToggling] = useState<string | null>(null);
+  const [impersonating, setImpersonating] = useState<string | null>(null);
+
+  const handleImpersonate = async (u: User) => {
+    setImpersonating(u.id);
+    try {
+      const res = await fetch("/api/super-admin/impersonate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: u.id }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        window.location.href = data.redirectUrl || "/inbox";
+      } else {
+        alert(data.error || "Failed to impersonate tenant");
+      }
+    } catch (err) {
+      alert("Network error while trying to log in as tenant");
+    } finally {
+      setImpersonating(null);
+    }
+  };
 
   const load = useCallback(() => {
     setLoading(true);
@@ -473,8 +609,17 @@ export default function SuperAdminUsersPage() {
                     className="w-44 rounded-xl border border-slate-200 bg-white shadow-xl shadow-slate-200/50 overflow-hidden"
                     onClick={(e) => e.stopPropagation()}
                   >
+                    <button onClick={() => { handleImpersonate(u); setOpenMenu(null); }}
+                      className="flex items-center gap-2.5 w-full px-3.5 py-2.5 text-xs font-semibold text-violet-600 hover:bg-violet-50 transition-all duration-200 first:rounded-t-xl">
+                      {impersonating === u.id ? <Loader2 className="size-3.5 animate-spin" /> : <LogIn className="size-3.5" />}
+                      Log In as Tenant
+                    </button>
+                    <button onClick={() => { setFlagsUser(u); setOpenMenu(null); }}
+                      className="flex items-center gap-2.5 w-full px-3.5 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-all duration-200">
+                      <Sliders className="size-3.5 text-violet-500" /> Feature Flags
+                    </button>
                     <button onClick={() => { setEditUser(u); setOpenMenu(null); }}
-                      className="flex items-center gap-2.5 w-full px-3.5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-all duration-200 first:rounded-t-xl">
+                      className="flex items-center gap-2.5 w-full px-3.5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-all duration-200">
                       <Edit2 className="size-3.5" /> Edit User
                     </button>
                     <button onClick={() => { toggleAccess(u); setOpenMenu(null); }}
@@ -598,6 +743,15 @@ export default function SuperAdminUsersPage() {
 
                   {/* Actions */}
                   <div className="space-y-2 pt-2">
+                    <button onClick={() => handleImpersonate(detail)} disabled={impersonating === detail.id}
+                      className="w-full py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold shadow-md shadow-violet-500/20 active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2">
+                      {impersonating === detail.id ? <Loader2 className="size-3.5 animate-spin" /> : <LogIn className="size-3.5" />}
+                      Log In as Tenant (Impersonate)
+                    </button>
+                    <button onClick={() => setFlagsUser(detail)}
+                      className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold shadow-sm active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2">
+                      <Sliders className="size-3.5 text-violet-600" /> Manage Feature Flags
+                    </button>
                     <button onClick={() => { setEditUser(detail); setDetail(null); }}
                       className="w-full py-2.5 rounded-xl bg-violet-50 hover:bg-violet-100 hover:border-violet-200 border border-violet-100 text-violet-600 text-xs font-bold shadow-sm active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2">
                       <Edit2 className="size-3.5" /> Edit User & Subscription
@@ -641,6 +795,20 @@ export default function SuperAdminUsersPage() {
                 </div>
               </motion.div>
             </div>
+          )}
+        </AnimatePresence>
+
+        {/* Feature Flags Modal */}
+        <AnimatePresence>
+          {flagsUser && (
+            <FeatureFlagsModal
+              user={flagsUser}
+              onSave={() => {
+                setFlagsUser(null);
+                load();
+              }}
+              onClose={() => setFlagsUser(null)}
+            />
           )}
         </AnimatePresence>
 

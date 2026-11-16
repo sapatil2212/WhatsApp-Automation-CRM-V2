@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Settings, Tag, User, Palette } from 'lucide-react';
+import { Settings, Tag, User, Palette, Sparkles, Users } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { WhatsAppConfig } from '@/components/settings/whatsapp-config';
 import { TagManager } from '@/components/settings/tag-manager';
@@ -9,10 +9,14 @@ import { ProfileForm } from '@/components/settings/profile-form';
 import { PasswordForm } from '@/components/settings/password-form';
 import { SessionsCard } from '@/components/settings/sessions-card';
 import { AppearancePanel } from '@/components/settings/appearance-panel';
+import { AiConfigPanel } from '@/components/settings/ai-config-panel';
+import { TeamManager } from '@/components/settings/team-manager';
 
 const TAB_VALUES = [
   'profile',
+  'team',
   'whatsapp',
+  'ai',
   'tags',
   'appearance',
 ] as const;
@@ -44,7 +48,7 @@ export default function SettingsPage() {
       <div>
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Settings</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-          Manage your profile, WhatsApp® integration, and tags.
+          Manage your profile, team members, WhatsApp® integration, AI assistant, and workspace preferences.
         </p>
       </div>
 
@@ -58,11 +62,25 @@ export default function SettingsPage() {
             Profile
           </TabsTrigger>
           <TabsTrigger
+            value="team"
+            className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-slate-600 dark:text-slate-400 data-active:shadow-sm transition-all duration-200"
+          >
+            <Users className="size-4" />
+            Team
+          </TabsTrigger>
+          <TabsTrigger
             value="whatsapp"
             className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-slate-600 dark:text-slate-400 data-active:shadow-sm transition-all duration-200"
           >
             <Settings className="size-4" />
             WhatsApp Config
+          </TabsTrigger>
+          <TabsTrigger
+            value="ai"
+            className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-slate-600 dark:text-slate-400 data-active:shadow-sm transition-all duration-200"
+          >
+            <Sparkles className="size-4" />
+            AI Assistant
           </TabsTrigger>
           <TabsTrigger
             value="tags"
@@ -86,8 +104,16 @@ export default function SettingsPage() {
           <SessionsCard />
         </TabsContent>
 
+        <TabsContent value="team">
+          <TeamManager />
+        </TabsContent>
+
         <TabsContent value="whatsapp">
           <WhatsAppConfig />
+        </TabsContent>
+
+        <TabsContent value="ai">
+          <AiConfigPanel />
         </TabsContent>
 
         <TabsContent value="tags">

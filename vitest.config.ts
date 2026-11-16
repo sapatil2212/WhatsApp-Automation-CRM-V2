@@ -15,6 +15,9 @@ export default defineConfig({
       ENCRYPTION_KEY:
         "0000000000000000000000000000000000000000000000000000000000000000",
       META_APP_SECRET: "test-meta-app-secret",
+      // Negative tests deliberately trigger 5xx paths; the kernel logger
+      // would otherwise print their stack traces and bury the results.
+      LOG_LEVEL: "silent",
     },
     clearMocks: true,
   },

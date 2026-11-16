@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { hashPassword } from '@/lib/auth'
 import crypto from 'crypto'
 import nodemailer from 'nodemailer'
-import path from 'path'
+import { emailLayout, emailHeading, emailSubtitle, emailOtp, emailText, emailTokens } from '@/lib/email/template'
 
 export async function POST(req: NextRequest) {
   try {
@@ -169,116 +169,39 @@ export async function POST(req: NextRequest) {
           },
         });
 
-        const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <style>
-            body {
-              font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-              background-color: #f8fafc;
-              color: #0f172a;
-              margin: 0;
-              padding: 0;
-              text-align: center;
-            }
-            .container {
-              max-width: 600px;
-              margin: 40px auto;
-              background-color: #ffffff;
-              border: 1px solid #e2e8f0;
-              border-radius: 16px;
-              padding: 40px 30px;
-              text-align: center;
-              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-            }
-            .logo-text {
-              font-size: 24px;
-              font-weight: 800;
-              color: #4f46e5;
-              margin-bottom: 25px;
-              letter-spacing: -0.025em;
-              display: inline-block;
-            }
-            h1 {
-              font-size: 24px;
-              font-weight: 700;
-              color: #0f172a;
-              margin: 0 0 10px 0;
-              line-height: 1.3;
-            }
-            p.subtitle {
-              font-size: 15px;
-              color: #475569;
-              margin: 0 0 30px 0;
-              line-height: 1.5;
-            }
-            .divider {
-              height: 1px;
-              background-color: #e2e8f0;
-              margin: 30px 0;
-            }
-            .otp-code {
-              display: inline-block;
-              font-size: 32px;
-              font-weight: 800;
-              color: #059669;
-              letter-spacing: 0.15em;
-              background-color: #f1f5f9;
-              border: 1px dashed #10b981;
-              border-radius: 8px;
-              padding: 12px 24px;
-              margin: 20px 0;
-            }
-            p.body-text {
-              font-size: 14px;
-              color: #334155;
-              margin: 0 0 30px 0;
-              line-height: 1.6;
-            }
-            .footer {
-              font-size: 12px;
-              color: #64748b;
-              line-height: 1.5;
-            }
-            .footer a {
-              color: #059669;
-              text-decoration: none;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="logo-text">ChatNexGen</div>
-            <h1>Verify Your ChatNexGen Account</h1>
-            <p class="subtitle">Please use the 6-digit OTP code below to complete your signup.</p>
-            <div class="divider"></div>
-            <div class="otp-code">${otpCode}</div>
-            <p class="body-text">
-              This code is valid for <strong>5 minutes</strong>. If you did not request this, please ignore this email.
-            </p>
-            <div class="divider"></div>
-            <p class="footer">
-              This is an automated verification email from ChatNexGen.<br>
-              Need help? Reach out at <a href="mailto:chatnexgen@gmail.com">chatnexgen@gmail.com</a>.
-            </p>
-          </div>
-        </body>
-        </html>
-        `;
-
-        await transporter.sendMail({
-          from: `"ChatNexGen Support" <${smtpUser}>`,
-          to: email,
-          bcc: smtpBcc || undefined,
-          subject: "Verify your ChatNexGen Account",
-          text: `Your verification code is: ${otpCode}. It is valid for 5 minutes.`,
-          html: htmlContent
+        const htmlContent = emailLayout({
+          title: "Verify your ChatNexGen account",
+          preview: `Your verification code is ${otpCode}`,
+          contentHtml:
+            emailHeading("Verify your account") +
+            emailSubtitle("Use the 6-digit code below to complete your signup.") +
+            emailOtp(otpCode) +
+            emailText(
+              "This code is valid for <strong>5 minutes</strong>. If you didn't request this, you can safely ignore this email.",
+              { size: 12, color: emailTokens.muted }
+            ),
         });
-        console.log(`[SMTP SIGNUP] OTP verification email sent to ${email}`);
+
+        // Send in the background so the signup request returns immediately.
+        // The OTP is already persisted in the database, so the client can move
+        // to the verification step without waiting for SMTP delivery.
+        transporter
+          .sendMail({
+            from: `"ChatNexGen Support" <${smtpUser}>`,
+            to: email,
+            bcc: smtpBcc || undefined,
+            subject: "Verify your ChatNexGen Account",
+            text: `Your verification code is: ${otpCode}. It is valid for 5 minutes.`,
+            html: htmlContent
+          })
+          .then(() => {
+            console.log(`[SMTP SIGNUP] OTP verification email sent to ${email}`);
+          })
+          .catch((mailErr: any) => {
+            console.error('[signup] Error sending verification email:', mailErr?.message || mailErr);
+          });
       } catch (mailErr: any) {
-        console.error('[signup] Error sending verification email:', mailErr.message || mailErr)
+        console.error('[signup] Error preparing verification email:', mailErr.message || mailErr)
       }
     } else {
       console.warn("SMTP settings are not configured. Falling back to mock console output.");

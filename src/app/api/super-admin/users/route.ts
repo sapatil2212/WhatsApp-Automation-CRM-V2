@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import { hashPassword } from "@/lib/auth";
+import { hashPassword, verifySuperAdminToken } from "@/lib/auth";
 import nodemailer from "nodemailer";
+import { emailLayout, emailHeading, emailSubtitle, emailText, emailButton, emailDivider, emailTokens } from "@/lib/email/template";
 
 async function isAuthed(): Promise<boolean> {
   const cookieStore = await cookies();
-  return cookieStore.get("super_admin_session")?.value === "authenticated";
+  const token = cookieStore.get("super_admin_session")?.value ?? cookieStore.get("admin_session")?.value;
+  return Boolean(token && verifySuperAdminToken(token));
 }
 
 // ─── GET /api/super-admin/users ─────────────────────────────────────────────
@@ -55,6 +57,7 @@ export async function GET() {
         businessType: u.profile?.businessType ?? "",
         phoneNumber: u.profile?.phoneNumber ?? "",
         avatarUrl: u.profile?.avatarUrl ?? null,
+        betaFeatures: (u.profile?.betaFeatures as string[]) ?? [],
         // Tenant / Subscription
         tenantId: tenant?.id ?? null,
         tenantName: tenant?.name ?? null,
@@ -183,7 +186,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    const { id, isVerified, plan, role, fullName, businessName, businessType, phoneNumber } = await req.json();
+    const { id, isVerified, plan, role, fullName, businessName, businessType, phoneNumber, betaFeatures, tenantActive } = await req.json();
     if (!id) return NextResponse.json({ error: "Missing user id" }, { status: 400 });
 
     // Update user fields
@@ -247,31 +250,22 @@ export async function PATCH(req: NextRequest) {
               },
             });
 
-            const htmlContent = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <meta charset="utf-8">
-              <style>
-                body { font-family: Arial, sans-serif; background-color: #f8fafc; color: #0f172a; margin: 0; padding: 20px; }
-                .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 30px; text-align: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-                h1 { font-size: 24px; font-weight: bold; color: #059669; margin: 0 0 10px 0; }
-                p { font-size: 15px; color: #334155; line-height: 1.6; }
-                .btn { display: inline-block; background-color: #10b981; color: #ffffff !important; text-decoration: none; font-weight: bold; font-size: 14px; padding: 14px 32px; border-radius: 8px; margin: 20px 0; }
-              </style>
-            </head>
-            <body>
-              <div class="container">
-                <h1>Account Activated! 🎉</h1>
-                <p>Hi <strong>${fullName}</strong>,</p>
-                <p>Your payment has been successfully verified, and your 1-month subscription is now active.</p>
-                <p style="font-weight: bold; color: #ef4444;">Active Subscription Ends: ${computedExpiry.toLocaleDateString()}</p>
-                <a href="${dashboardUrl}" class="btn">Log In to Dashboard</a>
-                <p style="font-size: 12px; color: #64748b; margin-top: 30px;">ChatNexGen Support Team</p>
-              </div>
-            </body>
-            </html>
-            `;
+            const htmlContent = emailLayout({
+              title: "Your ChatNexGen account is activated",
+              preview: "Your workspace is active and ready to use.",
+              contentHtml:
+                emailHeading("Account activated 🎉") +
+                emailSubtitle(`Hi ${fullName}, welcome to ChatNexGen!`) +
+                emailDivider() +
+                emailText(
+                  "Your payment has been verified and your 1-month subscription is now active. Your workspace is ready to use."
+                ) +
+                emailText(`Subscription active until <strong>${computedExpiry.toLocaleDateString()}</strong>.`, {
+                  size: 12,
+                  color: emailTokens.muted,
+                }) +
+                emailButton(dashboardUrl, "Log in to dashboard"),
+            });
 
             await transporter.sendMail({
               from: `"ChatNexGen Support" <${smtpUser}>`,
@@ -300,14 +294,18 @@ export async function PATCH(req: NextRequest) {
     if (businessType !== undefined) profileUpdateData.businessType = businessType;
     if (phoneNumber !== undefined) profileUpdateData.phoneNumber = phoneNumber;
     if (role !== undefined) profileUpdateData.role = role;
+    if (betaFeatures !== undefined) profileUpdateData.betaFeatures = betaFeatures;
 
     if (Object.keys(profileUpdateData).length > 0) {
       await prisma.profile.updateMany({ where: { userId: id }, data: profileUpdateData });
     }
 
-    // Update tenant plan
-    if (plan !== undefined) {
-      await prisma.tenant.updateMany({ where: { ownerUserId: id }, data: { plan } });
+    // Update tenant plan and active status
+    if (plan !== undefined || tenantActive !== undefined) {
+      const tenantData: Record<string, any> = {};
+      if (plan !== undefined) tenantData.plan = plan;
+      if (tenantActive !== undefined) tenantData.isActive = tenantActive;
+      await prisma.tenant.updateMany({ where: { ownerUserId: id }, data: tenantData });
     }
 
     return NextResponse.json({ ok: true });

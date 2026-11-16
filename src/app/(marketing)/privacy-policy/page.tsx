@@ -13,12 +13,16 @@ export default function PrivacyPolicyPage() {
         <h1 className="text-3xl sm:text-5xl font-extrabold text-[var(--m-text-heading)] tracking-tight">
           Privacy Policy
         </h1>
-        <p className="text-xs text-[var(--m-text-muted)]">Last updated: June 23, 2026</p>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--m-text-muted)]">
+          <p>Last updated: June 23, 2026</p>
+          <span>•</span>
+          <p className="font-medium text-[var(--m-text-secondary)]">A product of Brightwave Digital Products LLP.</p>
+        </div>
       </div>
 
       <div className="space-y-8 text-xs sm:text-sm text-[var(--m-text-secondary)] leading-relaxed">
         <p>
-          This Privacy Policy (the &quot;Policy&quot;) describes how ChatNexGen Technologies (&quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) collects, uses, maintains, and discloses information from users of our Platform. By accessing or using the ChatNexGen SaaS platform, you consent to the practices described in this Policy. If you do not agree, please do not use the Platform.
+          This Privacy Policy (the &quot;Policy&quot;) describes how ChatNexGen Technologies (A product of Brightwave Digital Products LLP, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) collects, uses, maintains, and discloses information from users of our Platform. By accessing or using the ChatNexGen SaaS platform, you consent to the practices described in this Policy. If you do not agree, please do not use the Platform.
         </p>
 
         <section className="space-y-3">
@@ -96,6 +100,7 @@ export default function PrivacyPolicyPage() {
           </p>
           <div className="text-xs text-[var(--m-text-tertiary)] mt-3 space-y-1">
             <p className="font-bold text-[var(--m-text-primary)]">ChatNexGen Technologies</p>
+            <p className="text-[var(--m-text-secondary)] font-medium">A product of Brightwave Digital Products LLP.</p>
             <p>Compliance Department</p>
             <p>Pune, Maharashtra, India</p>
             <p>

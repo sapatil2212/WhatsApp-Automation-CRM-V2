@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyPassword, generateAccessToken, generateRefreshToken, setAuthCookies } from '@/lib/auth'
+import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = req.headers.get('x-forwarded-for') || 'anonymous'
+    const loginLimit = checkRateLimit(`login:${ip}`, { limit: 15, windowMs: 60_000 })
+    if (!loginLimit.success) {
+      return rateLimitResponse(loginLimit)
+    }
+
     const { email, password } = await req.json()
 
     if (!email || !password) {
