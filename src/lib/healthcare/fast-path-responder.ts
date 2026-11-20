@@ -92,7 +92,7 @@ export function tryFastPath(
     const clinicName = ctx.clinic.clinic_name || 'our clinic'
     let greeting = isFirstInbound && ctx.aiSettings?.greeting_message
       ? ctx.aiSettings.greeting_message
-      : `👋 Hello! Welcome to *${clinicName}*! 🏥\n\nHow can I assist you today? I can help with:\n\n📅 *Appointment Booking*\n🩺 *Doctor Information*\n⏰ *Clinic Timings*\n💊 *Services & Pricing*\n\nJust type your question! 😊`
+      : `Hello! 👋 Welcome to *${clinicName}*. How can I help you today?\n\nYou can ask me things like:\n• Book an appointment\n• Which doctors are available?\n• Clinic timings\n• Consultation fees & services\n• Clinic address`
     if (isFirstInbound && ctx.aiSettings?.greeting_message && greeting.toLowerCase().includes('our clinic')) {
       greeting = greeting.replace(/our clinic/gi, clinicName)
     }

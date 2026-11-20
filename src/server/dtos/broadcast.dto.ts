@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 import { BROADCAST_STATUSES, RECIPIENT_STATUSES } from '../services/broadcast-status';
 import { isoDateSchema, toIso, toIsoOrNull, toJsonObject } from './common.dto';
+import { fromStoredVariables } from '@/lib/campaigns/personalization';
 
 export const broadcastStatusSchema = z.enum(BROADCAST_STATUSES);
 export const recipientStatusSchema = z.enum(RECIPIENT_STATUSES);
@@ -17,7 +18,16 @@ export const recipientStatusSchema = z.enum(RECIPIENT_STATUSES);
  * time.
  */
 export const audienceSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('all') }),
+  z.object({
+    type: z.literal('all'),
+    excludeTagIds: z.array(z.string().uuid()).default([]),
+  }),
+  /** An explicit list — used for CSV uploads, which are imported as contacts first. */
+  z.object({
+    type: z.literal('contacts'),
+    contactIds: z.array(z.string().uuid()).min(1, 'Add at least one contact.').max(50_000),
+    excludeTagIds: z.array(z.string().uuid()).default([]),
+  }),
   z.object({
     type: z.literal('tags'),
     tagIds: z.array(z.string().uuid()).min(1, 'Select at least one tag.'),
@@ -56,6 +66,12 @@ export const broadcastDtoSchema = z.object({
   templateLanguage: z.string(),
   /** Positional `{{n}}` values, index 0 → `{{1}}`. */
   templateVariables: z.array(z.string()),
+  /** Per-slot mappings (body_n / header_1 / header_media / button_i). */
+  personalization: z.record(z.string(), z.object({
+    source: z.string(),
+    value: z.string().optional(),
+    fallback: z.string().optional(),
+  })),
   audience: audienceSchema.nullable(),
   scheduledAt: isoDateSchema.nullable(),
   status: broadcastStatusSchema,
@@ -144,6 +160,7 @@ export function toBroadcastDto(row: BroadcastRow): BroadcastDto {
     templateName: row.templateName,
     templateLanguage: row.templateLanguage,
     templateVariables: parseVariables(row.templateVariables),
+    personalization: fromStoredVariables(row.templateVariables),
     audience: parseAudience(row.audienceFilter),
     scheduledAt: toIsoOrNull(row.scheduledAt),
     status: resolvedStatus,

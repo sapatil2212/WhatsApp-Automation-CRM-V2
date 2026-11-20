@@ -34,11 +34,11 @@ export function Footer() {
     : branding.logoDarkUrl || "/images/logo/chatnexgen-logo.png";
 
   return (
-    <footer className="relative w-full border-t border-[var(--m-border-primary)] bg-[var(--m-bg-glass)] py-16 px-4 md:px-6 overflow-hidden">
+    <footer className="relative w-full border-t border-[var(--m-border-primary)] bg-[var(--m-bg-glass)] py-16 px-8 sm:px-20 lg:px-32 overflow-hidden">
       {/* Background radial highlight */}
       <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-[150px] rounded-full bg-emerald-500/5 blur-3xl pointer-events-none" />
 
-      <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-6 gap-10 md:gap-8 relative z-10">
+      <div className="max-w-[1360px] mx-auto grid grid-cols-1 md:grid-cols-6 gap-10 md:gap-8 relative z-10">
         {/* Brand Column */}
         <div className="col-span-1 md:col-span-2 space-y-4">
           <Link href="/" className="inline-block">
@@ -115,7 +115,7 @@ export function Footer() {
       </div>
 
       {/* Meta API disclaimer & Copyright footer */}
-      <div className="max-w-6xl mx-auto mt-12 pt-8 border-t border-[var(--m-border-primary)]/50 space-y-4 relative z-10 text-center">
+      <div className="max-w-[1360px] mx-auto mt-12 pt-8 border-t border-[var(--m-border-primary)]/50 space-y-4 relative z-10 text-center">
         {footer.disclaimerText && (
           <p className="text-[10px] leading-relaxed text-[var(--m-text-muted)] max-w-3xl mx-auto">
             &quot;{footer.disclaimerText}&quot;

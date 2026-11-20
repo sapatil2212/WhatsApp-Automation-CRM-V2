@@ -24,6 +24,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { AiSetupImport, type SetupSection } from "@/components/setup/ai-setup-import";
+import { BookingLinkCard } from "@/components/booking/booking-link-card";
+import type { ExtractedSetup } from "@/lib/ai/setup-extract";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -169,6 +172,64 @@ export default function BusinessSetupWizard() {
     loadData();
   }, [businessSegment]);
 
+  // AI document import: merge approved sections, then save once the state
+  // has re-rendered (handleSave reads the latest state).
+  const [pendingAutoSave, setPendingAutoSave] = useState(false);
+  const applyAiSetup = (data: ExtractedSetup, sections: Set<SetupSection>) => {
+    const p = data.profile;
+    const keep = (v: string | undefined, fallback: string) => (v && v.trim() ? v : fallback);
+    if (sections.has('profile') || sections.has('knowledge')) {
+      setBusinessInfo((prev) => ({
+        ...prev,
+        ...(sections.has('profile')
+          ? {
+              business_name: keep(p.name, prev.business_name),
+              description: keep(p.description, prev.description),
+              phone: keep(p.phone, prev.phone),
+              whatsapp_number: keep(p.whatsapp_number, prev.whatsapp_number),
+              email: keep(p.email, prev.email),
+              website: keep(p.website, prev.website),
+              address: keep(p.address, prev.address),
+              city: keep(p.city, prev.city),
+              state: keep(p.state, prev.state),
+              pincode: keep(p.pincode, prev.pincode),
+              google_map_link: keep(p.google_map_link, prev.google_map_link),
+              instagram_url: keep(p.instagram_url, prev.instagram_url),
+              facebook_url: keep(p.facebook_url, prev.facebook_url),
+            }
+          : {}),
+        ...(sections.has('knowledge') && data.knowledge
+          ? { ai_knowledge_base: [prev.ai_knowledge_base, data.knowledge].filter(Boolean).join("\n\n") }
+          : {}),
+      }));
+    }
+    if (sections.has('timings') && data.timings.length) {
+      setWorkingHours(data.timings.map((t) => ({ day_name: t.day_name, opening_time: t.opening_time, closing_time: t.closing_time, is_closed: t.is_closed })));
+    }
+    if (sections.has('people') && data.people.length) {
+      setStaffList((prev) => {
+        const kept = prev.filter((x: any) => x.name?.trim());
+        const names = new Set(kept.map((x: any) => x.name.trim().toLowerCase()));
+        return [...kept, ...data.people.filter((x) => !names.has(x.name.toLowerCase())).map((x) => ({ name: x.name, role: x.role || x.department, specialization: x.department, qualification: x.qualification }))];
+      });
+    }
+    if (sections.has('services') && data.services.length) {
+      setServicesList((prev) => {
+        const kept = prev.filter((x: any) => x.name?.trim());
+        const names = new Set(kept.map((x: any) => x.name.trim().toLowerCase()));
+        return [...kept, ...data.services.filter((x) => !names.has(x.name.toLowerCase())).map((x) => ({ name: x.name, description: x.description, price: x.price, duration_minutes: x.duration, category: x.category }))];
+      });
+    }
+    if (sections.has('faqs') && data.faqs.length) {
+      setFaqsList((prev) => {
+        const kept = prev.filter((x: any) => x.question?.trim() && x.answer?.trim());
+        const qs = new Set(kept.map((x: any) => x.question.trim().toLowerCase()));
+        return [...kept, ...data.faqs.filter((x) => !qs.has(x.question.toLowerCase())).map((x) => ({ question: x.question, answer: x.answer, keywords: "" }))];
+      });
+    }
+    setPendingAutoSave(true);
+  };
+
   const handleNext = () => setCurrentStep((prev) => Math.min(prev + 1, 6));
   const handlePrev = () => setCurrentStep((prev) => Math.max(prev - 1, 1));
 
@@ -297,6 +358,13 @@ export default function BusinessSetupWizard() {
   };
 
   const addStaff = () => setStaffList([...staffList, { name: "", role: "", specialization: "", qualification: "" }]);
+  useEffect(() => {
+    if (!pendingAutoSave) return;
+    setPendingAutoSave(false);
+    void handleSave();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingAutoSave]);
+
   const removeStaff = (index: number) => setStaffList(staffList.filter((_, i) => i !== index));
 
   const addService = () => setServicesList([...servicesList, { name: "", description: "", price: 20, duration_minutes: 30 }]);
@@ -307,8 +375,10 @@ export default function BusinessSetupWizard() {
 
   if (loading) {
     return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="mx-auto max-w-4xl space-y-4">
+        <div className="h-20 animate-pulse rounded-2xl bg-muted/60" />
+        <div className="h-16 animate-pulse rounded-2xl bg-muted/60" />
+        <div className="h-96 animate-pulse rounded-2xl bg-muted/50" />
       </div>
     );
   }
@@ -324,8 +394,11 @@ export default function BusinessSetupWizard() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
+      <AiSetupImport isHealthcare={false} onApply={applyAiSetup} />
+      {businessId && <BookingLinkCard />}
+
       {/* Step indicators */}
-      <div className="flex justify-between items-center bg-slate-900/40 p-4 rounded-xl border border-slate-800">
+      <div className="flex justify-between items-center bg-muted/40 p-4 rounded-xl border border-border">
         {steps.map((s, idx) => {
           const StepIcon = s.icon;
           const isCompleted = idx + 1 < currentStep;
@@ -341,15 +414,15 @@ export default function BusinessSetupWizard() {
                   isCompleted
                     ? "bg-primary border-primary text-primary-foreground"
                     : isActive
-                    ? "bg-slate-800 border-primary text-white"
-                    : "border-slate-800 bg-slate-950 text-slate-500"
+                    ? "bg-muted border-primary text-white"
+                    : "border-border bg-background text-muted-foreground"
                 }`}
               >
                 <StepIcon className="h-4 w-4" />
               </div>
               <span
                 className={`text-[10px] hidden md:block font-medium ${
-                  isActive ? "text-white font-bold" : "text-slate-500"
+                  isActive ? "text-foreground font-bold" : "text-muted-foreground"
                 }`}
               >
                 {s.title}
@@ -359,16 +432,16 @@ export default function BusinessSetupWizard() {
         })}
       </div>
 
-      <Card className="border-slate-800 bg-slate-900/60 backdrop-blur-md">
+      <Card className="border-border bg-muted/40 backdrop-blur-md">
         <CardHeader>
-          <CardTitle className="text-xl text-white font-bold flex items-center gap-2">
+          <CardTitle className="text-xl text-foreground font-bold flex items-center gap-2">
             {steps[currentStep - 1].title} Setup
           </CardTitle>
-          <CardDescription className="text-xs text-slate-400">
+          <CardDescription className="text-xs text-muted-foreground">
             Configure {steps[currentStep - 1].title.toLowerCase()} for {term.businessNameLabel.split('/')[0].trim()}.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4 text-white">
+        <CardContent className="space-y-4 text-foreground">
           {/* Step 1: Business Details */}
           {currentStep === 1 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -378,7 +451,7 @@ export default function BusinessSetupWizard() {
                   value={businessInfo.business_name}
                   onChange={(e) => setBusinessInfo({ ...businessInfo, business_name: e.target.value })}
                   placeholder="e.g. Bella Salon & Spa"
-                  className="h-9 border-slate-800 bg-slate-950 text-xs"
+                  className="h-9 border-border bg-background text-xs"
                 />
               </div>
               <div className="space-y-1">
@@ -386,7 +459,7 @@ export default function BusinessSetupWizard() {
                 <Input
                   disabled
                   value={businessSegment.toUpperCase()}
-                  className="h-9 border-slate-850 bg-slate-950/40 text-xs text-slate-400"
+                  className="h-9 border-slate-850 bg-background text-xs text-muted-foreground"
                 />
               </div>
               <div className="space-y-1">
@@ -395,7 +468,7 @@ export default function BusinessSetupWizard() {
                   value={businessInfo.phone}
                   onChange={(e) => setBusinessInfo({ ...businessInfo, phone: e.target.value })}
                   placeholder="Phone"
-                  className="h-9 border-slate-800 bg-slate-950 text-xs"
+                  className="h-9 border-border bg-background text-xs"
                 />
               </div>
               <div className="space-y-1">
@@ -404,7 +477,7 @@ export default function BusinessSetupWizard() {
                   value={businessInfo.whatsapp_number}
                   onChange={(e) => setBusinessInfo({ ...businessInfo, whatsapp_number: e.target.value })}
                   placeholder="WhatsApp Number"
-                  className="h-9 border-slate-800 bg-slate-950 text-xs"
+                  className="h-9 border-border bg-background text-xs"
                 />
               </div>
               <div className="space-y-1 md:col-span-2">
@@ -413,7 +486,7 @@ export default function BusinessSetupWizard() {
                   value={businessInfo.description}
                   onChange={(e) => setBusinessInfo({ ...businessInfo, description: e.target.value })}
                   placeholder="Tell clients who you are, what services you specialize in, and standard policies..."
-                  className="min-h-[100px] border-slate-800 bg-slate-950 text-xs"
+                  className="min-h-[100px] border-border bg-background text-xs"
                 />
               </div>
               <div className="space-y-1 md:col-span-2">
@@ -422,7 +495,7 @@ export default function BusinessSetupWizard() {
                   value={businessInfo.address}
                   onChange={(e) => setBusinessInfo({ ...businessInfo, address: e.target.value })}
                   placeholder="Address"
-                  className="h-9 border-slate-800 bg-slate-950 text-xs"
+                  className="h-9 border-border bg-background text-xs"
                 />
               </div>
               <div className="space-y-1">
@@ -431,7 +504,7 @@ export default function BusinessSetupWizard() {
                   value={businessInfo.email}
                   onChange={(e) => setBusinessInfo({ ...businessInfo, email: e.target.value })}
                   placeholder="info@business.com"
-                  className="h-9 border-slate-800 bg-slate-950 text-xs"
+                  className="h-9 border-border bg-background text-xs"
                 />
               </div>
               <div className="space-y-1">
@@ -440,17 +513,17 @@ export default function BusinessSetupWizard() {
                   value={businessInfo.website}
                   onChange={(e) => setBusinessInfo({ ...businessInfo, website: e.target.value })}
                   placeholder="https://yourbusiness.com"
-                  className="h-9 border-slate-800 bg-slate-950 text-xs"
+                  className="h-9 border-border bg-background text-xs"
                 />
               </div>
 
               {/* AI Training Sources */}
-              <div className="md:col-span-2 mt-2 pt-4 border-t border-slate-800/80">
+              <div className="md:col-span-2 mt-2 pt-4 border-t border-border">
                 <div className="flex items-center gap-2 mb-1">
                   <Sparkles className="h-4 w-4 text-emerald-400" />
-                  <h3 className="text-sm font-bold text-white tracking-wide">AI Training Sources</h3>
+                  <h3 className="text-sm font-bold text-foreground tracking-wide">AI Training Sources</h3>
                 </div>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-muted-foreground">
                   Add your public links so the AI can reference them and answer customers like an expert about your business.
                 </p>
               </div>
@@ -460,7 +533,7 @@ export default function BusinessSetupWizard() {
                   value={businessInfo.google_map_link}
                   onChange={(e) => setBusinessInfo({ ...businessInfo, google_map_link: e.target.value })}
                   placeholder="https://g.page/... or https://goo.gl/maps/..."
-                  className="h-9 border-slate-800 bg-slate-950 text-xs"
+                  className="h-9 border-border bg-background text-xs"
                 />
               </div>
               <div className="space-y-1">
@@ -469,7 +542,7 @@ export default function BusinessSetupWizard() {
                   value={businessInfo.instagram_url}
                   onChange={(e) => setBusinessInfo({ ...businessInfo, instagram_url: e.target.value })}
                   placeholder="https://instagram.com/yourbusiness"
-                  className="h-9 border-slate-800 bg-slate-950 text-xs"
+                  className="h-9 border-border bg-background text-xs"
                 />
               </div>
               <div className="space-y-1">
@@ -478,18 +551,18 @@ export default function BusinessSetupWizard() {
                   value={businessInfo.facebook_url}
                   onChange={(e) => setBusinessInfo({ ...businessInfo, facebook_url: e.target.value })}
                   placeholder="https://facebook.com/yourbusiness"
-                  className="h-9 border-slate-800 bg-slate-950 text-xs"
+                  className="h-9 border-border bg-background text-xs"
                 />
               </div>
               <div className="space-y-1 md:col-span-2">
                 <Label className="text-xs">
-                  Expert Knowledge for AI <span className="text-slate-500">(optional)</span>
+                  Expert Knowledge for AI <span className="text-muted-foreground">(optional)</span>
                 </Label>
                 <Textarea
                   value={businessInfo.ai_knowledge_base}
                   onChange={(e) => setBusinessInfo({ ...businessInfo, ai_knowledge_base: e.target.value })}
                   placeholder="Paste anything the AI should know to answer like an expert: specialties, unique selling points, policies, common customer concerns, awards, experience, etc."
-                  className="min-h-[100px] border-slate-800 bg-slate-950 text-xs"
+                  className="min-h-[100px] border-border bg-background text-xs"
                 />
               </div>
             </div>
@@ -501,7 +574,7 @@ export default function BusinessSetupWizard() {
               {workingHours.map((t, idx) => (
                 <div
                   key={t.day_name}
-                  className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3 bg-slate-950/40 rounded-lg border border-slate-850"
+                  className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3 bg-background rounded-lg border border-slate-850"
                 >
                   <div className="w-24 text-sm font-semibold">{t.day_name}</div>
                   <div className="flex items-center gap-4">
@@ -514,7 +587,7 @@ export default function BusinessSetupWizard() {
                           updated[idx].is_closed = e.target.checked;
                           setWorkingHours(updated);
                         }}
-                        className="rounded border-slate-800 bg-slate-950 text-primary focus:ring-0 cursor-pointer"
+                        className="rounded border-border bg-background text-primary focus:ring-0 cursor-pointer"
                       />
                       Closed
                     </label>
@@ -529,9 +602,9 @@ export default function BusinessSetupWizard() {
                             updated[idx].opening_time = e.target.value;
                             setWorkingHours(updated);
                           }}
-                          className="h-8 w-24 border-slate-800 bg-slate-950 text-xs px-2"
+                          className="h-8 w-24 border-border bg-background text-xs px-2"
                         />
-                        <span className="text-xs text-slate-500">to</span>
+                        <span className="text-xs text-muted-foreground">to</span>
                         <Input
                           type="time"
                           value={t.closing_time}
@@ -540,7 +613,7 @@ export default function BusinessSetupWizard() {
                             updated[idx].closing_time = e.target.value;
                             setWorkingHours(updated);
                           }}
-                          className="h-8 w-24 border-slate-800 bg-slate-950 text-xs px-2"
+                          className="h-8 w-24 border-border bg-background text-xs px-2"
                         />
                       </div>
                     )}
@@ -554,7 +627,7 @@ export default function BusinessSetupWizard() {
           {currentStep === 3 && (
             <div className="space-y-4">
               {staffList.map((staff, index) => (
-                <div key={index} className="flex gap-3 items-end p-4 bg-slate-950/30 rounded-lg border border-slate-800 relative">
+                <div key={index} className="flex gap-3 items-end p-4 bg-background rounded-lg border border-border relative">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 flex-1">
                     <div className="space-y-1">
                       <Label className="text-xs">{term.staffLabel} Name</Label>
@@ -566,7 +639,7 @@ export default function BusinessSetupWizard() {
                           setStaffList(list);
                         }}
                         placeholder="Name"
-                        className="h-9 border-slate-800 bg-slate-950 text-xs"
+                        className="h-9 border-border bg-background text-xs"
                       />
                     </div>
                     <div className="space-y-1">
@@ -579,7 +652,7 @@ export default function BusinessSetupWizard() {
                           setStaffList(list);
                         }}
                         placeholder="Specialization"
-                        className="h-9 border-slate-800 bg-slate-950 text-xs"
+                        className="h-9 border-border bg-background text-xs"
                       />
                     </div>
                   </div>
@@ -587,13 +660,13 @@ export default function BusinessSetupWizard() {
                     type="button"
                     variant="ghost"
                     onClick={() => removeStaff(index)}
-                    className="h-9 w-9 text-slate-500 hover:text-red-400 border border-slate-800"
+                    className="h-9 w-9 text-muted-foreground hover:text-red-400 border border-border"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               ))}
-              <Button type="button" variant="outline" onClick={addStaff} className="w-full border-slate-800 hover:bg-slate-800">
+              <Button type="button" variant="outline" onClick={addStaff} className="w-full border-border hover:bg-accent">
                 <Plus className="h-4 w-4 mr-2" /> Add {term.staffLabel}
               </Button>
             </div>
@@ -603,7 +676,7 @@ export default function BusinessSetupWizard() {
           {currentStep === 4 && (
             <div className="space-y-4">
               {servicesList.map((service, index) => (
-                <div key={index} className="flex gap-3 items-end p-4 bg-slate-950/30 rounded-lg border border-slate-800">
+                <div key={index} className="flex gap-3 items-end p-4 bg-background rounded-lg border border-border">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3 flex-1">
                     <div className="space-y-1">
                       <Label className="text-xs">Service Name</Label>
@@ -615,7 +688,7 @@ export default function BusinessSetupWizard() {
                           setServicesList(list);
                         }}
                         placeholder="Service Name"
-                        className="h-9 border-slate-800 bg-slate-950 text-xs"
+                        className="h-9 border-border bg-background text-xs"
                       />
                     </div>
                     <div className="space-y-1">
@@ -629,7 +702,7 @@ export default function BusinessSetupWizard() {
                           setServicesList(list);
                         }}
                         placeholder="Price"
-                        className="h-9 border-slate-800 bg-slate-950 text-xs"
+                        className="h-9 border-border bg-background text-xs"
                       />
                     </div>
                     <div className="space-y-1">
@@ -643,7 +716,7 @@ export default function BusinessSetupWizard() {
                           setServicesList(list);
                         }}
                         placeholder="Duration"
-                        className="h-9 border-slate-800 bg-slate-950 text-xs"
+                        className="h-9 border-border bg-background text-xs"
                       />
                     </div>
                   </div>
@@ -651,13 +724,13 @@ export default function BusinessSetupWizard() {
                     type="button"
                     variant="ghost"
                     onClick={() => removeService(index)}
-                    className="h-9 w-9 text-slate-500 hover:text-red-400 border border-slate-800"
+                    className="h-9 w-9 text-muted-foreground hover:text-red-400 border border-border"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               ))}
-              <Button type="button" variant="outline" onClick={addService} className="w-full border-slate-800 hover:bg-slate-800">
+              <Button type="button" variant="outline" onClick={addService} className="w-full border-border hover:bg-accent">
                 <Plus className="h-4 w-4 mr-2" /> Add Service
               </Button>
             </div>
@@ -667,7 +740,7 @@ export default function BusinessSetupWizard() {
           {currentStep === 5 && (
             <div className="space-y-4">
               {faqsList.map((faq, index) => (
-                <div key={index} className="flex gap-3 items-end p-4 bg-slate-950/30 rounded-lg border border-slate-800">
+                <div key={index} className="flex gap-3 items-end p-4 bg-background rounded-lg border border-border">
                   <div className="grid grid-cols-1 gap-3 flex-1">
                     <div className="space-y-1">
                       <Label className="text-xs">Question</Label>
@@ -679,7 +752,7 @@ export default function BusinessSetupWizard() {
                           setFaqsList(list);
                         }}
                         placeholder="e.g. Do you allow walk-ins?"
-                        className="h-9 border-slate-800 bg-slate-950 text-xs"
+                        className="h-9 border-border bg-background text-xs"
                       />
                     </div>
                     <div className="space-y-1">
@@ -692,7 +765,7 @@ export default function BusinessSetupWizard() {
                           setFaqsList(list);
                         }}
                         placeholder="Answer details..."
-                        className="min-h-[60px] border-slate-800 bg-slate-950 text-xs"
+                        className="min-h-[60px] border-border bg-background text-xs"
                       />
                     </div>
                   </div>
@@ -700,13 +773,13 @@ export default function BusinessSetupWizard() {
                     type="button"
                     variant="ghost"
                     onClick={() => removeFaq(index)}
-                    className="h-9 w-9 text-slate-500 hover:text-red-400 border border-slate-800"
+                    className="h-9 w-9 text-muted-foreground hover:text-red-400 border border-border"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               ))}
-              <Button type="button" variant="outline" onClick={addFaq} className="w-full border-slate-800 hover:bg-slate-800">
+              <Button type="button" variant="outline" onClick={addFaq} className="w-full border-border hover:bg-accent">
                 <Plus className="h-4 w-4 mr-2" /> Add FAQ Q&A
               </Button>
             </div>
@@ -715,10 +788,10 @@ export default function BusinessSetupWizard() {
           {/* Step 6: AI Settings */}
           {currentStep === 6 && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-slate-950/40 rounded-lg border border-slate-850">
+              <div className="flex items-center justify-between p-4 bg-background rounded-lg border border-slate-850">
                 <div>
                   <div className="text-sm font-semibold">Enable AI Autopilot</div>
-                  <div className="text-xs text-slate-500">Allow AI chatbot to automatically answer questions and book appointments.</div>
+                  <div className="text-xs text-muted-foreground">Allow AI chatbot to automatically answer questions and book appointments.</div>
                 </div>
                 <Switch
                   checked={aiSettings.ai_enabled}
@@ -732,7 +805,7 @@ export default function BusinessSetupWizard() {
                   value={aiSettings.ai_tone}
                   onChange={(e) => setAiSettings({ ...aiSettings, ai_tone: e.target.value })}
                   placeholder="e.g. friendly and casual, or formal and precise"
-                  className="h-9 border-slate-800 bg-slate-950 text-xs"
+                  className="h-9 border-border bg-background text-xs"
                 />
               </div>
 
@@ -742,7 +815,7 @@ export default function BusinessSetupWizard() {
                   value={aiSettings.greeting_message}
                   onChange={(e) => setAiSettings({ ...aiSettings, greeting_message: e.target.value })}
                   placeholder="Hi! Thanks for contacting us. How can we help you book or find info today?"
-                  className="min-h-[80px] border-slate-800 bg-slate-950 text-xs"
+                  className="min-h-[80px] border-border bg-background text-xs"
                 />
               </div>
             </div>
@@ -756,7 +829,7 @@ export default function BusinessSetupWizard() {
           variant="outline"
           disabled={currentStep === 1}
           onClick={handlePrev}
-          className="border-slate-800 text-white hover:bg-slate-800"
+          className="border-border text-foreground hover:bg-accent"
         >
           <ChevronLeft className="h-4 w-4 mr-1" /> Previous
         </Button>

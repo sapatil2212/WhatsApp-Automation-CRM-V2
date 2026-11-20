@@ -181,12 +181,11 @@ export class ConversationService {
   private assertSendable(input: {
     contentType: SendMessageBody['contentType'];
     lastInboundAt: Date | null;
-    conversationStatus: string;
   }): void {
-    if (input.conversationStatus === 'closed') {
-      throw new ConflictError('This conversation is closed. Reopen it before sending.');
-    }
-
+    // A resolved (`closed`) conversation is *not* refused: an agent replying
+    // to it is the normal way a chat gets reopened, and refusing made manual
+    // replies silently fail whenever the AI had auto-closed an idle chat.
+    // `sendMessage` reopens it after a successful send instead.
     const window = computeServiceWindow(input.lastInboundAt);
     if (window.expired && input.contentType !== 'template') {
       throw new ConflictError(
@@ -213,7 +212,6 @@ export class ConversationService {
     this.assertSendable({
       contentType: body.contentType,
       lastInboundAt: conversation.messages[0]?.createdAt ?? null,
-      conversationStatus: conversation.status,
     });
 
     // Resolve the quote target before touching Meta. A parent from another
@@ -255,7 +253,8 @@ export class ConversationService {
         contextMessageId,
       }));
       templateName = body.templateName;
-      preview = `[template] ${body.templateName}`;
+      contentText = body.renderedText?.trim() || null;
+      preview = contentText ?? `[template] ${body.templateName}`;
     } else {
       ({ whatsappMessageId } = await transport.sendMedia({
         to: phone,
@@ -289,6 +288,10 @@ export class ConversationService {
     });
 
     await this.deps.conversations.touchLastMessage(conversationId, preview, message.createdAt);
+    if (conversation.status === 'closed') {
+      // An agent replying takes the chat back: reopen it as human-handled.
+      await this.deps.conversations.update(conversationId, { status: 'open' });
+    }
 
     return toMessageDto(message);
   }

@@ -5,7 +5,12 @@
  * for human agents working in the inbox.
  */
 
-import { callLLM, parseJSONFromLLM, type CallOptions } from '@/lib/ai/llm';
+import {
+  callLLM,
+  inferTaskCriticality,
+  parseJSONFromLLM,
+  type CallOptions,
+} from '@/lib/ai/llm';
 import { ValidationError, type TenantDb } from '../kernel';
 
 export interface SuggestRepliesInput {
@@ -53,9 +58,6 @@ export class AiAssistantService {
   private async getTenantAiConfig(): Promise<CallOptions> {
     const config = await this.db.tenantConfiguration.findFirst({
       select: {
-        aiProvider: true,
-        aiApiKey: true,
-        aiModel: true,
         aiTemperature: true,
         aiSystemPrompt: true,
         aiPersonality: true,
@@ -63,12 +65,13 @@ export class AiAssistantService {
       },
     });
 
-    if (!config) return {};
+    if (!config) return { provider: 'gemini' };
 
     return {
-      provider: (config.aiProvider as 'gemini' | 'openai' | 'openrouter') || undefined,
-      apiKey: config.aiApiKey || undefined,
-      model: config.aiModel || undefined,
+      // Gemini is the platform default. Keeping its credential and model
+      // selection on the server means GEMINI_API_KEY stays private and the
+      // task router can move basic/standard/critical work between tiers.
+      provider: 'gemini',
       temperature: config.aiTemperature ? Number(config.aiTemperature) : undefined,
       systemPrompt: config.aiSystemPrompt || undefined,
     };
@@ -105,6 +108,11 @@ Format output strictly as a JSON array of 3 strings:
       ...tenantConfig,
       maxTokens: 500,
       temperature: 0.3,
+      // A simple customer "hi" stays on the economical model tier; the
+      // router upgrades substantive or sensitive messages automatically.
+      taskCriticality: inferTaskCriticality(
+        input.recentMessages.slice(-2).map((message) => message.text).join(' '),
+      ),
     });
 
     if (!llmResult.success) {
@@ -159,6 +167,7 @@ Return ONLY the rewritten message text without quotation marks, markdown wrapper
       ...tenantConfig,
       maxTokens: 500,
       temperature: 0.2,
+      taskCriticality: inferTaskCriticality(input.text),
     });
 
     const polished = llmResult.success ? llmResult.text.trim().replace(/^["']|["']$/g, '') : input.text;

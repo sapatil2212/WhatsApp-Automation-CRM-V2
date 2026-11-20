@@ -63,7 +63,7 @@ export function MessageReactions({
             "inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] leading-none transition-colors",
             g.byCurrentUser
               ? "border-primary/60 bg-primary/15 text-primary hover:bg-primary/25"
-              : "border-slate-700 bg-slate-800/80 text-slate-200 hover:bg-slate-700",
+              : "border-border bg-muted text-foreground/90 hover:bg-accent",
           )}
         >
           <span className="text-sm leading-none">{g.emoji}</span>

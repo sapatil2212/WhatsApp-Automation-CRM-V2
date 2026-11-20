@@ -3,6 +3,10 @@ import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { verifyAccessToken, rotateRefreshToken } from '@/lib/auth'
 import { invalidateClinicCache } from '@/lib/healthcare/clinic-cache'
+import { notifyAffectedAppointments } from '@/server/services/closure-notify'
+import { invalidateBookingSlugs } from '@/server/services/booking-slug'
+import { provisionTemplates } from '@/server/services/utility-template.service'
+import { tenantDb } from '@/server/kernel'
 
 // ─── Auth helper ────────────────────────────────────────────────────────────
 async function getAuthContext() {
@@ -131,6 +135,7 @@ export async function POST(req: NextRequest) {
 
     // ── Step 1: Clinic Info ──────────────────────────────────────────────────
     if (step === 1) {
+      invalidateBookingSlugs() // clinic name drives the booking link
       if (!data.clinic_name) {
         return NextResponse.json({ error: 'Clinic Name is required.' }, { status: 400 })
       }
@@ -177,6 +182,12 @@ export async function POST(req: NextRequest) {
 
       // Refresh cached clinic context so AI picks up new info without waiting for TTL
       invalidateClinicCache(ctx.userId)
+
+      // Provision this tenant's appointment utility templates for its vertical
+      // (idempotent; existing templates and their approvals are untouched).
+      void provisionTemplates(tenantDb(ctx.tenantId), { tenantId: ctx.tenantId, userId: ctx.userId }).catch((e) =>
+        console.warn('[Setup] template provisioning failed', e),
+      )
 
       return NextResponse.json({ success: true, clinic_id: clinic.id })
     }
@@ -228,6 +239,8 @@ export async function POST(req: NextRequest) {
         data: { dateExceptions: date_exceptions ?? [] },
       })
 
+      // Cancel + notify bookings that now fall on a closure / leave date.
+      void notifyAffectedAppointments({ clinicId }).catch((e) => console.error('[Setup] closure notify failed', e))
       return NextResponse.json({ success: true })
     }
 
@@ -263,6 +276,8 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // Cancel + notify bookings that now fall on a closure / leave date.
+      void notifyAffectedAppointments({ clinicId }).catch((e) => console.error('[Setup] closure notify failed', e))
       return NextResponse.json({ success: true })
     }
 

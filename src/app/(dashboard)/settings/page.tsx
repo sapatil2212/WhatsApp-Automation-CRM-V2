@@ -1,23 +1,22 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Settings, Tag, User, Palette, Sparkles, Users } from 'lucide-react';
+import { Tag, User, Palette, Users, BellRing } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { WhatsAppConfig } from '@/components/settings/whatsapp-config';
 import { TagManager } from '@/components/settings/tag-manager';
 import { ProfileForm } from '@/components/settings/profile-form';
 import { PasswordForm } from '@/components/settings/password-form';
 import { SessionsCard } from '@/components/settings/sessions-card';
 import { AppearancePanel } from '@/components/settings/appearance-panel';
-import { AiConfigPanel } from '@/components/settings/ai-config-panel';
 import { TeamManager } from '@/components/settings/team-manager';
+import { FollowUpPanel } from '@/components/settings/follow-up-panel';
 
 const TAB_VALUES = [
   'profile',
   'team',
-  'whatsapp',
-  'ai',
   'tags',
+  'followups',
   'appearance',
 ] as const;
 type TabValue = (typeof TAB_VALUES)[number];
@@ -37,6 +36,11 @@ export default function SettingsPage() {
   const queryTab = searchParams.get('tab');
   const tab: TabValue = isTabValue(queryTab) ? queryTab : 'profile';
 
+  // WhatsApp configuration moved to Integrations; keep old links working.
+  useEffect(() => {
+    if (queryTab === 'whatsapp') router.replace('/connections?tab=whatsapp');
+  }, [queryTab, router]);
+
   const onChange = (next: TabValue) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('tab', next);
@@ -47,8 +51,8 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Settings</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-          Manage your profile, team members, WhatsApp® integration, AI assistant, and workspace preferences.
+        <p className="text-sm text-muted-foreground dark:text-slate-400 mt-1">
+          Manage your profile, team members, tags and workspace preferences. WhatsApp and Google Sheets live under Integrations.
         </p>
       </div>
 
@@ -56,42 +60,35 @@ export default function SettingsPage() {
         <TabsList className="bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800/60 p-1 h-10 w-fit gap-1">
           <TabsTrigger
             value="profile"
-            className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-slate-600 dark:text-slate-400 data-active:shadow-sm transition-all duration-200"
+            className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-muted-foreground dark:text-slate-400 data-active:shadow-sm transition-all duration-200"
           >
             <User className="size-4" />
             Profile
           </TabsTrigger>
           <TabsTrigger
             value="team"
-            className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-slate-600 dark:text-slate-400 data-active:shadow-sm transition-all duration-200"
+            className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-muted-foreground dark:text-slate-400 data-active:shadow-sm transition-all duration-200"
           >
             <Users className="size-4" />
             Team
           </TabsTrigger>
           <TabsTrigger
-            value="whatsapp"
-            className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-slate-600 dark:text-slate-400 data-active:shadow-sm transition-all duration-200"
-          >
-            <Settings className="size-4" />
-            WhatsApp Config
-          </TabsTrigger>
-          <TabsTrigger
-            value="ai"
-            className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-slate-600 dark:text-slate-400 data-active:shadow-sm transition-all duration-200"
-          >
-            <Sparkles className="size-4" />
-            AI Assistant
-          </TabsTrigger>
-          <TabsTrigger
             value="tags"
-            className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-slate-600 dark:text-slate-400 data-active:shadow-sm transition-all duration-200"
+            className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-muted-foreground dark:text-slate-400 data-active:shadow-sm transition-all duration-200"
           >
             <Tag className="size-4" />
             Tags
           </TabsTrigger>
           <TabsTrigger
+            value="followups"
+            className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-muted-foreground dark:text-slate-400 data-active:shadow-sm transition-all duration-200"
+          >
+            <BellRing className="size-4" />
+            Follow-ups
+          </TabsTrigger>
+          <TabsTrigger
             value="appearance"
-            className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-slate-600 dark:text-slate-400 data-active:shadow-sm transition-all duration-200"
+            className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-muted-foreground dark:text-slate-400 data-active:shadow-sm transition-all duration-200"
           >
             <Palette className="size-4" />
             Appearance
@@ -108,16 +105,12 @@ export default function SettingsPage() {
           <TeamManager />
         </TabsContent>
 
-        <TabsContent value="whatsapp">
-          <WhatsAppConfig />
-        </TabsContent>
-
-        <TabsContent value="ai">
-          <AiConfigPanel />
-        </TabsContent>
-
         <TabsContent value="tags">
           <TagManager />
+        </TabsContent>
+
+        <TabsContent value="followups">
+          <FollowUpPanel />
         </TabsContent>
 
         <TabsContent value="appearance">

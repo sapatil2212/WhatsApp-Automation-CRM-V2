@@ -143,7 +143,7 @@ export function MessageComposer({
   };
 
   return (
-    <div className="border-t border-slate-800 bg-slate-900 p-3 space-y-2">
+    <div className="border-t border-border bg-card p-3 space-y-2">
       {replyTo && (
         <div className="mb-2">
           <ReplyQuote
@@ -173,7 +173,7 @@ export function MessageComposer({
 
       {/* AI Smart Suggestions Chips Bar */}
       {aiSuggestions.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 rounded-lg bg-slate-800/80 p-2 border border-violet-500/30 animate-in fade-in duration-200">
+        <div className="flex flex-wrap items-center gap-1.5 rounded-lg bg-muted p-2 border border-violet-500/30 animate-in fade-in duration-200">
           <span className="text-[11px] font-semibold text-violet-400 flex items-center gap-1 shrink-0">
             <Sparkles className="h-3 w-3" /> Suggestions:
           </span>
@@ -186,7 +186,7 @@ export function MessageComposer({
                 setAiSuggestions([]);
                 setTimeout(adjustHeight, 50);
               }}
-              className="text-xs bg-slate-900 hover:bg-violet-950/60 border border-slate-700 hover:border-violet-500/50 text-slate-200 hover:text-white rounded-md px-2.5 py-1 text-left transition-colors truncate max-w-xs"
+              className="text-xs bg-card hover:bg-violet-950/60 border border-border hover:border-violet-500/50 text-foreground/90 hover:text-foreground rounded-md px-2.5 py-1 text-left transition-colors truncate max-w-xs"
               title={suggestion}
             >
               {suggestion}
@@ -195,7 +195,7 @@ export function MessageComposer({
           <button
             type="button"
             onClick={() => setAiSuggestions([])}
-            className="text-[10px] text-slate-400 hover:text-slate-200 ml-auto"
+            className="text-[10px] text-muted-foreground hover:text-foreground ml-auto"
           >
             Dismiss
           </button>
@@ -206,7 +206,7 @@ export function MessageComposer({
         <Button
           variant="ghost"
           size="sm"
-          className="h-9 w-9 shrink-0 p-0 text-slate-400 hover:text-white"
+          className="h-9 w-9 shrink-0 p-0 text-muted-foreground hover:text-foreground"
           onClick={onOpenTemplates}
           title="Send template"
         >
@@ -241,28 +241,28 @@ export function MessageComposer({
               <Wand2 className="h-3.5 w-3.5 mr-1" />
               Polish
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="bg-slate-900 border-slate-700 text-slate-200 w-48">
+            <DropdownMenuContent align="start" className="bg-card border-border text-foreground/90 w-48">
               <DropdownMenuItem
                 onClick={() => handlePolishDraft("professional")}
-                className="text-xs hover:bg-slate-800 cursor-pointer"
+                className="text-xs hover:bg-accent cursor-pointer"
               >
                 👔 Professional & Polite
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => handlePolishDraft("friendly")}
-                className="text-xs hover:bg-slate-800 cursor-pointer"
+                className="text-xs hover:bg-accent cursor-pointer"
               >
                 😊 Friendly & Warm
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => handlePolishDraft("concise")}
-                className="text-xs hover:bg-slate-800 cursor-pointer"
+                className="text-xs hover:bg-accent cursor-pointer"
               >
                 ⚡ Concise & Direct
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => handlePolishDraft("fix_grammar")}
-                className="text-xs hover:bg-slate-800 cursor-pointer"
+                className="text-xs hover:bg-accent cursor-pointer"
               >
                 ✨ Fix Grammar & Spelling
               </DropdownMenuItem>
@@ -283,7 +283,7 @@ export function MessageComposer({
           disabled={sessionExpired}
           rows={1}
           className={cn(
-            "flex-1 resize-none rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition-colors focus:border-primary/50",
+            "flex-1 resize-none rounded-xl border border-border bg-muted px-4 py-2.5 text-sm text-foreground placeholder-slate-500 outline-none transition-colors focus:border-primary/50",
             sessionExpired && "cursor-not-allowed opacity-50"
           )}
         />
@@ -299,7 +299,7 @@ export function MessageComposer({
       </div>
 
       {/* Hint */}
-      <p className="mt-1 pl-11 text-[10px] text-slate-600">
+      <p className="mt-1 pl-11 text-[10px] text-muted-foreground">
         Type &apos;/&apos; for quick replies · Click &quot;AI Suggest&quot; for instant replies
       </p>
     </div>

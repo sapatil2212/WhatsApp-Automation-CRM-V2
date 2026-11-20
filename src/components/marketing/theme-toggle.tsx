@@ -2,7 +2,6 @@
 
 import React from "react";
 import { Sun, Moon } from "lucide-react";
-import { motion } from "framer-motion";
 import { useMarketingTheme } from "./marketing-theme-provider";
 import { cn } from "@/lib/utils";
 
@@ -40,11 +39,7 @@ export function ThemeToggle({ className }: { className?: string }) {
             aria-label={opt.label}
           >
             {isActive && (
-              <motion.span
-                layoutId="active-theme-pill"
-                className="absolute inset-0 rounded-full bg-emerald-500/10 border border-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.15)]"
-                transition={{ type: "spring", stiffness: 380, damping: 30 }}
-              />
+              <span className="absolute inset-0 rounded-full bg-emerald-500/10 border border-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.15)]" />
             )}
             <Icon className="h-4 w-4 relative z-10" />
           </button>

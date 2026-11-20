@@ -1,5 +1,6 @@
 "use client";
 
+import { PageSkeleton } from "@/components/ui/page-skeleton";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -122,24 +123,15 @@ export default function WhatsAppAILogs() {
   // Extract unique intents for filter dropdown
   const uniqueIntents = Array.from(new Set(logs.map((log) => log.detected_intent).filter(Boolean)));
 
-  if (loading) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          <p className="text-sm text-slate-400">Loading automation audit logs...</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <PageSkeleton variant="table" />;
 
   if (!clinicId) {
     return (
-      <Card className="border-slate-800 bg-slate-900/60 max-w-lg mx-auto mt-12 text-center p-6">
+      <Card className="border-border bg-muted/40 max-w-lg mx-auto mt-12 text-center p-6">
         <CardHeader className="flex flex-col items-center justify-center">
           <AlertCircle className="h-12 w-12 text-amber-500 mb-4 animate-bounce" />
-          <CardTitle className="text-white">Business Onboarding Required</CardTitle>
-          <CardDescription className="text-slate-400 mt-2">
+          <CardTitle className="text-foreground">Business Onboarding Required</CardTitle>
+          <CardDescription className="text-muted-foreground mt-2">
             You must set up your business information before checking AI logs.
           </CardDescription>
         </CardHeader>
@@ -160,11 +152,11 @@ export default function WhatsAppAILogs() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-white flex items-center gap-3">
+          <h1 className="text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-3">
             <History className="h-8 w-8 text-primary" />
             AI Chat Logs
           </h1>
-          <p className="text-slate-400 text-sm mt-1">
+          <p className="text-muted-foreground text-sm mt-1">
             Audit history of AI automated conversations, intents detected, and LLM replies.
           </p>
         </div>
@@ -178,20 +170,20 @@ export default function WhatsAppAILogs() {
       {/* Filters Row */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center justify-between">
         <div className="relative md:col-span-2">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search client, query keywords, or AI answers..."
-            className="pl-9 bg-slate-900 border-slate-800 text-white h-10"
+            className="pl-9 bg-card border-border text-foreground h-10"
           />
         </div>
         <div>
           <Select value={selectedIntent} onValueChange={(val) => setSelectedIntent(val || "all")}>
-            <SelectTrigger className="bg-slate-900 border-slate-800 text-white h-10">
+            <SelectTrigger className="bg-card border-border text-foreground h-10">
               <SelectValue placeholder="Filter by intent" />
             </SelectTrigger>
-            <SelectContent className="bg-slate-900 text-white border-slate-800">
+            <SelectContent className="bg-card text-foreground border-border">
               <SelectItem value="all">All Intents</SelectItem>
               {uniqueIntents.map((intent: any) => (
                 <SelectItem key={intent} value={intent}>
@@ -201,25 +193,25 @@ export default function WhatsAppAILogs() {
             </SelectContent>
           </Select>
         </div>
-        <div className="text-right text-xs text-slate-500 font-medium">
+        <div className="text-right text-xs text-muted-foreground font-medium">
           Showing {filteredLogs.length} logs
         </div>
       </div>
 
       {/* Audit Log Table */}
-      <Card className="border-slate-800 bg-slate-900/60 backdrop-blur-md overflow-hidden">
+      <Card className="border-border bg-muted/40 backdrop-blur-md overflow-hidden">
         <CardContent className="p-0">
           {filteredLogs.length === 0 ? (
             <div className="p-16 text-center">
-              <History className="h-12 w-12 text-slate-700 mx-auto mb-3" />
-              <p className="text-slate-400 text-sm">No automation logs recorded.</p>
-              <p className="text-xs text-slate-600 mt-1">Logs populate here once client messages are processed by the AI.</p>
+              <History className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+              <p className="text-muted-foreground text-sm">No automation logs recorded.</p>
+              <p className="text-xs text-muted-foreground mt-1">Logs populate here once client messages are processed by the AI.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-slate-800 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-950/20">
+                  <tr className="border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wider bg-background">
                     <th className="p-4 font-medium">Client</th>
                     <th className="p-4 font-medium">User Query</th>
                     <th className="p-4 font-medium">AI response</th>
@@ -229,25 +221,25 @@ export default function WhatsAppAILogs() {
                     <th className="p-4 font-medium text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60 text-sm">
+                <tbody className="divide-y divide-border text-sm">
                   {filteredLogs.map((log) => (
                     <tr
                       key={log.id}
                       onClick={() => handleOpenDetails(log)}
-                      className="hover:bg-slate-800/10 transition-colors cursor-pointer"
+                      className="hover:bg-accent transition-colors cursor-pointer"
                     >
                       <td className="p-4">
-                        <div className="font-semibold text-white">
+                        <div className="font-semibold text-foreground">
                           {log.contacts?.name || "Client"}
                         </div>
-                        <div className="text-xs text-slate-500">
+                        <div className="text-xs text-muted-foreground">
                           {log.contacts?.phone || ""}
                         </div>
                       </td>
-                      <td className="p-4 max-w-[200px] truncate text-slate-400">
+                      <td className="p-4 max-w-[200px] truncate text-muted-foreground">
                         {log.user_message}
                       </td>
-                      <td className="p-4 max-w-[250px] truncate text-slate-300">
+                      <td className="p-4 max-w-[250px] truncate text-foreground/90">
                         {log.ai_response}
                       </td>
                       <td className="p-4">
@@ -269,10 +261,10 @@ export default function WhatsAppAILogs() {
                             {(log.confidence_score * 100).toFixed(0)}%
                           </span>
                         ) : (
-                          <span className="text-slate-500">-</span>
+                          <span className="text-muted-foreground">-</span>
                         )}
                       </td>
-                      <td className="p-4 text-xs text-slate-500 whitespace-nowrap">
+                      <td className="p-4 text-xs text-muted-foreground whitespace-nowrap">
                         {new Date(log.created_at).toLocaleString([], {
                           month: "short",
                           day: "numeric",
@@ -289,7 +281,7 @@ export default function WhatsAppAILogs() {
                             }}
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-slate-450 hover:text-white hover:bg-slate-800/40"
+                            className="h-8 w-8 text-slate-450 hover:text-foreground hover:bg-accent"
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
@@ -314,37 +306,37 @@ export default function WhatsAppAILogs() {
 
       {/* Log Details Modal */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="max-w-xl bg-slate-900 border-slate-800 text-slate-200">
+        <DialogContent className="max-w-xl bg-card border-border text-foreground/90">
           {selectedLog && (
             <div className="space-y-4">
               <DialogHeader>
-                <DialogTitle className="text-white text-xl flex items-center gap-2">
+                <DialogTitle className="text-foreground text-xl flex items-center gap-2">
                   <Sparkles className="h-5 w-5 text-teal-400 animate-pulse" />
                   AI Transaction Details
                 </DialogTitle>
-                <DialogDescription className="text-slate-400">
+                <DialogDescription className="text-muted-foreground">
                   Detailed inspection of incoming metadata and generated automated responses.
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="grid grid-cols-2 gap-4 text-xs border-t border-b border-slate-800 py-3 mt-2">
+              <div className="grid grid-cols-2 gap-4 text-xs border-t border-b border-border py-3 mt-2">
                 <div>
-                  <span className="text-slate-500 block uppercase tracking-wider mb-0.5">Client Name</span>
-                  <span className="text-slate-300 font-semibold text-sm">{selectedLog.contacts?.name || "Client"}</span>
+                  <span className="text-muted-foreground block uppercase tracking-wider mb-0.5">Client Name</span>
+                  <span className="text-foreground/90 font-semibold text-sm">{selectedLog.contacts?.name || "Client"}</span>
                 </div>
                 <div>
-                  <span className="text-slate-500 block uppercase tracking-wider mb-0.5">Client Phone</span>
-                  <span className="text-slate-300 font-semibold text-sm">{selectedLog.contacts?.phone || ""}</span>
+                  <span className="text-muted-foreground block uppercase tracking-wider mb-0.5">Client Phone</span>
+                  <span className="text-foreground/90 font-semibold text-sm">{selectedLog.contacts?.phone || ""}</span>
                 </div>
                 <div>
-                  <span className="text-slate-500 block uppercase tracking-wider mb-0.5">Detected Intent</span>
+                  <span className="text-muted-foreground block uppercase tracking-wider mb-0.5">Detected Intent</span>
                   <Badge className="bg-teal-500/10 text-teal-400 border border-teal-500/20 text-[10px] font-semibold uppercase tracking-wider mt-1">
                     {selectedLog.detected_intent || "fallback"}
                   </Badge>
                 </div>
                 <div>
-                  <span className="text-slate-500 block uppercase tracking-wider mb-0.5">Confidence Level</span>
-                  <span className="text-slate-300 font-semibold text-sm font-mono">
+                  <span className="text-muted-foreground block uppercase tracking-wider mb-0.5">Confidence Level</span>
+                  <span className="text-foreground/90 font-semibold text-sm font-mono">
                     {selectedLog.confidence_score !== null && selectedLog.confidence_score !== undefined
                       ? `${(selectedLog.confidence_score * 100).toFixed(0)}%`
                       : "-"}
@@ -354,14 +346,14 @@ export default function WhatsAppAILogs() {
 
               <div className="space-y-3">
                 <div className="space-y-1">
-                  <Label className="text-xs text-slate-400 uppercase tracking-wider font-semibold">User Message</Label>
-                  <p className="text-sm text-slate-300 bg-slate-950/40 border border-slate-850 p-3 rounded-lg leading-relaxed whitespace-pre-wrap italic">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">User Message</Label>
+                  <p className="text-sm text-foreground/90 bg-background border border-slate-850 p-3 rounded-lg leading-relaxed whitespace-pre-wrap italic">
                     "{selectedLog.user_message}"
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-slate-400 uppercase tracking-wider font-semibold">AI Automated Reply</Label>
-                  <p className="text-sm text-slate-200 bg-slate-800/40 border border-slate-800 p-3 rounded-lg leading-relaxed whitespace-pre-wrap">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">AI Automated Reply</Label>
+                  <p className="text-sm text-foreground/90 bg-muted/60 border border-border p-3 rounded-lg leading-relaxed whitespace-pre-wrap">
                     {selectedLog.ai_response}
                   </p>
                 </div>
@@ -371,7 +363,7 @@ export default function WhatsAppAILogs() {
                 Log generated at: {new Date(selectedLog.created_at).toLocaleString()}
               </div>
 
-              <DialogFooter className="border-t border-slate-800 pt-4 mt-2">
+              <DialogFooter className="border-t border-border pt-4 mt-2">
                 <Button type="button" onClick={() => setIsDetailsOpen(false)} className="bg-primary text-primary-foreground hover:bg-primary/95">
                   Close Details
                 </Button>

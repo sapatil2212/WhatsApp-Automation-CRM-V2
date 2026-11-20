@@ -83,15 +83,15 @@ export function AiCheckPanel({
   }
 
   return (
-    <div className="rounded-lg border border-slate-800 bg-slate-900/80 p-4 backdrop-blur">
+    <div className="rounded-lg border border-border bg-card p-4 backdrop-blur">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
             <Sparkles className="h-4 w-4" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-white">AI flow check</h3>
-            <p className="text-[11px] text-slate-400">
+            <h3 className="text-sm font-semibold text-foreground">AI flow check</h3>
+            <p className="text-[11px] text-muted-foreground">
               Let AI review the whole conversation for dead-ends, clarity, and tone.
             </p>
           </div>
@@ -112,11 +112,11 @@ export function AiCheckPanel({
       </div>
 
       {result && (
-        <div className="mt-4 space-y-4 border-t border-slate-800 pt-4">
+        <div className="mt-4 space-y-4 border-t border-border pt-4">
           {/* Score + summary */}
           <div className="flex items-start gap-3">
             <ScoreBadge score={result.score} passed={result.passed} />
-            <p className="flex-1 text-xs leading-relaxed text-slate-300">
+            <p className="flex-1 text-xs leading-relaxed text-foreground/90">
               {result.summary}
             </p>
           </div>
@@ -126,16 +126,16 @@ export function AiCheckPanel({
             {result.checks.map((c, i) => (
               <li
                 key={`${c.id}-${i}`}
-                className="flex items-start gap-2 rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2"
+                className="flex items-start gap-2 rounded-md border border-border bg-background px-3 py-2"
               >
                 <CheckIcon passed={c.passed} severity={c.severity} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-slate-200">
+                    <span className="text-xs font-medium text-foreground/90">
                       {c.label}
                     </span>
                   </div>
-                  <p className="text-[11px] leading-relaxed text-slate-400">
+                  <p className="text-[11px] leading-relaxed text-muted-foreground">
                     {c.message}
                   </p>
                   {!c.passed && c.suggestion && (
@@ -155,7 +155,7 @@ export function AiCheckPanel({
                 <Lightbulb className="h-3.5 w-3.5" />
                 Suggested improvements
               </div>
-              <ul className="list-disc space-y-1 pl-4 text-[11px] leading-relaxed text-slate-300">
+              <ul className="list-disc space-y-1 pl-4 text-[11px] leading-relaxed text-foreground/90">
                 {result.improvements.map((tip, i) => (
                   <li key={i}>{tip}</li>
                 ))}
@@ -170,10 +170,10 @@ export function AiCheckPanel({
 
 function ScoreBadge({ score, passed }: { score: number; passed: boolean }) {
   const color = passed
-    ? "border-emerald-600/40 bg-emerald-500/10 text-emerald-300"
+    ? "border-emerald-600/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
     : score >= 60
-      ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
-      : "border-red-600/40 bg-red-500/10 text-red-300";
+      ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+      : "border-red-600/40 bg-red-500/10 text-red-700 dark:text-red-300";
   return (
     <div
       className={cn(
@@ -195,13 +195,13 @@ function CheckIcon({
   severity: "error" | "warning" | "info";
 }) {
   if (passed) {
-    return <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />;
+    return <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-700 dark:text-emerald-400" />;
   }
   if (severity === "error") {
-    return <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400" />;
+    return <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-600 dark:text-red-400" />;
   }
   if (severity === "warning") {
-    return <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400" />;
+    return <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-700 dark:text-amber-400" />;
   }
-  return <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />;
+  return <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />;
 }

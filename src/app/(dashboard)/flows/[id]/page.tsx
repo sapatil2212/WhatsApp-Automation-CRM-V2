@@ -1,6 +1,8 @@
 "use client";
 
+import { PageSkeleton } from "@/components/ui/page-skeleton";
 import { useEffect, useState } from "react";
+import { flowFromDto, nodesFromDto, unwrap, type FlowDtoLike } from "@/lib/flows/client";
 import { useParams, useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -40,13 +42,10 @@ export default function FlowEditorPage() {
           return;
         }
         if (!res.ok) throw new Error(`Failed: ${res.status}`);
-        const json = (await res.json()) as {
-          flow: FlowRow;
-          nodes: FlowNodeRow[];
-        };
+        const dto = unwrap<FlowDtoLike>(await res.json());
         if (!cancelled) {
-          setFlow(json.flow);
-          setNodes(json.nodes ?? []);
+          setFlow(flowFromDto(dto));
+          setNodes(nodesFromDto(dto.id, dto));
         }
       } catch (err) {
         if (!cancelled) {
@@ -62,17 +61,11 @@ export default function FlowEditorPage() {
     };
   }, [params.id]);
 
-  if (loading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
-      </div>
-    );
-  }
+  if (loading) return <PageSkeleton variant="table" />;
   if (notFound || !flow) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3">
-        <p className="text-sm text-slate-400">Flow not found.</p>
+        <p className="text-sm text-muted-foreground">Flow not found.</p>
         <button
           type="button"
           onClick={() => router.push("/flows")}

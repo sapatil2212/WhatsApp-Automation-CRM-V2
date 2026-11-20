@@ -33,7 +33,9 @@ export class AudienceRepository extends BaseRepository {
     const where: Prisma.ContactWhereInput = {};
     const excludeTagIds = 'excludeTagIds' in audience ? audience.excludeTagIds : [];
 
-    if (audience.type === 'tags') {
+    if (audience.type === 'contacts') {
+      where.id = { in: audience.contactIds };
+    } else if (audience.type === 'tags') {
       where.tags = { some: { tagId: { in: audience.tagIds } } };
     } else if (audience.type === 'customField') {
       const valueFilter: Prisma.StringNullableFilter =
@@ -76,8 +78,7 @@ export class AudienceRepository extends BaseRepository {
   async countBeforeExclusions(audience: Audience): Promise<number> {
     const excludeTagIds = 'excludeTagIds' in audience ? audience.excludeTagIds : [];
     if (excludeTagIds.length === 0) return this.count(audience);
-    const without: Audience =
-      audience.type === 'all' ? audience : { ...audience, excludeTagIds: [] };
+    const without: Audience = { ...audience, excludeTagIds: [] };
     return this.db.contact.count({ where: this.buildWhere(without) });
   }
 

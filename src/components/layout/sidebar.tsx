@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useTotalUnread } from "@/hooks/use-total-unread";
 import { useTheme } from "@/hooks/use-theme";
 import { getBusinessSegment, getTerminology } from "@/lib/business/terminology";
+import { ReviewsNavSection } from "@/components/reviews/reviews-nav-section";
 import {
   LayoutDashboard,
   MessageSquare,
@@ -15,12 +16,9 @@ import {
   GitBranch,
   Zap,
   Workflow,
+  ListOrdered,
   Settings,
-  LogOut,
-  User,
   X,
-  Activity,
-  Brain,
   History,
   Calendar,
   Shield,
@@ -28,22 +26,14 @@ import {
   LayoutTemplate,
   Megaphone,
   Building,
-  Bot,
-  Package,
   HelpCircle,
+  Plug,
+  LifeBuoy,
+  Mail,
+  Stethoscope,
+  ClipboardList,
+  FileSignature,
 } from "lucide-react";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 interface NavItem {
   href: string;
@@ -56,31 +46,25 @@ interface NavItem {
   beta?: boolean;
 }
 
+/** One dashboard for every business type (analytics live there). */
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/inbox", label: "Inbox", icon: MessageSquare },
-  { href: "/campaigns", label: "Campaigns", icon: Megaphone },
   { href: "/contacts", label: "Contacts", icon: Users },
+  { href: "/campaigns", label: "Campaigns", icon: Megaphone },
+  { href: "/templates", label: "Templates", icon: LayoutTemplate },
   { href: "/pipelines", label: "Pipelines", icon: GitBranch },
   { href: "/automations", label: "Automations", icon: Zap },
   { href: "/flows", label: "Flows", icon: Workflow },
-  { href: "/templates", label: "Templates", icon: LayoutTemplate },
-];
-
-const healthcareNavItems: NavItem[] = [
-  { href: "/healthcare/dashboard", label: "Dashboard", icon: Activity },
-  { href: "/healthcare/appointments", label: "Bookings", icon: Calendar },
-  { href: "/healthcare/setup", label: "Business Setup", icon: Building },
-  { href: "/healthcare/doctors", label: "AI Agents & Staff", icon: Bot },
-  { href: "/healthcare/services", label: "Services Offered", icon: Package },
-  { href: "/healthcare/faqs", label: "AI Knowledge Base", icon: HelpCircle },
-  { href: "/healthcare/settings", label: "AI Settings", icon: Brain },
-  { href: "/healthcare/logs", label: "WhatsApp AI Logs", icon: History },
+  { href: "/sequences", label: "Sequences", icon: ListOrdered },
 ];
 
 const bottomNavItems = [
+  { href: "/connections", label: "Integrations", icon: Plug },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
+
+const SUPPORT_EMAIL = "chatnexgen@gmail.com";
 
 interface SidebarProps {
   /** Controlled on mobile by the Header's hamburger button. Ignored on lg+. */
@@ -99,15 +83,20 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
   const term = getTerminology(segment);
   const isHealthcare = segment === "healthcare";
 
+  // Services, staff/doctors and AI behaviour are all managed inside
+  // Business Setup now, so the business section stays short.
   const dynamicNavItems: NavItem[] = [
-    { href: `/${segment}/dashboard`, label: "Dashboard", icon: isHealthcare ? Activity : LayoutDashboard },
-    { href: `/${segment}/appointments`, label: isHealthcare ? "Bookings" : (term.bookingPluralLabel.length > 20 ? "Bookings" : term.bookingPluralLabel), icon: Calendar },
+    { href: `/${segment}/appointments`, label: isHealthcare ? "Appointments" : (term.bookingPluralLabel.length > 20 ? "Bookings" : term.bookingPluralLabel), icon: Calendar },
+    ...(isHealthcare
+      ? [
+          { href: "/healthcare/consultations", label: "Consultation", icon: Stethoscope },
+          { href: "/healthcare/patients", label: "Patients", icon: ClipboardList },
+          { href: "/healthcare/prescription-settings", label: "Prescription Setup", icon: FileSignature },
+        ]
+      : []),
     { href: `/${segment}/setup`, label: term.businessSetupLabel, icon: Building },
-    { href: `/${segment}/doctors`, label: term.staffPluralLabel, icon: Bot },
-    { href: `/${segment}/services`, label: term.servicePluralLabel, icon: Package },
     { href: `/${segment}/faqs`, label: "AI Knowledge Base", icon: HelpCircle },
-    { href: `/${segment}/settings`, label: "AI Settings", icon: Brain },
-    { href: `/${segment}/logs`, label: "WhatsApp AI Logs", icon: History },
+    { href: `/${segment}/logs`, label: "AI Chat Logs", icon: History },
   ];
 
   // Close the drawer when route changes — users opened it to navigate,
@@ -233,7 +222,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
           <div className="my-3 border-t border-sidebar-border/60" />
 
           <div className="px-2.5 mb-1.5 text-[10px] font-semibold text-sidebar-foreground/50 uppercase tracking-wider">
-            AI Booking & Agent
+            {isHealthcare ? "Clinic" : "Business"}
           </div>
 
           <ul className="flex flex-col gap-0.5 mb-2">
@@ -258,6 +247,8 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
               );
             })}
           </ul>
+
+          <ReviewsNavSection />
 
           {profile?.role === "admin" && (
             <>
@@ -323,72 +314,23 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
           </ul>
         </nav>
 
-        {/* User section */}
+        {/* Help & support */}
         <div className="shrink-0 border-t border-sidebar-border p-2.5">
-          <DropdownMenu>
-            <DropdownMenuTrigger className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus:bg-sidebar-accent focus:outline-none data-[state=open]:bg-sidebar-accent">
-              <Avatar className="size-7 shrink-0">
-                {profile?.avatar_url ? (
-                  <AvatarImage
-                    src={profile.avatar_url}
-                    alt={profile.full_name ?? "Avatar"}
-                  />
-                ) : null}
-                <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
-                  {profile?.full_name?.charAt(0)?.toUpperCase() ??
-                    profile?.email?.charAt(0)?.toUpperCase() ??
-                    "U"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-medium text-sidebar-foreground">
-                  {profile?.full_name ?? "User"}
-                </p>
-                <p className="truncate text-[11px] text-sidebar-foreground/60">
-                  {profile?.email ?? ""}
-                </p>
-              </div>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              side="top"
-              sideOffset={6}
-              className="min-w-56 bg-popover text-popover-foreground border border-border"
-            >
-              <DropdownMenuItem
-                render={
-                  <Link
-                    href="/settings?tab=profile"
-                    onClick={onClose}
-                    className="text-foreground focus:bg-accent focus:text-foreground"
-                  />
-                }
-              >
-                <User className="size-4" />
-                Profile
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                render={
-                  <Link
-                    href="/settings?tab=whatsapp"
-                    onClick={onClose}
-                    className="text-foreground focus:bg-accent focus:text-foreground"
-                  />
-                }
-              >
-                <Settings className="size-4" />
-                Settings
-              </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-border" />
-              <DropdownMenuItem
-                onClick={signOut}
-                className="text-foreground focus:bg-accent focus:text-foreground"
-              >
-                <LogOut className="size-4" />
-                Sign out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <a
+            href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent("ChatNexGen support request")}`}
+            className="group flex items-start gap-2.5 rounded-xl border border-sidebar-border bg-sidebar-accent/40 p-2.5 transition-colors hover:border-primary/40 hover:bg-primary/5"
+          >
+            <span className="relative mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <LifeBuoy className="size-4" />
+              <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-emerald-500 ring-2 ring-sidebar" aria-hidden />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-xs font-semibold text-sidebar-foreground">Help &amp; Support 24×7</span>
+              <span className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-sidebar-foreground/65 group-hover:text-primary">
+                <Mail className="size-3 shrink-0" /> {SUPPORT_EMAIL}
+              </span>
+            </span>
+          </a>
         </div>
       </aside>
     </>

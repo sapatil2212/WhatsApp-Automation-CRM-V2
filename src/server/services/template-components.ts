@@ -21,7 +21,7 @@ import { ValidationError } from '../kernel';
 export const TEMPLATE_CATEGORIES = ['Marketing', 'Utility', 'Authentication'] as const;
 export type TemplateCategory = (typeof TEMPLATE_CATEGORIES)[number];
 
-export const TEMPLATE_STATUSES = ['Draft', 'Pending', 'Approved', 'Rejected'] as const;
+export const TEMPLATE_STATUSES = ['Draft', 'Pending', 'Approved', 'Rejected', 'Paused', 'Disabled'] as const;
 export type TemplateStatus = (typeof TEMPLATE_STATUSES)[number];
 
 export const TEMPLATE_HEADER_TYPES = ['none', 'text', 'image', 'video', 'document'] as const;
@@ -110,9 +110,11 @@ export function toLocalStatus(metaStatus: string): TemplateStatus {
     case 'APPROVED':
       return 'Approved';
     case 'REJECTED':
-    case 'DISABLED':
-    case 'PAUSED':
       return 'Rejected';
+    case 'PAUSED':
+      return 'Paused';
+    case 'DISABLED':
+      return 'Disabled';
     case 'PENDING':
     case 'IN_APPEAL':
     case 'PENDING_DELETION':

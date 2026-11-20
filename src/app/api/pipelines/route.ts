@@ -58,10 +58,25 @@ export async function POST(req: NextRequest) {
     if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const body = await req.json().catch(() => null)
-    const name = body?.name?.trim()
+    const name = body?.name?.trim()?.slice(0, 80)
     if (!name) return NextResponse.json({ error: 'name is required' }, { status: 400 })
 
     const withDefaultStages = body?.withDefaultStages !== false // default true
+
+    // Optional custom stage list (templates / AI designer). Sanitised here so
+    // a malformed payload can never create an unusable pipeline.
+    const customStages: Array<{ name: string; color: string }> | null = Array.isArray(body?.stages)
+      ? body.stages
+          .map((s: { name?: unknown; color?: unknown }) => ({
+            name: String(s?.name ?? '').trim().slice(0, 60),
+            color: /^#[0-9a-f]{6}$/i.test(String(s?.color ?? '')) ? String(s.color) : '#3b82f6',
+          }))
+          .filter((s: { name: string }) => s.name)
+          .slice(0, 12)
+      : null
+    if (customStages && customStages.length < 2) {
+      return NextResponse.json({ error: 'A pipeline needs at least two stages.' }, { status: 400 })
+    }
 
     const pipeline = await prisma.$transaction(async (tx) => {
       const p = await tx.pipeline.create({
@@ -72,7 +87,11 @@ export async function POST(req: NextRequest) {
         },
       })
 
-      if (withDefaultStages) {
+      if (customStages) {
+        await tx.pipelineStage.createMany({
+          data: customStages.map((s, position) => ({ pipelineId: p.id, name: s.name, color: s.color, position })),
+        })
+      } else if (withDefaultStages) {
         await tx.pipelineStage.createMany({
           data: SPEC_DEFAULT_STAGES.map((s) => ({
             pipelineId: p.id,

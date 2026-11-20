@@ -117,7 +117,7 @@ function groupMessagesByDate(messages: Message[]) {
 const STATUS_OPTIONS: { label: string; value: ConversationStatus; color: string }[] = [
   { label: "Open", value: "open", color: "text-primary" },
   { label: "Pending", value: "pending", color: "text-amber-400" },
-  { label: "Closed", value: "closed", color: "text-slate-400" },
+  { label: "Closed", value: "closed", color: "text-muted-foreground" },
 ];
 
 /**
@@ -130,7 +130,7 @@ const STATUS_OPTIONS: { label: string; value: ConversationStatus; color: string 
  * if we ever switch the asset, both spots update together.
  */
 const DOODLE_BG_CLASSES =
-  "bg-slate-950 inbox-doodle-bg bg-repeat";
+  "bg-background inbox-doodle-bg bg-repeat";
 
 export function MessageThread({
   conversation,
@@ -727,13 +727,13 @@ export function MessageThread({
   if (!conversation || !contact) {
     return (
       <div className={cn("flex flex-1 flex-col items-center justify-center", DOODLE_BG_CLASSES)}>
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-800">
-          <MessageSquare className="h-8 w-8 text-slate-600" />
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+          <MessageSquare className="h-8 w-8 text-muted-foreground" />
         </div>
-        <h3 className="mt-4 text-sm font-medium text-slate-400">
+        <h3 className="mt-4 text-sm font-medium text-muted-foreground">
           Select a conversation
         </h3>
-        <p className="mt-1 text-xs text-slate-600">
+        <p className="mt-1 text-xs text-muted-foreground">
           Choose a conversation from the left to start messaging
         </p>
       </div>
@@ -755,7 +755,7 @@ export function MessageThread({
     <div className={cn("flex flex-1 flex-col", DOODLE_BG_CLASSES)}>
       {/* Header — solid bg-slate-900 sits on top of the doodle so the
           name/avatar/dropdowns stay legible. */}
-      <div className="flex items-center justify-between gap-2 border-b border-slate-800 bg-slate-900 px-3 py-3 sm:px-4">
+      <div className="flex items-center justify-between gap-2 border-b border-border bg-card px-3 py-3 sm:px-4">
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           {/* Back-to-list button — mobile only. Hidden on lg+ where the
               conversation list is always visible next to the thread. */}
@@ -764,24 +764,24 @@ export function MessageThread({
               type="button"
               onClick={onBack}
               aria-label="Back to conversations"
-              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md text-slate-300 hover:bg-slate-800 hover:text-white lg:hidden"
+              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md text-foreground/90 hover:bg-accent hover:text-foreground lg:hidden"
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
           )}
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-slate-700 text-sm font-medium text-white">
+          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-foreground">
             {displayName.charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0">
-            <h2 className="truncate text-sm font-semibold text-white">{displayName}</h2>
-            <p className="truncate text-xs text-slate-400">{contact.phone}</p>
+            <h2 className="truncate text-sm font-semibold text-foreground">{displayName}</h2>
+            <p className="truncate text-xs text-muted-foreground">{contact.phone}</p>
           </div>
           {/* Session timer badge — hidden on the narrowest phones so
               the name + back arrow keep their room. */}
           <Badge
             variant="outline"
             className={cn(
-              "ml-1 hidden gap-1 border-slate-700 text-[10px] sm:inline-flex sm:ml-2",
+              "ml-1 hidden gap-1 border-border text-[10px] sm:inline-flex sm:ml-2",
               sessionInfo.expired ? "text-red-400" : "text-primary"
             )}
           >
@@ -804,7 +804,7 @@ export function MessageThread({
               aria-label="Refresh conversation"
               title="Refresh"
               className={cn(
-                "inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-800 hover:text-white disabled:opacity-60",
+                "inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-60",
               )}
             >
               <RefreshCw
@@ -823,7 +823,7 @@ export function MessageThread({
               "inline-flex h-7 px-2 items-center justify-center gap-1 rounded-md text-xs transition-colors border",
               showSimulator
                 ? "bg-teal-500/10 border-teal-500/30 text-teal-300"
-                : "border-slate-700 bg-slate-800/50 text-slate-400 hover:bg-slate-800 hover:text-white"
+                : "border-border bg-muted/60 text-muted-foreground hover:bg-accent hover:text-foreground"
             )}
           >
             <Sparkles className="h-3 w-3 text-teal-400" />
@@ -833,15 +833,15 @@ export function MessageThread({
           {/* Status dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger className={cn(
-                  "inline-flex items-center justify-center h-7 gap-1 px-2 text-xs rounded-md hover:bg-slate-800",
-                  currentStatus?.color ?? "text-slate-400"
+                  "inline-flex items-center justify-center h-7 gap-1 px-2 text-xs rounded-md hover:bg-accent",
+                  currentStatus?.color ?? "text-muted-foreground"
                 )}>
                 {currentStatus?.label ?? "Status"}
                 <ChevronDown className="h-3 w-3" />
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="end"
-              className="border-slate-700 bg-slate-800"
+              className="border-border bg-muted"
             >
               {STATUS_OPTIONS.map((opt) => (
                 <DropdownMenuItem
@@ -859,8 +859,8 @@ export function MessageThread({
           <DropdownMenu>
             <DropdownMenuTrigger
               className={cn(
-                "inline-flex items-center justify-center h-7 gap-1 px-2 text-xs rounded-md hover:bg-slate-800",
-                assignedAgentId ? "text-primary" : "text-slate-400"
+                "inline-flex items-center justify-center h-7 gap-1 px-2 text-xs rounded-md hover:bg-accent",
+                assignedAgentId ? "text-primary" : "text-muted-foreground"
               )}
             >
               <UserPlus className="h-3 w-3" />
@@ -869,10 +869,10 @@ export function MessageThread({
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="end"
-              className="border-slate-700 bg-slate-800"
+              className="border-border bg-muted"
             >
               {profiles.length === 0 ? (
-                <DropdownMenuItem disabled className="text-sm text-slate-500">
+                <DropdownMenuItem disabled className="text-sm text-muted-foreground">
                   No teammates available
                 </DropdownMenuItem>
               ) : (
@@ -884,7 +884,7 @@ export function MessageThread({
                       onClick={() => handleAssignChange(p.user_id)}
                       className={cn(
                         "text-sm",
-                        isSelected ? "text-primary" : "text-slate-300"
+                        isSelected ? "text-primary" : "text-foreground/90"
                       )}
                     >
                       <span className="flex-1">
@@ -898,10 +898,10 @@ export function MessageThread({
               )}
               {assignedAgentId && (
                 <>
-                  <DropdownMenuSeparator className="bg-slate-700" />
+                  <DropdownMenuSeparator className="bg-muted" />
                   <DropdownMenuItem
                     onClick={() => handleAssignChange(null)}
-                    className="text-sm text-slate-400"
+                    className="text-sm text-muted-foreground"
                   >
                     Unassign
                   </DropdownMenuItem>
@@ -924,7 +924,7 @@ export function MessageThread({
                 setShowSimulator(false);
                 setSimulatedText("");
               }}
-              className="text-[10px] text-slate-400 hover:text-white"
+              className="text-[10px] text-muted-foreground hover:text-foreground"
             >
               Cancel
             </button>
@@ -935,7 +935,7 @@ export function MessageThread({
               value={simulatedText}
               onChange={(e) => setSimulatedText(e.target.value)}
               placeholder="Ask anything (e.g. 'Do you offer teeth whitening?' or 'What are your hours?')"
-              className="flex-1 rounded-md border border-teal-500/30 bg-slate-900/60 px-3 py-1.5 text-xs text-white placeholder-slate-500 outline-none focus:border-teal-500/50"
+              className="flex-1 rounded-md border border-teal-500/30 bg-muted/40 px-3 py-1.5 text-xs text-foreground placeholder-slate-500 outline-none focus:border-teal-500/50"
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   handleSimulateSubmit();
@@ -963,8 +963,8 @@ export function MessageThread({
           </div>
         ) : messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12">
-            <p className="text-sm text-slate-500">No messages yet</p>
-            <p className="text-xs text-slate-600">
+            <p className="text-sm text-muted-foreground">No messages yet</p>
+            <p className="text-xs text-muted-foreground">
               Send a template to start the conversation
             </p>
           </div>
@@ -974,7 +974,7 @@ export function MessageThread({
               <div key={group.date}>
                 {/* Date separator */}
                 <div className="mb-4 flex items-center justify-center">
-                  <span className="rounded-full bg-slate-800 px-3 py-1 text-[10px] font-medium text-slate-400">
+                  <span className="rounded-full bg-muted px-3 py-1 text-[10px] font-medium text-muted-foreground">
                     {formatDateSeparator(group.date)}
                   </span>
                 </div>

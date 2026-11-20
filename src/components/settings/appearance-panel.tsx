@@ -152,7 +152,7 @@ function ThemeCard({
       </div>
       <div>
         <div className="text-sm font-semibold text-slate-900 dark:text-white">{name}</div>
-        <div className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+        <div className="mt-1 text-xs leading-relaxed text-muted-foreground dark:text-slate-400">
           {tagline}
         </div>
       </div>
@@ -161,9 +161,9 @@ function ThemeCard({
         aria-hidden
       >
         <span className="flex-1" style={{ background: swatch }} />
-        <span className="w-3 bg-slate-700" />
-        <span className="w-3 bg-slate-800" />
-        <span className="w-3 bg-slate-900" />
+        <span className="w-3 bg-muted" />
+        <span className="w-3 bg-muted" />
+        <span className="w-3 bg-card" />
       </div>
       <span className="sr-only">Theme id: {id}</span>
     </button>

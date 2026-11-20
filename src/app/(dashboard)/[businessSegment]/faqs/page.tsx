@@ -1,5 +1,6 @@
 "use client";
 
+import { PageSkeleton } from "@/components/ui/page-skeleton";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useParams } from "next/navigation";
@@ -149,24 +150,18 @@ export default function FaqsManagement() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  if (loading) return <PageSkeleton variant="table" />;
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
             <HelpCircle className="h-6 w-6 text-primary" />
             AI Knowledge Base & FAQs
           </h1>
-          <p className="text-slate-400 text-sm mt-1">
+          <p className="text-muted-foreground text-sm mt-1">
             Program the Q&A pairs the AI assistant uses to answer customer enquiries automatically on WhatsApp.
           </p>
         </div>
@@ -178,26 +173,26 @@ export default function FaqsManagement() {
       {/* FAQs List */}
       <div className="space-y-4">
         {faqsList.length === 0 ? (
-          <Card className="border-slate-800 bg-slate-900/60 p-12 text-center">
-            <MessageSquare className="h-12 w-12 text-slate-700 mx-auto mb-3" />
-            <p className="text-sm text-slate-400">No FAQs found. Train your bot by adding some questions!</p>
+          <Card className="border-border bg-muted/40 p-12 text-center">
+            <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+            <p className="text-sm text-muted-foreground">No FAQs found. Train your bot by adding some questions!</p>
           </Card>
         ) : (
           faqsList.map((faq) => (
-            <Card key={faq.id} className="border-slate-800 bg-slate-900/60 hover:border-slate-700 transition-all">
+            <Card key={faq.id} className="border-border bg-muted/40 hover:border-foreground/20 transition-all">
               <CardHeader className="flex flex-row items-start justify-between pb-2">
                 <div className="space-y-1.5 flex-1 pr-4">
                   <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
                     Q
                   </span>
-                  <CardTitle className="text-sm font-bold text-white leading-snug">{faq.question}</CardTitle>
+                  <CardTitle className="text-sm font-bold text-foreground leading-snug">{faq.question}</CardTitle>
                 </div>
                 <div className="flex gap-1 shrink-0">
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={() => handleOpenEdit(faq)}
-                    className="h-8 w-8 text-slate-400 hover:text-white"
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
                   >
                     <Edit2 className="h-4 w-4" />
                   </Button>
@@ -208,20 +203,20 @@ export default function FaqsManagement() {
                       setFaqToDelete(faq.id);
                       setDeleteOpen(true);
                     }}
-                    className="h-8 w-8 text-slate-400 hover:text-red-400"
+                    className="h-8 w-8 text-muted-foreground hover:text-red-400"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </CardHeader>
               <CardContent className="pt-2 text-xs space-y-3">
-                <div className="text-slate-350 leading-relaxed bg-slate-950/30 border border-slate-850 p-3 rounded-lg">
+                <div className="text-slate-350 leading-relaxed bg-background border border-slate-850 p-3 rounded-lg">
                   <span className="font-semibold text-emerald-400 block mb-1">AI ANSWER:</span>
                   {faq.answer}
                 </div>
                 {faq.keywords && (
-                  <div className="text-[10px] text-slate-500">
-                    Keywords: <span className="font-mono text-slate-400">{faq.keywords}</span>
+                  <div className="text-[10px] text-muted-foreground">
+                    Keywords: <span className="font-mono text-muted-foreground">{faq.keywords}</span>
                   </div>
                 )}
               </CardContent>
@@ -232,7 +227,7 @@ export default function FaqsManagement() {
 
       {/* Add / Edit Dialog */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="border-slate-800 bg-slate-900 text-white max-w-md">
+        <DialogContent className="border-border bg-card text-foreground max-w-md">
           <DialogHeader>
             <DialogTitle>{editingFaq ? "Edit FAQ" : "Add FAQ"}</DialogTitle>
           </DialogHeader>
@@ -244,7 +239,7 @@ export default function FaqsManagement() {
                 value={form.question}
                 onChange={(e) => setForm({ ...form, question: e.target.value })}
                 placeholder="e.g. What are your salon hours on holidays?"
-                className="h-9 border-slate-800 bg-slate-950 text-xs"
+                className="h-9 border-border bg-background text-xs"
               />
             </div>
             <div className="space-y-1">
@@ -254,7 +249,7 @@ export default function FaqsManagement() {
                 value={form.answer}
                 onChange={(e: any) => setForm({ ...form, answer: e.target.value })}
                 placeholder="Write the precise answer the chatbot should reply with..."
-                className="min-h-[100px] border-slate-800 bg-slate-950 text-xs"
+                className="min-h-[100px] border-border bg-background text-xs"
               />
             </div>
             <div className="space-y-1">
@@ -263,7 +258,7 @@ export default function FaqsManagement() {
                 value={form.keywords}
                 onChange={(e) => setForm({ ...form, keywords: e.target.value })}
                 placeholder="e.g. hours, schedule, holiday, weekend"
-                className="h-9 border-slate-800 bg-slate-950 text-xs"
+                className="h-9 border-border bg-background text-xs"
               />
             </div>
 

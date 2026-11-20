@@ -77,11 +77,11 @@ describe('category and status mapping', () => {
     expect(toLocalCategory('MARKETING')).toBe('Marketing');
   });
 
-  it('collapses every unsendable Meta status onto Rejected', () => {
+  it('maps unsendable Meta statuses to distinct local statuses', () => {
     expect(toLocalStatus('APPROVED')).toBe('Approved');
     expect(toLocalStatus('REJECTED')).toBe('Rejected');
-    expect(toLocalStatus('DISABLED')).toBe('Rejected');
-    expect(toLocalStatus('PAUSED')).toBe('Rejected');
+    expect(toLocalStatus('DISABLED')).toBe('Disabled');
+    expect(toLocalStatus('PAUSED')).toBe('Paused');
   });
 
   it('treats unknown or in-flight states as Pending', () => {

@@ -16,6 +16,9 @@
  */
 
 import {
+  sendDocumentById,
+  uploadMessageMedia,
+  uploadTemplateMedia,
   createMessageTemplate,
   deleteMessageTemplate,
   listMessageTemplates,
@@ -139,6 +142,7 @@ export class WhatsappTransport
     templateName: string;
     language?: string;
     params: string[];
+    components?: Array<Record<string, unknown>>;
     contextMessageId?: string;
   }): Promise<{ whatsappMessageId: string }> {
     const phone = this.normalise(input.to);
@@ -151,6 +155,7 @@ export class WhatsappTransport
           templateName: input.templateName,
           language: input.language,
           params: input.params,
+          components: input.components,
           contextMessageId: input.contextMessageId,
         }),
       );
@@ -286,6 +291,39 @@ export class WhatsappTransport
     }
   }
 
+  // ── Media (prescriptions, documents) ──────────────────────────────
+
+  /** Uploads a file for sending; returns Meta's media_id. */
+  async uploadMedia(input: { bytes: Uint8Array; mimeType: string; fileName: string }): Promise<string> {
+    try {
+      return await uploadMessageMedia({ phoneNumberId: this.credentials.phoneNumberId, accessToken: this.credentials.accessToken, ...input });
+    } catch (error) {
+      this.wrap(error, 'Uploading media');
+    }
+  }
+
+  /** Sample file for a template's media header review; returns the upload handle. */
+  async uploadTemplateSample(input: { bytes: Uint8Array; mimeType: string; fileName: string }): Promise<string> {
+    try {
+      const copy = new Uint8Array(input.bytes);
+      return await uploadTemplateMedia({ accessToken: this.credentials.accessToken, bytes: copy.buffer as ArrayBuffer, mimeType: input.mimeType, fileName: input.fileName });
+    } catch (error) {
+      this.wrap(error, 'Uploading the template sample');
+    }
+  }
+
+  async sendDocument(input: { to: string; mediaId: string; fileName: string; caption?: string }): Promise<{ whatsappMessageId: string }> {
+    const phone = this.normalise(input.to);
+    try {
+      const result = await this.withPhoneVariants(phone, (candidate) =>
+        sendDocumentById({ phoneNumberId: this.credentials.phoneNumberId, accessToken: this.credentials.accessToken, to: candidate, mediaId: input.mediaId, fileName: input.fileName, caption: input.caption }),
+      );
+      return { whatsappMessageId: result.messageId };
+    } catch (error) {
+      this.wrap(error, 'Sending a document');
+    }
+  }
+
   // ── TemplateTransport ─────────────────────────────────────────────
 
   async submit(input: {
@@ -293,7 +331,7 @@ export class WhatsappTransport
     language: string;
     category: MetaTemplateCategory;
     components: MetaTemplateComponentInput[];
-  }): Promise<{ status: string }> {
+  }): Promise<{ status: string; id?: string }> {
     if (!this.credentials.wabaId) {
       throw new ValidationError(
         'WABA ID is missing. Reconnect your WhatsApp Business account in Settings before submitting templates.',
@@ -308,19 +346,21 @@ export class WhatsappTransport
         category: input.category,
         components: input.components,
       });
-      return { status: result.status };
+      return { status: result.status, id: result.id ? String(result.id) : undefined };
     } catch (error) {
       this.wrap(error, 'Submitting a template');
     }
   }
 
-  async remove(input: { name: string }): Promise<void> {
+  async remove(input: { name: string; templateId?: string }): Promise<void> {
     if (!this.credentials.wabaId) return;
     try {
       await deleteMessageTemplate({
         wabaId: this.credentials.wabaId,
         accessToken: this.credentials.accessToken,
         name: input.name,
+        // With hsm_id only that exact template (one language/version) is removed.
+        templateId: input.templateId,
       });
     } catch (error) {
       this.wrap(error, 'Deleting a template');
@@ -351,6 +391,8 @@ export class WhatsappTransport
             category: template.category,
             status: template.status,
             components: (template.components ?? []) as Array<Record<string, unknown>>,
+            id: template.id ? String(template.id) : undefined,
+            rejectedReason: template.rejected_reason ?? null,
           });
         }
 

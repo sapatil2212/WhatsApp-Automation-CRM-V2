@@ -327,7 +327,7 @@ export function ContactDetailView({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="bg-slate-900 border-slate-700 text-slate-200 sm:max-w-lg w-full p-0"
+        className="bg-card border-border text-foreground/90 sm:max-w-lg w-full p-0"
       >
         {loading || !contact ? (
           <div className="flex items-center justify-center h-full">
@@ -336,21 +336,21 @@ export function ContactDetailView({
         ) : (
           <div className="flex flex-col h-full">
             {/* Header */}
-            <SheetHeader className="p-4 border-b border-slate-700/50">
+            <SheetHeader className="p-4 border-b border-border/60">
               <div className="flex items-center gap-3">
-                <Avatar className="size-12 bg-slate-800 border border-slate-700">
+                <Avatar className="size-12 bg-muted border border-border">
                   <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
                     {getInitials(contact.name)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <SheetTitle className="text-white truncate">
+                  <SheetTitle className="text-foreground truncate">
                     {contact.name || 'Unknown'}
                   </SheetTitle>
-                  <SheetDescription className="text-slate-400 text-xs mt-0.5">
+                  <SheetDescription className="text-muted-foreground text-xs mt-0.5">
                     Contact details
                   </SheetDescription>
-                  <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-slate-400">
+                  <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-muted-foreground">
                     <button
                       onClick={copyPhone}
                       className="flex items-center gap-1 hover:text-primary transition-colors cursor-pointer"
@@ -385,31 +385,31 @@ export function ContactDetailView({
               <TabsList className="bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800/60 p-1 h-9 mx-4 mt-3 gap-1 w-fit">
                 <TabsTrigger
                   value="details"
-                  className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-slate-600 dark:text-slate-400 data-active:shadow-sm px-3 transition-all duration-200"
+                  className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-muted-foreground dark:text-slate-400 data-active:shadow-sm px-3 transition-all duration-200"
                 >
                   Details
                 </TabsTrigger>
                 <TabsTrigger
                   value="tags"
-                  className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-slate-600 dark:text-slate-400 data-active:shadow-sm px-3 transition-all duration-200"
+                  className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-muted-foreground dark:text-slate-400 data-active:shadow-sm px-3 transition-all duration-200"
                 >
                   Tags
                 </TabsTrigger>
                 <TabsTrigger
                   value="notes"
-                  className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-slate-600 dark:text-slate-400 data-active:shadow-sm px-3 transition-all duration-200"
+                  className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-muted-foreground dark:text-slate-400 data-active:shadow-sm px-3 transition-all duration-200"
                 >
                   Notes
                 </TabsTrigger>
                 <TabsTrigger
                   value="custom"
-                  className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-slate-600 dark:text-slate-400 data-active:shadow-sm px-3 transition-all duration-200"
+                  className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-muted-foreground dark:text-slate-400 data-active:shadow-sm px-3 transition-all duration-200"
                 >
                   Custom Fields
                 </TabsTrigger>
                 <TabsTrigger
                   value="deals"
-                  className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-slate-600 dark:text-slate-400 data-active:shadow-sm px-3 transition-all duration-200"
+                  className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-muted-foreground dark:text-slate-400 data-active:shadow-sm px-3 transition-all duration-200"
                 >
                   Deals
                 </TabsTrigger>
@@ -419,37 +419,37 @@ export function ContactDetailView({
               <TabsContent value="details" className="flex-1 overflow-y-auto px-4 py-3">
                 <div className="space-y-3">
                   <div className="space-y-1.5">
-                    <Label className="text-slate-400 text-xs">Name</Label>
+                    <Label className="text-muted-foreground text-xs">Name</Label>
                     <Input
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
-                      className="bg-slate-800 border-slate-700 text-white h-8 text-sm"
+                      className="bg-muted border-border text-foreground h-8 text-sm"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-slate-400 text-xs">
+                    <Label className="text-muted-foreground text-xs">
                       Phone <span className="text-red-400">*</span>
                     </Label>
                     <Input
                       value={editPhone}
                       onChange={(e) => setEditPhone(e.target.value)}
-                      className="bg-slate-800 border-slate-700 text-white h-8 text-sm"
+                      className="bg-muted border-border text-foreground h-8 text-sm"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-slate-400 text-xs">Email</Label>
+                    <Label className="text-muted-foreground text-xs">Email</Label>
                     <Input
                       value={editEmail}
                       onChange={(e) => setEditEmail(e.target.value)}
-                      className="bg-slate-800 border-slate-700 text-white h-8 text-sm"
+                      className="bg-muted border-border text-foreground h-8 text-sm"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-slate-400 text-xs">Company</Label>
+                    <Label className="text-muted-foreground text-xs">Company</Label>
                     <Input
                       value={editCompany}
                       onChange={(e) => setEditCompany(e.target.value)}
-                      className="bg-slate-800 border-slate-700 text-white h-8 text-sm"
+                      className="bg-muted border-border text-foreground h-8 text-sm"
                     />
                   </div>
                   <Button
@@ -471,11 +471,11 @@ export function ContactDetailView({
               {/* Tags Tab */}
               <TabsContent value="tags" className="flex-1 overflow-y-auto px-4 py-3">
                 <div className="space-y-3">
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-muted-foreground">
                     Click a tag to add or remove it from this contact.
                   </p>
                   {allTags.length === 0 ? (
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm text-muted-foreground">
                       No tags available. Create tags in Settings.
                     </p>
                   ) : (
@@ -514,7 +514,7 @@ export function ContactDetailView({
                     value={newNote}
                     onChange={(e) => setNewNote(e.target.value)}
                     placeholder="Write a note..."
-                    className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 min-h-[60px] text-sm resize-none"
+                    className="bg-muted border-border text-foreground placeholder:text-muted-foreground min-h-[60px] text-sm resize-none"
                   />
                   <Button
                     onClick={addNote}
@@ -534,30 +534,30 @@ export function ContactDetailView({
                 <div className="flex-1 overflow-y-auto space-y-2">
                   {loadingNotes ? (
                     <div className="flex items-center justify-center py-8">
-                      <Loader2 className="size-5 animate-spin text-slate-500" />
+                      <Loader2 className="size-5 animate-spin text-muted-foreground" />
                     </div>
                   ) : notes.length === 0 ? (
-                    <p className="text-sm text-slate-500 text-center py-8">
+                    <p className="text-sm text-muted-foreground text-center py-8">
                       No notes yet.
                     </p>
                   ) : (
                     notes.map((note) => (
                       <div
                         key={note.id}
-                        className="rounded-lg bg-slate-800/50 border border-slate-700/50 p-3 group"
+                        className="rounded-lg bg-muted/50 border border-border/60 p-3 group"
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <p className="text-sm text-slate-300 whitespace-pre-wrap flex-1">
+                          <p className="text-sm text-foreground/90 whitespace-pre-wrap flex-1">
                             {note.note_text}
                           </p>
                           <button
                             onClick={() => deleteNote(note.id)}
-                            className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-all cursor-pointer shrink-0"
+                            className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-400 transition-all cursor-pointer shrink-0"
                           >
                             <Trash2 className="size-3.5" />
                           </button>
                         </div>
-                        <p className="text-xs text-slate-500 mt-1.5">
+                        <p className="text-xs text-muted-foreground mt-1.5">
                           {new Date(note.created_at).toLocaleDateString('en-US', {
                             month: 'short',
                             day: 'numeric',
@@ -576,17 +576,17 @@ export function ContactDetailView({
               <TabsContent value="custom" className="flex-1 overflow-y-auto px-4 py-3">
                 {loadingCustom ? (
                   <div className="flex items-center justify-center py-8">
-                    <Loader2 className="size-5 animate-spin text-slate-500" />
+                    <Loader2 className="size-5 animate-spin text-muted-foreground" />
                   </div>
                 ) : customFields.length === 0 ? (
-                  <p className="text-sm text-slate-500 text-center py-8">
+                  <p className="text-sm text-muted-foreground text-center py-8">
                     No custom fields defined. Create them in Settings.
                   </p>
                 ) : (
                   <div className="space-y-3">
                     {customFields.map((field) => (
                       <div key={field.id} className="space-y-1.5">
-                        <Label className="text-slate-400 text-xs capitalize">
+                        <Label className="text-muted-foreground text-xs capitalize">
                           {field.field_name}
                         </Label>
                         <Input
@@ -598,7 +598,7 @@ export function ContactDetailView({
                             }))
                           }
                           placeholder={`Enter ${field.field_name}...`}
-                          className="bg-slate-800 border-slate-700 text-white h-8 text-sm placeholder:text-slate-500"
+                          className="bg-muted border-border text-foreground h-8 text-sm placeholder:text-muted-foreground"
                         />
                       </div>
                     ))}
@@ -626,16 +626,16 @@ export function ContactDetailView({
                     <Loader2 className="size-5 animate-spin text-primary" />
                   </div>
                 ) : deals.length === 0 ? (
-                  <p className="text-xs text-slate-500">No deals yet</p>
+                  <p className="text-xs text-muted-foreground">No deals yet</p>
                 ) : (
                   <div className="space-y-2">
                     {deals.map((deal) => (
                       <div
                         key={deal.id}
-                        className="rounded-lg border border-slate-700 bg-slate-800/50 p-3"
+                        className="rounded-lg border border-border bg-muted/50 p-3"
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <p className="text-sm font-medium text-white">
+                          <p className="text-sm font-medium text-foreground">
                             {deal.title}
                           </p>
                           {deal.stage && (
@@ -650,7 +650,7 @@ export function ContactDetailView({
                             </span>
                           )}
                         </div>
-                        <div className="mt-1.5 flex items-center justify-between text-xs text-slate-400">
+                        <div className="mt-1.5 flex items-center justify-between text-xs text-muted-foreground">
                           <span className="flex items-center gap-1">
                             <DollarSign className="size-3" />
                             {new Intl.NumberFormat('en-US', {

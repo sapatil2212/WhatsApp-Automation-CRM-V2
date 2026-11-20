@@ -5,23 +5,24 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  ArrowLeft, Loader2, Eye, EyeOff, QrCode,
-  Paperclip, CheckCircle, X, PartyPopper, Zap, TrendingUp, Crown
+  ArrowRight,
+  CheckCircle,
+  Eye,
+  EyeOff,
+  Loader2,
+  Lock,
+  Mail,
+  Paperclip,
+  PartyPopper,
+  QrCode,
+  Sparkles,
+  X,
 } from "lucide-react";
-import { InteractiveGrid } from "@/components/marketing/interactive-grid";
-import { useTheme } from "@/hooks/use-theme";
 import { AnimatePresence, motion } from "framer-motion";
+import { AuthShell } from "@/components/auth/auth-shell";
+import { AuthField, authInputClass } from "@/components/auth/auth-field";
 
 const WHATSAPP_CONTACT = "917745868073";
 
@@ -199,7 +200,6 @@ function RenewalModal({
 }
 
 function LoginPageInner() {
-  const { mode } = useTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -266,7 +266,18 @@ function LoginPageInner() {
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await res.json();
+      let data: any = {};
+      const contentType = res.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        data = await res.json().catch(() => ({}));
+      } else {
+        const text = await res.text().catch(() => "");
+        throw new Error(
+          res.status === 404
+            ? "Authentication endpoint not available. Please refresh the page and verify your connection."
+            : `Authentication error (${res.status}): ${text.slice(0, 100) || "Invalid server response"}`
+        );
+      }
 
       if (!res.ok) {
         // If subscription is expired, display the QR renewal modal
@@ -316,44 +327,48 @@ function LoginPageInner() {
   };
 
   return (
-    <div className="relative min-h-screen w-full flex items-center justify-center bg-[var(--m-bg-primary)] px-4 overflow-hidden select-none">
-      <InteractiveGrid gridSize={40} className="opacity-20" />
-      <div className="absolute top-[20%] left-[20%] w-[50%] h-[50%] rounded-full bg-emerald-500/5 blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[20%] right-[20%] w-[50%] h-[50%] rounded-full bg-teal-500/5 blur-[120px] pointer-events-none" />
-
-      <Link
-        href="/"
-        className="absolute top-6 left-6 inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--m-text-tertiary)] hover:text-[var(--m-text-primary)] transition-colors bg-[var(--m-bg-secondary)]/60 border border-[var(--m-border-glass)] px-3 py-1.5 rounded-lg backdrop-blur"
+    <>
+      <AuthShell
+        variant="login"
+        topRight={
+          <p className="text-[var(--m-text-tertiary)]">
+            Not a member yet?{" "}
+            <Link href="/signup" className="font-semibold text-emerald-500 hover:text-emerald-400">
+              Sign up
+            </Link>
+          </p>
+        }
       >
-        <ArrowLeft className="size-3.5" /> Back Home
-      </Link>
+        <div>
+          <div className="mb-8">
+            <p className="text-xs uppercase tracking-wide text-[var(--m-text-tertiary)]">Welcome back</p>
+            <h1 className="mt-1 text-2xl font-bold text-[var(--m-text-heading)]">Log in to ChatNexGen</h1>
+          </div>
 
-      <Card className="w-full max-w-sm border border-[var(--m-border-glass)]/40 bg-[var(--m-bg-glass)]/70 backdrop-blur-xl relative z-10 p-6 md:p-8 shadow-none transition-all duration-300">
-        <CardHeader className="items-center text-center p-0 pb-5">
-          <CardTitle className="text-lg font-bold tracking-tight text-[var(--m-text-heading)]">
-            Sign In
-          </CardTitle>
-          <CardDescription className="text-[11px] text-[var(--m-text-tertiary)] mt-1">
-            Access your AI WhatsApp Automation Dashboard
-          </CardDescription>
-        </CardHeader>
-
-        <CardContent className="p-0">
-          <form onSubmit={handleLogin} className="flex flex-col gap-3.5">
+          <form onSubmit={handleLogin} className="flex flex-col gap-4">
             {isVerified && (
-              <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-[11px] text-emerald-400 text-center">
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-start gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2.5 text-[11px] leading-relaxed text-emerald-400"
+              >
+                <CheckCircle className="mt-px size-3.5 shrink-0" />
                 Email verified successfully! You can now sign in.
-              </div>
+              </motion.div>
             )}
             {errorParam && (
-              <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-[11px] text-red-400 text-center">
+              <div className="rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2.5 text-[11px] text-red-400">
                 {errorParam === "invalid-verification-token"
                   ? "Invalid or expired verification link."
                   : "Email verification failed."}
               </div>
             )}
             {error && (
-              <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-[11px] text-red-400 text-center leading-relaxed">
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2.5 text-[11px] leading-relaxed text-red-400"
+              >
                 {error}
                 {error.includes("subscription has ended") && (
                   <button
@@ -379,79 +394,77 @@ function LoginPageInner() {
                       }
                       setShowRenewalModal(true);
                     }}
-                    className="block w-full mt-2 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-bold text-[10px] uppercase tracking-wider transition-all"
+                    className="mt-2 block w-full rounded-lg bg-emerald-500 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-900 transition-all hover:bg-emerald-400"
                   >
                     Subscribe Now
                   </button>
                 )}
-              </div>
+              </motion.div>
             )}
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="email" className="text-[11px] font-semibold text-[var(--m-text-secondary)]/90">Email Address</Label>
+            <AuthField label="Email address" htmlFor="email">
               <Input
                 id="email"
                 type="email"
-                placeholder="Enter your email"
+                placeholder="you@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoComplete="email"
                 disabled={loading}
-                className="h-8.5 px-3 border-[var(--m-input-border)] bg-[var(--m-input-bg)] text-[11px] text-[var(--m-text-primary)] focus-visible:border-emerald-500/70 focus-visible:ring-emerald-500/10 transition-all"
+                className={authInputClass}
               />
-            </div>
+            </AuthField>
 
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password" className="text-[11px] font-semibold text-[var(--m-text-secondary)]/90">Password</Label>
-                <Link href="/forgot-password" className="text-[10px] text-emerald-500 hover:text-emerald-400 font-medium transition-colors">Forgot password?</Link>
-              </div>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete="current-password"
-                  disabled={loading}
-                  className="h-8.5 pl-3 pr-9 w-full border-[var(--m-input-border)] bg-[var(--m-input-bg)] text-[11px] text-[var(--m-text-primary)] focus-visible:border-emerald-500/70 focus-visible:ring-emerald-500/10 transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-2 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
-                >
-                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                </button>
-              </div>
-            </div>
+            <AuthField label="Password" htmlFor="password">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+                disabled={loading}
+                className={`${authInputClass} pr-10`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label="Toggle password visibility"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--m-text-muted)] transition-colors hover:text-[var(--m-text-primary)]"
+              >
+                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </button>
+            </AuthField>
 
-            <Button
+            <button
               type="submit"
               disabled={loading}
               id="sign-in-btn"
-              className="mt-1 h-8.5 w-full bg-emerald-500 text-white hover:bg-emerald-400 font-bold text-[11px] transition-all duration-200 border border-emerald-400/20"
+              className="mt-1 flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#00DF82] text-[13px] font-semibold text-slate-950 transition-colors hover:bg-[#00c673] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <Loader2 className="size-3.5 animate-spin" />
-                  Authenticating…
-                </span>
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Signing in…
+                </>
               ) : (
-                "Sign In"
+                "Continue"
               )}
-            </Button>
+            </button>
           </form>
 
-          <p className="mt-4.5 text-center text-[11px] text-[var(--m-text-muted)]">
-            Don&apos;t have an account?{" "}
-            <Link href="/signup" className="text-emerald-500 hover:text-emerald-400 font-bold transition-colors">Create Account</Link>
-          </p>
-        </CardContent>
-      </Card>
+          <div className="mt-6 text-center">
+            <Link
+              href="/forgot-password"
+              className="text-xs text-[var(--m-text-secondary)] hover:text-emerald-500"
+            >
+              Forgot Password?
+            </Link>
+          </div>
+        </div>
+      </AuthShell>
 
       {/* Renewal Modal */}
       <AnimatePresence>
@@ -463,7 +476,7 @@ function LoginPageInner() {
           />
         )}
       </AnimatePresence>
-    </div>
+    </>
   );
 }
 

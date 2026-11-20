@@ -141,6 +141,42 @@ export const broadcastController = {
     },
   }),
 
+  pause: createHandler({
+    operation: 'broadcasts.pause',
+    auth: 'tenant',
+    params: broadcastParamsSchema,
+    response: broadcastDtoSchema,
+    async handle({ params, ctx, db }) {
+      assertTenant(ctx);
+      const service = BroadcastService.create(db, ctx.userId, TemplateService.create(db, ctx.userId));
+      return result(await service.pause(params.id), { message: 'Campaign paused.' });
+    },
+  }),
+
+  resume: createHandler({
+    operation: 'broadcasts.resume',
+    auth: 'tenant',
+    params: broadcastParamsSchema,
+    response: broadcastDtoSchema,
+    async handle({ params, ctx, db }) {
+      assertTenant(ctx);
+      const service = BroadcastService.create(db, ctx.userId, TemplateService.create(db, ctx.userId));
+      return result(await service.resume(params.id), { message: 'Campaign resumed.' });
+    },
+  }),
+
+  cancel: createHandler({
+    operation: 'broadcasts.cancel',
+    auth: 'tenant',
+    params: broadcastParamsSchema,
+    response: broadcastDtoSchema,
+    async handle({ params, ctx, db }) {
+      assertTenant(ctx);
+      const service = BroadcastService.create(db, ctx.userId, TemplateService.create(db, ctx.userId));
+      return result(await service.cancel(params.id), { message: 'Campaign cancelled.' });
+    },
+  }),
+
   dispatch: createHandler({
     operation: 'broadcasts.dispatch',
     auth: 'tenant',

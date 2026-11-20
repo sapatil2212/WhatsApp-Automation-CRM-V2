@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { invalidateBookingSlugs } from '@/server/services/booking-slug';
 import { cookies } from 'next/headers'
 import { verifyAccessToken, rotateRefreshToken } from '@/lib/auth'
 
@@ -122,6 +123,7 @@ export async function PATCH(req: NextRequest) {
         where: { userId: payload.userId }
       })
       if (hasBusiness) {
+        invalidateBookingSlugs();
         await prisma.businessProfile.update({
           where: { userId: payload.userId },
           data: { businessName: trimmed || null }

@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import { registerInboxRealtime } from '@/server/realtime/inbox-events'
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
@@ -11,6 +12,9 @@ export const prisma =
   })
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+
+// Inbox realtime: broadcast message/conversation writes to the tenant room.
+registerInboxRealtime(prisma)
 
 /**
  * Creates a scoped Prisma client that enforces tenant isolation.

@@ -90,7 +90,8 @@ describe('TENANT_SCOPES', () => {
       .filter(([, scope]) => scope.kind === 'global')
       .map(([name, scope]) => ({ name, reason: (scope as { reason: string }).reason }));
 
-    expect(globals.map((entry) => entry.name).sort()).toEqual(['RefreshToken', 'Tenant', 'User']);
+    // Platform CMS tables are managed by super admins and have no tenant column.
+    expect(globals.map((entry) => entry.name).sort()).toEqual(['CmsAnnouncement', 'CmsArticle', 'CmsChangelog', 'CmsSetting', 'RefreshToken', 'Tenant', 'User']);
     for (const entry of globals) {
       expect(entry.reason.length, `${entry.name} needs a justification`).toBeGreaterThan(10);
     }

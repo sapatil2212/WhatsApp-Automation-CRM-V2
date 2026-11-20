@@ -38,7 +38,7 @@ export function SpotlightCard({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className={cn(
-        "relative rounded-xl border border-[var(--m-border-primary)] bg-[var(--m-bg-card)] backdrop-blur-md overflow-hidden transition-all duration-300",
+        "relative rounded-xl border border-[var(--m-border-primary)] bg-[var(--m-bg-card)] backdrop-blur-md overflow-hidden transition-[border-color,box-shadow] duration-500 ease-out",
         interactive &&
           "hover:border-[var(--m-border-secondary)] hover:shadow-lg",
         className
@@ -46,9 +46,9 @@ export function SpotlightCard({
       {...props}
     >
       {/* Background Spotlight Sweep */}
-      {interactive && isHovered && (
+      {interactive && (
         <div
-          className="absolute pointer-events-none z-0 transition-opacity duration-300"
+          className="absolute pointer-events-none z-0 transition-opacity duration-500 ease-out"
           style={{
             width: `${glowSize}px`,
             height: `${glowSize}px`,
@@ -57,7 +57,7 @@ export function SpotlightCard({
             left: `${coords.x - glowSize / 2}px`,
             top: `${coords.y - glowSize / 2}px`,
             mixBlendMode: "var(--m-spotlight-blend)" as any,
-            opacity: "var(--m-spotlight-opacity)" as any,
+            opacity: isHovered ? ("var(--m-spotlight-opacity)" as any) : 0,
           }}
         />
       )}

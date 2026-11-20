@@ -293,10 +293,10 @@ export function ProfileForm() {
   return (
     <div className="space-y-6">
       {/* Profile Edit Card */}
-      <Card className="bg-slate-900/40 border-slate-800">
+      <Card className="bg-muted/40 border-border">
         <CardHeader>
-          <CardTitle className="text-white">Profile</CardTitle>
-          <CardDescription className="text-slate-400">
+          <CardTitle className="text-foreground">Profile</CardTitle>
+          <CardDescription className="text-muted-foreground">
             Your personal and business details. Update your information below.
           </CardDescription>
         </CardHeader>
@@ -337,13 +337,13 @@ export function ProfileForm() {
                     variant="ghost"
                     onClick={onRemoveAvatar}
                     disabled={saving}
-                    className="text-slate-400 hover:text-white"
+                    className="text-muted-foreground hover:text-foreground"
                   >
                     <Trash2 className="size-4" />
                     Remove
                   </Button>
                 )}
-                <p className="w-full text-xs text-slate-500">
+                <p className="w-full text-xs text-muted-foreground">
                   PNG, JPG, WebP, or GIF. Up to 2 MB.
                 </p>
               </div>
@@ -352,7 +352,7 @@ export function ProfileForm() {
             {/* Form fields - 2 columns */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="profile-full-name" className="text-slate-200">
+                <Label htmlFor="profile-full-name" className="text-foreground/90">
                   <UserIcon className="inline size-3.5 mr-1" />
                   Display Name
                 </Label>
@@ -368,7 +368,7 @@ export function ProfileForm() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="profile-email" className="text-slate-200">
+                <Label htmlFor="profile-email" className="text-foreground/90">
                   <Mail className="inline size-3.5 mr-1" />
                   Email
                 </Label>
@@ -383,7 +383,7 @@ export function ProfileForm() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="profile-business-name" className="text-slate-200">
+                <Label htmlFor="profile-business-name" className="text-foreground/90">
                   <Building2 className="inline size-3.5 mr-1" />
                   Business Name
                 </Label>
@@ -397,7 +397,7 @@ export function ProfileForm() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="profile-business-type" className="text-slate-200">
+                <Label htmlFor="profile-business-type" className="text-foreground/90">
                   <Building2 className="inline size-3.5 mr-1" />
                   Business Type
                 </Label>
@@ -411,7 +411,7 @@ export function ProfileForm() {
               </div>
 
               <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="profile-phone" className="text-slate-200">
+                <Label htmlFor="profile-phone" className="text-foreground/90">
                   <Phone className="inline size-3.5 mr-1" />
                   Phone Number
                 </Label>
@@ -426,7 +426,7 @@ export function ProfileForm() {
             </div>
 
             {!profileData && (
-              <p className="flex items-center gap-2 text-sm text-slate-400">
+              <p className="flex items-center gap-2 text-sm text-muted-foreground">
                 <CircleAlert className="size-4" />
                 Loading your profile…
               </p>
@@ -449,29 +449,29 @@ export function ProfileForm() {
       </Card>
 
       {/* Account Details Card — Read-only info */}
-      <Card className="bg-slate-900/40 border-slate-800">
+      <Card className="bg-muted/40 border-border">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-white">
+          <CardTitle className="flex items-center gap-2 text-foreground">
             <Shield className="size-4 text-primary" />
             Account Details
           </CardTitle>
-          <CardDescription className="text-slate-400">
+          <CardDescription className="text-muted-foreground">
             Your account status, subscription, and system information.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {/* Role */}
-            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Role</p>
-              <p className="text-sm font-semibold text-slate-200 capitalize">
+            <div className="rounded-lg border border-border bg-muted/40 p-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Role</p>
+              <p className="text-sm font-semibold text-foreground/90 capitalize">
                 {account?.role ?? 'user'}
               </p>
             </div>
 
             {/* Verification Status */}
-            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Account Status</p>
+            <div className="rounded-lg border border-border bg-muted/40 p-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Account Status</p>
               <p className="flex items-center gap-1.5 text-sm font-semibold">
                 {account?.isVerified ? (
                   <>
@@ -488,8 +488,8 @@ export function ProfileForm() {
             </div>
 
             {/* Email Verified */}
-            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Email Verified</p>
+            <div className="rounded-lg border border-border bg-muted/40 p-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Email Verified</p>
               <p className="flex items-center gap-1.5 text-sm font-semibold">
                 {account?.isEmailVerified ? (
                   <>
@@ -506,19 +506,19 @@ export function ProfileForm() {
             </div>
 
             {/* Selected Plan */}
-            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+            <div className="rounded-lg border border-border bg-muted/40 p-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
                 <CreditCard className="inline size-3 mr-1" />
                 Plan
               </p>
-              <p className="text-sm font-semibold text-slate-200">
+              <p className="text-sm font-semibold text-foreground/90">
                 {account?.selectedPlan ? planLabels[account.selectedPlan] || account.selectedPlan : 'No Plan'}
               </p>
             </div>
 
             {/* Subscription Expiry */}
-            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+            <div className="rounded-lg border border-border bg-muted/40 p-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
                 <Clock className="inline size-3 mr-1" />
                 Subscription
               </p>
@@ -533,14 +533,14 @@ export function ProfileForm() {
                     {isSubscriptionActive ? `Active until ${subscriptionExpiry}` : `Expired on ${subscriptionExpiry}`}
                   </>
                 ) : (
-                  <span className="text-slate-400">Not subscribed</span>
+                  <span className="text-muted-foreground">Not subscribed</span>
                 )}
               </p>
             </div>
 
             {/* Payment Proof */}
-            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Payment Proof</p>
+            <div className="rounded-lg border border-border bg-muted/40 p-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Payment Proof</p>
               <p className="flex items-center gap-1.5 text-sm font-semibold">
                 {account?.paymentProofAttached ? (
                   <>
@@ -549,42 +549,42 @@ export function ProfileForm() {
                   </>
                 ) : (
                   <>
-                    <XCircle className="size-3.5 text-slate-500" />
-                    <span className="text-slate-400">Not Submitted</span>
+                    <XCircle className="size-3.5 text-muted-foreground" />
+                    <span className="text-muted-foreground">Not Submitted</span>
                   </>
                 )}
               </p>
             </div>
 
             {/* Joined Date */}
-            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+            <div className="rounded-lg border border-border bg-muted/40 p-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
                 <Calendar className="inline size-3 mr-1" />
                 Joined
               </p>
-              <p className="text-sm font-semibold text-slate-200">{joined}</p>
+              <p className="text-sm font-semibold text-foreground/90">{joined}</p>
             </div>
 
             {/* Tenant Info */}
             {tenant && (
-              <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
-                <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+              <div className="rounded-lg border border-border bg-muted/40 p-3">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
                   <Building2 className="inline size-3 mr-1" />
                   Workspace
                 </p>
-                <p className="text-sm font-semibold text-slate-200">
+                <p className="text-sm font-semibold text-foreground/90">
                   {tenant.name || 'Default Workspace'}
                 </p>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-muted-foreground mt-0.5">
                   {tenant.isActive ? 'Active' : 'Inactive'} · Plan: {tenant.plan || 'None'}
                 </p>
               </div>
             )}
 
             {/* User ID */}
-            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3 sm:col-span-2 lg:col-span-3">
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">User ID</p>
-              <p className="break-all font-mono text-xs text-slate-400">
+            <div className="rounded-lg border border-border bg-muted/40 p-3 sm:col-span-2 lg:col-span-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">User ID</p>
+              <p className="break-all font-mono text-xs text-muted-foreground">
                 {account?.id ?? '—'}
               </p>
             </div>

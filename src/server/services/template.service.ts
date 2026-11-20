@@ -46,6 +46,9 @@ export interface MetaTemplateSummary {
   category: string;
   status: string;
   components: Array<Record<string, unknown>>;
+  /** Meta template id and rejection reason, when Meta reports them. */
+  id?: string;
+  rejectedReason?: string | null;
 }
 
 /**
@@ -58,8 +61,8 @@ export interface TemplateTransport {
     language: string;
     category: ReturnType<typeof toMetaCategory>;
     components: ReturnType<typeof buildTemplateComponents>['components'];
-  }): Promise<{ status: string }>;
-  remove(input: { name: string }): Promise<void>;
+  }): Promise<{ status: string; id?: string }>;
+  remove(input: { name: string; templateId?: string }): Promise<void>;
   listAll(): Promise<{ templates: MetaTemplateSummary[]; truncated: boolean }>;
 }
 

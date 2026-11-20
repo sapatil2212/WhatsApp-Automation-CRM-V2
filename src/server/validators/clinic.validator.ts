@@ -247,7 +247,7 @@ export const availabilityQuerySchema = z.object({
   doctorId: idSchema,
   from: dateOnlyInputSchema.optional(),
   /** How many days forward to compute. */
-  days: z.coerce.number().int().min(1).max(30).default(7),
+  days: z.coerce.number().int().min(1).max(31).default(7),
 });
 export type AvailabilityQuery = z.infer<typeof availabilityQuerySchema>;
 

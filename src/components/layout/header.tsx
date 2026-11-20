@@ -4,6 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
+import { getBusinessSegment } from "@/lib/business/terminology";
+import { GlobalSearch } from "@/components/layout/global-search";
+import { NotificationBell } from "@/components/layout/notification-bell";
 import { LogOut, Menu, Settings as SettingsIcon, User, Sun, Moon } from "lucide-react";
 import {
   Avatar,
@@ -26,13 +29,12 @@ const pageTitles: Record<string, string> = {
   "/campaigns": "Campaigns",
   "/automations": "Automations",
   "/settings": "Settings",
-  "/healthcare/dashboard": "AI Booking Dashboard",
-  "/healthcare/appointments": "Bookings & Appointments",
+  "/templates": "Templates",
+  "/flows": "Flows",
+  "/connections": "Integrations",
+  "/healthcare/appointments": "Appointments",
   "/healthcare/setup": "Business Setup",
-  "/healthcare/doctors": "AI Agents & Staff",
-  "/healthcare/services": "Services Offered",
-  "/healthcare/faqs": "AI Knowledge Base (FAQs)",
-  "/healthcare/settings": "AI Agent Settings",
+  "/healthcare/faqs": "AI Knowledge Base",
   "/healthcare/logs": "AI Chat Logs",
 };
 
@@ -55,6 +57,7 @@ export function Header({ onOpenSidebar }: HeaderProps) {
   const { profile, signOut } = useAuth();
   const { mode, setMode } = useTheme();
   const title = getPageTitle(pathname);
+  const segment = getBusinessSegment(profile?.business_type);
 
   const initial =
     profile?.full_name?.charAt(0)?.toUpperCase() ??
@@ -78,7 +81,12 @@ export function Header({ onOpenSidebar }: HeaderProps) {
         </h1>
       </div>
 
+      <div className="flex min-w-0 flex-1 justify-end px-1 sm:justify-center sm:px-2">
+        <GlobalSearch bookingsHref={`/${segment}/appointments`} setupHref={`/${segment}/setup`} />
+      </div>
+
       <div className="flex items-center gap-2.5">
+        <NotificationBell />
         {/* Sun / Moon Toggle */}
         <button
           type="button"
@@ -141,7 +149,7 @@ export function Header({ onOpenSidebar }: HeaderProps) {
             <DropdownMenuItem
               render={
                 <Link
-                  href="/settings?tab=whatsapp"
+                  href="/connections"
                   className="text-foreground focus:bg-accent focus:text-foreground"
                 />
               }

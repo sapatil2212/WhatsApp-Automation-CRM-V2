@@ -18,6 +18,21 @@ interface PhonePreviewProps {
   buttons?: PreviewButton[];
   businessName?: string;
   theme?: 'light' | 'dark';
+  /** Sample values for body {{1}}..{{n}} — shown in place of the placeholders. */
+  bodySamples?: string[];
+  /** Sample value for a text header {{1}}. */
+  headerSample?: string;
+  /** Local object URL of the sample media, rendered instead of the placeholder. */
+  mediaPreviewUrl?: string;
+}
+
+function samplesToMap(samples?: string[]): Record<number, string> | undefined {
+  if (!samples?.length) return undefined;
+  const map: Record<number, string> = {};
+  samples.forEach((value, i) => {
+    if (value?.trim()) map[i + 1] = value;
+  });
+  return map;
 }
 
 /** Render {{n}} placeholders with sample values or a greyed span */
@@ -28,10 +43,10 @@ function fillPreview(text: string, isDark: boolean, sampleMap?: Record<number, s
 
   if (!text) return [<span key="empty" className={mutedColor}>Your message body appears here…</span>];
 
-  const parts = text.split(/(\{\{\d+\}\}|\n)/g);
+  const parts = text.split(/(\{\{\s*\d+\s*\}\}|\n)/g);
   return parts.map((part, i) => {
     if (part === '\n') return <br key={i} />;
-    const varMatch = part.match(/^\{\{(\d+)\}\}$/);
+    const varMatch = part.match(/^\{\{\s*(\d+)\s*\}\}$/);
     if (varMatch) {
       const n = parseInt(varMatch[1], 10);
       const sample = sampleMap?.[n];
@@ -41,7 +56,18 @@ function fillPreview(text: string, isDark: boolean, sampleMap?: Record<number, s
         <span key={i} className={`rounded ${varBg} px-1.5 ${mutedColor} text-[11px]`}>{`{{${n}}}`}</span>
       );
     }
-    return <span key={i} className={textColor}>{part}</span>;
+    // WhatsApp inline formatting: *bold*, _italic_, ~strike~
+    const fmt = part.split(/(\*[^*\n]+\*|_[^_\n]+_|~[^~\n]+~)/g);
+    return (
+      <span key={i} className={textColor}>
+        {fmt.map((seg, j) => {
+          if (/^\*[^*]+\*$/.test(seg)) return <strong key={j}>{seg.slice(1, -1)}</strong>;
+          if (/^_[^_]+_$/.test(seg)) return <em key={j}>{seg.slice(1, -1)}</em>;
+          if (/^~[^~]+~$/.test(seg)) return <s key={j}>{seg.slice(1, -1)}</s>;
+          return seg;
+        })}
+      </span>
+    );
   });
 }
 
@@ -67,6 +93,9 @@ export function PhonePreview({
   buttons = [],
   businessName = 'Your Business',
   theme = 'light',
+  bodySamples,
+  headerSample,
+  mediaPreviewUrl,
 }: PhonePreviewProps) {
   const hasContent = bodyText || headerText || footerText || buttons.length > 0;
   const isDark = theme === 'dark';
@@ -76,9 +105,9 @@ export function PhonePreview({
   const statusBarText = isDark ? 'text-white/80' : 'text-slate-800';
   const headerBg = isDark ? 'bg-[#1f2c34]' : 'bg-[#008069]';
   const avatarBg = isDark ? 'bg-emerald-700' : 'bg-[#005e54]';
-  const titleText = isDark ? 'text-[#e9edef]' : 'text-white';
+  const titleText = isDark ? 'text-[#e9edef]' : 'text-foreground';
   const subText = isDark ? 'text-[#8696a0]' : 'text-emerald-100/80';
-  const iconColor = isDark ? 'text-[#aebac1]' : 'text-white';
+  const iconColor = isDark ? 'text-[#aebac1]' : 'text-foreground';
   
   // Chat Wallpapers
   const darkWallpaper = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='100' height='100' fill='%23111b21'/%3E%3Cpath d='M25 25L75 75M75 25L25 75' stroke='%23ffffff05' stroke-width='1'/%3E%3C/svg%3E")`;
@@ -127,7 +156,7 @@ export function PhonePreview({
 
         {/* WhatsApp header bar */}
         <div className={`flex items-center gap-2.5 ${headerBg} px-3 py-2.5 z-10 transition-colors duration-300`}>
-          <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${avatarBg} text-xs font-bold text-white transition-colors duration-300`}>
+          <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${avatarBg} text-xs font-bold text-foreground transition-colors duration-300`}>
             {businessName.charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0 flex-1">
@@ -176,16 +205,23 @@ export function PhonePreview({
                         animate={{ opacity: 1 }}
                         className={`mb-1 text-[12px] font-semibold ${headerTextColor}`}
                       >
-                        {headerText}
+                        {headerSample?.trim() ? headerText.replace(/\{\{\s*1\s*\}\}/, headerSample) : headerText}
                       </motion.p>
                     )}
                     {(headerType === 'image' || headerType === 'video' || headerType === 'document') && (
-                      <HeaderMedia type={headerType} isDark={isDark} />
+                      mediaPreviewUrl && headerType === 'image' ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={mediaPreviewUrl} alt="Header sample" className="mb-1.5 max-h-[140px] w-full rounded-md object-cover" />
+                      ) : mediaPreviewUrl && headerType === 'video' ? (
+                        <video src={mediaPreviewUrl} className="mb-1.5 max-h-[140px] w-full rounded-md object-cover" muted />
+                      ) : (
+                        <HeaderMedia type={headerType} isDark={isDark} />
+                      )
                     )}
 
                     {/* Body */}
                     <p className="whitespace-pre-wrap text-[12px] leading-[1.5]">
-                      {fillPreview(bodyText || '', isDark)}
+                      {fillPreview(bodyText || '', isDark, samplesToMap(bodySamples))}
                     </p>
 
                     {/* Footer */}
@@ -240,7 +276,7 @@ export function PhonePreview({
           <div className={`flex-1 rounded-full ${inputBg} px-3 py-1.5 text-[11px] ${inputPlaceholderColor} transition-colors`}>
             Type a message
           </div>
-          <div className={`flex h-7 w-7 items-center justify-center rounded-full ${sendBtnBg} text-white`}>
+          <div className={`flex h-7 w-7 items-center justify-center rounded-full ${sendBtnBg} text-foreground`}>
             <svg viewBox="0 0 24 24" className="size-3.5 fill-current">
               <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
             </svg>
@@ -254,7 +290,7 @@ export function PhonePreview({
       </div>
 
       {/* Label */}
-      <p className="mt-3 text-center text-[11px] text-slate-500 dark:text-slate-400">
+      <p className="mt-3 text-center text-[11px] text-muted-foreground dark:text-slate-400">
         Live WhatsApp Preview
       </p>
     </div>

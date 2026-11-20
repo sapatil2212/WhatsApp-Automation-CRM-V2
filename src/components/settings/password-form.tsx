@@ -76,13 +76,13 @@ export function PasswordForm() {
   };
 
   return (
-    <Card className="bg-slate-900/40 border-slate-800">
+    <Card className="bg-muted/40 border-border">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-white">
+        <CardTitle className="flex items-center gap-2 text-foreground">
           <KeyRound className="size-4 text-primary" />
           Change Password
         </CardTitle>
-        <CardDescription className="text-slate-400">
+        <CardDescription className="text-muted-foreground">
           Use at least {MIN_PASSWORD} characters. You will stay signed in on
           this device after changing it.
         </CardDescription>
@@ -91,7 +91,7 @@ export function PasswordForm() {
       <CardContent>
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="current-password" className="text-slate-200">
+            <Label htmlFor="current-password" className="text-foreground/90">
               Current password
             </Label>
             <div className="relative">
@@ -108,7 +108,7 @@ export function PasswordForm() {
               <button
                 type="button"
                 onClick={() => setShowCurrent(!showCurrent)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
               >
                 {showCurrent ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
@@ -117,7 +117,7 @@ export function PasswordForm() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="new-password" className="text-slate-200">
+              <Label htmlFor="new-password" className="text-foreground/90">
                 New password
               </Label>
               <div className="relative">
@@ -135,14 +135,14 @@ export function PasswordForm() {
                 <button
                   type="button"
                   onClick={() => setShowNew(!showNew)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {showNew ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 </button>
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirm-password" className="text-slate-200">
+              <Label htmlFor="confirm-password" className="text-foreground/90">
                 Confirm new password
               </Label>
               <Input

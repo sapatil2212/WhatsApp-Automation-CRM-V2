@@ -97,11 +97,12 @@ export async function POST(req: NextRequest) {
   const hasHardErrors = issues.some((i) => i.severity === "error");
 
   // ---- 2. Build a compact, model-friendly description of the graph ----
+  const triggerKeywords = flow.trigger_config?.keywords;
   const triggerDesc =
     flow.trigger_type === "keyword"
       ? `keyword (keywords: ${
-          Array.isArray((flow.trigger_config as any)?.keywords)
-            ? (flow.trigger_config as any).keywords.join(", ") || "NONE SET"
+          Array.isArray(triggerKeywords)
+            ? triggerKeywords.filter((keyword): keyword is string => typeof keyword === 'string').join(", ") || "NONE SET"
             : "NONE SET"
         })`
       : flow.trigger_type;
@@ -138,7 +139,10 @@ start (entry), send_message (text then auto-advance via next_node_key), send_but
 
 Scoring: start at 100, deduct 15 per error, 5 per warning. passed=true only if there are zero errors. Be specific and reference node keys. Return 4-9 checks and up to 5 improvements.`;
 
-  const { text, success, debugLogs } = await callLLM(prompt, { maxTokens: 2048 });
+  const { text, success, debugLogs } = await callLLM(prompt, {
+    taskCriticality: 'critical',
+    maxTokens: 2048,
+  });
   if (!success) {
     return NextResponse.json(
       {

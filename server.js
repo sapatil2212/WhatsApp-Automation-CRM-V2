@@ -8,7 +8,15 @@ const prisma = new PrismaClient();
 const dev = process.env.NODE_ENV !== "production";
 const hostname = "localhost";
 const port = process.env.PORT || 3002;
-const app = next({ dev, hostname, port });
+// In development, Turbopack on Windows has a known junction point bug with Prisma (os error 80).
+// Using webpack on Windows avoids junction point collisions and prevents 500/404 HTML errors on API routes.
+const isWindows = process.platform === "win32";
+const app = next({ 
+  dev, 
+  hostname, 
+  port,
+  ...(dev && isWindows ? { webpack: true } : {})
+});
 const handle = app.getRequestHandler();
 
 app.prepare().then(() => {
@@ -97,10 +105,20 @@ app.prepare().then(() => {
     console.log("[Socket.io] Client connected:", socket.id);
 
     // Clients call 'join-tenant' upon authentication to join their isolated room
-    socket.on("join-tenant", (tenantId) => {
-      if (tenantId) {
-        socket.join(tenantId);
-        console.log(`[Socket.io] Socket ${socket.id} joined room for tenantId: ${tenantId}`);
+    // Only the tenant the signed-in user belongs to may be joined: the
+    // access-token cookie is verified and the tenant resolved server-side.
+    socket.on("join-tenant", async (tenantId) => {
+      try {
+        if (!tenantId) return;
+        const cookieHeader = socket.handshake.headers.cookie || "";
+        const match = cookieHeader.match(/(?:^|;\s*)accessToken=([^;]+)/);
+        if (!match) return;
+        const jwt = require("jsonwebtoken");
+        const payload = jwt.verify(decodeURIComponent(match[1]), process.env.JWT_SECRET || "dev_jwt_access_secret_key_change_me");
+        const profile = await prisma.profile.findUnique({ where: { userId: payload.userId }, select: { tenantId: true } });
+        if (profile && profile.tenantId === tenantId) socket.join(tenantId);
+      } catch {
+        /* invalid / expired token — ignore the join */
       }
     });
 
@@ -119,5 +137,60 @@ app.prepare().then(() => {
 
   httpServer.listen(port, () => {
     console.log(`> [Socket.io] Ready on http://${hostname}:${port}`);
+    startCampaignTicker();
   });
+
+  /**
+   * Campaign dispatcher. Starts scheduled campaigns when they fall due and
+   * sends pending recipients in bounded batches (/api/broadcasts/cron).
+   * Without this nothing ever advanced a campaign past "scheduled"/"sending"
+   * unless an external cron was configured.
+   *
+   * Uses AUTOMATION_CRON_SECRET; when it is not configured a random
+   * per-process secret is generated (route handlers share this process's env).
+   * Set CAMPAIGN_TICKER=off when an external scheduler calls the cron instead.
+   */
+  function startCampaignTicker() {
+    if (process.env.CAMPAIGN_TICKER === "off") return;
+    if (!process.env.AUTOMATION_CRON_SECRET) {
+      process.env.AUTOMATION_CRON_SECRET = require("crypto").randomBytes(24).toString("hex");
+    }
+    const intervalMs = Number(process.env.CAMPAIGN_TICK_MS) || 15_000;
+    let running = false;
+    let tick = 0;
+    setInterval(async () => {
+      if (running) return;
+      running = true;
+      try {
+        const headers = { "x-cron-secret": process.env.AUTOMATION_CRON_SECRET };
+        const res = await fetch(`http://127.0.0.1:${port}/api/broadcasts/cron`, { method: "POST", headers });
+        if (!res.ok && res.status !== 404) {
+          console.warn(`[Campaign Ticker] cron returned ${res.status}`);
+        }
+        // Drip sequences — every tick.
+        const drip = await fetch(`http://127.0.0.1:${port}/api/sequences/cron`, { method: "POST", headers });
+        if (!drip.ok && drip.status !== 404) console.warn(`[Drip Ticker] returned ${drip.status}`);
+        // Delayed automation steps ("wait" nodes) — every tick. Without this
+        // a parked wait step never resumed.
+        const auto = await fetch(`http://127.0.0.1:${port}/api/automations/cron`, { method: "GET", headers });
+        if (!auto.ok && auto.status !== 404) console.warn(`[Automation Ticker] cron returned ${auto.status}`);
+        // Appointment confirmations / reminders / follow-ups — once a minute.
+        tick += 1;
+        if (tick % Math.max(1, Math.round(60_000 / intervalMs)) === 0) {
+          const life = await fetch(`http://127.0.0.1:${port}/api/appointments/lifecycle`, { method: "POST", headers });
+          if (!life.ok && life.status !== 404) console.warn(`[Appointment Ticker] lifecycle returned ${life.status}`);
+        }
+        // Sales follow-ups for customers who went quiet — every 5 minutes.
+        if (tick % Math.max(1, Math.round(300_000 / intervalMs)) === 0) {
+          const nurture = await fetch(`http://127.0.0.1:${port}/api/leads/nurture`, { method: "POST", headers });
+          if (!nurture.ok && nurture.status !== 404) console.warn(`[Lead Nurture Ticker] returned ${nurture.status}`);
+        }
+      } catch (err) {
+        console.warn("[Campaign Ticker] tick failed:", err.message || err);
+      } finally {
+        running = false;
+      }
+    }, intervalMs);
+    console.log(`> [Campaign Ticker] dispatching campaigns every ${intervalMs / 1000}s`);
+  }
 });

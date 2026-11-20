@@ -21,7 +21,7 @@ const MODES: {
     description:
       "The AI assistant answers automatically. A flow runs only if the AI can't handle the message.",
     icon: Bot,
-    accent: "text-violet-300",
+    accent: "text-violet-700 dark:text-violet-300",
   },
   {
     id: "flows_first",
@@ -29,7 +29,7 @@ const MODES: {
     description:
       "Your flows drive the conversation. The AI steps in only when no flow matches. Best for guided, multi-step journeys.",
     icon: Workflow,
-    accent: "text-emerald-300",
+    accent: "text-emerald-700 dark:text-emerald-300",
   },
   {
     id: "flows_only",
@@ -37,7 +37,7 @@ const MODES: {
     description:
       "Only your flows reply to customers. The AI assistant stays off.",
     icon: Workflow,
-    accent: "text-emerald-300",
+    accent: "text-emerald-700 dark:text-emerald-300",
   },
   {
     id: "ai_only",
@@ -45,7 +45,7 @@ const MODES: {
     description:
       "Only the AI assistant replies. Flows are paused for incoming messages.",
     icon: Bot,
-    accent: "text-violet-300",
+    accent: "text-violet-700 dark:text-violet-300",
   },
 ];
 
@@ -104,16 +104,16 @@ export function RoutingModeCard() {
   }
 
   return (
-    <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+    <section className="rounded-xl border border-border bg-muted/40 p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-white">Response handling</h2>
-          <p className="mt-0.5 text-xs text-slate-400">
+          <h2 className="text-sm font-semibold text-foreground">Response handling</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
             Choose how incoming WhatsApp messages are answered — by your Flows,
             the AI assistant, or a priority between them.
           </p>
         </div>
-        {loading && <Loader2 className="h-4 w-4 animate-spin text-slate-500" />}
+        {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -131,13 +131,13 @@ export function RoutingModeCard() {
                 "relative flex items-start gap-3 rounded-lg border p-3.5 text-left transition-colors disabled:opacity-60",
                 active
                   ? "border-primary bg-primary/5"
-                  : "border-slate-800 bg-slate-950 hover:border-slate-700",
+                  : "border-border bg-background hover:border-foreground/20",
               )}
             >
               <div
                 className={cn(
                   "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
-                  active ? "bg-primary/15" : "bg-slate-900",
+                  active ? "bg-primary/15" : "bg-card",
                 )}
               >
                 {isSaving ? (
@@ -148,7 +148,7 @@ export function RoutingModeCard() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-white">{m.label}</span>
+                  <span className="text-sm font-medium text-foreground">{m.label}</span>
                   {active && (
                     <span className="inline-flex items-center gap-0.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-primary">
                       <Check className="h-2.5 w-2.5" />
@@ -156,7 +156,7 @@ export function RoutingModeCard() {
                     </span>
                   )}
                 </div>
-                <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
+                <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
                   {m.description}
                 </p>
               </div>
@@ -165,7 +165,7 @@ export function RoutingModeCard() {
         })}
       </div>
 
-      <p className="mt-3 flex items-start gap-1.5 text-[11px] leading-relaxed text-slate-500">
+      <p className="mt-3 flex items-start gap-1.5 text-[11px] leading-relaxed text-muted-foreground">
         <Info className="mt-0.5 h-3 w-3 shrink-0" />
         A flow already in progress with a customer always continues, regardless
         of this setting. If nothing handles a message, your automations still run.

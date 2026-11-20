@@ -154,12 +154,12 @@ export function ContactForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-slate-900 border-slate-700 text-slate-200 sm:max-w-md">
+      <DialogContent className="bg-card border-border text-foreground/90 sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-white">
+          <DialogTitle className="text-foreground">
             {isEdit ? 'Edit Contact' : 'Add Contact'}
           </DialogTitle>
-          <DialogDescription className="text-slate-400">
+          <DialogDescription className="text-muted-foreground">
             {isEdit
               ? 'Update the contact details below.'
               : 'Fill in the details to create a new contact.'}
@@ -168,7 +168,7 @@ export function ContactForm({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="cf-name" className="text-slate-300">
+            <Label htmlFor="cf-name" className="text-foreground/90">
               Name
             </Label>
             <Input
@@ -176,12 +176,12 @@ export function ContactForm({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="John Doe"
-              className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+              className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="cf-phone" className="text-slate-300">
+            <Label htmlFor="cf-phone" className="text-foreground/90">
               Phone <span className="text-red-400">*</span>
             </Label>
             <Input
@@ -189,15 +189,15 @@ export function ContactForm({
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="+1 234 567 8900"
-              className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+              className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
             />
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-muted-foreground">
               Include country code, e.g. +1 for US
             </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="cf-email" className="text-slate-300">
+            <Label htmlFor="cf-email" className="text-foreground/90">
               Email
             </Label>
             <Input
@@ -206,12 +206,12 @@ export function ContactForm({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="john@example.com"
-              className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+              className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="cf-company" className="text-slate-300">
+            <Label htmlFor="cf-company" className="text-foreground/90">
               Company
             </Label>
             <Input
@@ -219,19 +219,19 @@ export function ContactForm({
               value={company}
               onChange={(e) => setCompany(e.target.value)}
               placeholder="Acme Inc."
-              className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+              className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
             />
           </div>
 
           <div className="space-y-2">
-            <Label className="text-slate-300">Tags</Label>
+            <Label className="text-foreground/90">Tags</Label>
             {loadingTags ? (
-              <div className="flex items-center gap-2 text-slate-500 text-sm">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm">
                 <Loader2 className="size-3 animate-spin" />
                 Loading tags...
               </div>
             ) : tags.length === 0 ? (
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-muted-foreground">
                 No tags available. Create tags in Settings.
               </p>
             ) : (
@@ -262,12 +262,12 @@ export function ContactForm({
             )}
           </div>
 
-          <DialogFooter className="bg-slate-900 border-slate-700">
+          <DialogFooter className="bg-card border-border">
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
-              className="border-slate-700 text-slate-300 hover:bg-slate-800"
+              className="border-border text-foreground/90 hover:bg-accent"
             >
               Cancel
             </Button>

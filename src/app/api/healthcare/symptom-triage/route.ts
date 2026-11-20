@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   })
 
   const doctorsContext = (doctors || [])
-    .map((d: any) => `- ${d.doctorName} (${d.specialization || 'General'}) [ID: ${d.id}]`)
+    .map((doctor) => `- ${doctor.doctorName} (${doctor.specialization || 'General'}) [ID: ${doctor.id}]`)
     .join('\n')
 
   const systemPrompt = `You are a medical triage assistant. You do NOT diagnose conditions or prescribe treatments. Your role is to assess reported symptoms and determine urgency level and appropriate specialist routing.
@@ -64,8 +64,11 @@ ${doctorsContext || 'No doctors registered.'}
   const timeoutId = setTimeout(() => controller.abort(), 5000)
 
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    // Symptom triage is high-consequence work: use the strongest Gemini tier
+    // first, while retaining compatible fallbacks for older API projects.
+    const modelCandidates = ['gemini-pro-latest', 'gemini-2.5-pro', 'gemini-flash-latest', 'gemini-2.5-flash']
+    const generate = (model: string) => fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -90,8 +93,15 @@ ${doctorsContext || 'No doctors registered.'}
             },
           },
         }),
-      }
+      },
     )
+
+    let response = await generate(modelCandidates[0])
+    for (const model of modelCandidates.slice(1)) {
+      if (response.ok) break
+      await response.text().catch(() => '')
+      response = await generate(model)
+    }
 
     clearTimeout(timeoutId)
 

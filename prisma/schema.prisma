@@ -12,43 +12,43 @@ generator client {
 // ==========================================
 
 model User {
-  id                 String            @id @default(uuid())
-  email              String            @unique
-  passwordHash       String
-  role               String            @default("user") // super_admin, tenant_admin, staff, receptionist, doctor, support, user
-  isVerified         Boolean           @default(false)
-  isEmailVerified    Boolean           @default(false)
-  subscriptionExpiresAt DateTime?
-  selectedPlan       String?
-  paymentProofAttached Boolean           @default(false)
-  paymentProofUrl    String?
-  verificationToken  String?
+  id                      String    @id @default(uuid())
+  email                   String    @unique
+  passwordHash            String
+  role                    String    @default("user") // super_admin, tenant_admin, staff, receptionist, doctor, support, user
+  isVerified              Boolean   @default(false)
+  isEmailVerified         Boolean   @default(false)
+  subscriptionExpiresAt   DateTime?
+  selectedPlan            String?
+  paymentProofAttached    Boolean   @default(false)
+  paymentProofUrl         String?
+  verificationToken       String?
   verificationTokenExpiry DateTime?
-  resetToken         String?
-  resetTokenExpiry   DateTime?
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
+  resetToken              String?
+  resetTokenExpiry        DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
-  profile            Profile?
-  memberships        WorkspaceMember[]
-  refreshTokens      RefreshToken[]
-  tenantsOwned       Tenant[]          @relation("TenantOwner")
-  invitedMembers     WorkspaceMember[] @relation("Inviter")
-  contacts           Contact[]
-  tags               Tag[]
-  customFields       CustomField[]
-  contactNotes       ContactNote[]
-  whatsappConfigs    WhatsappConfig[]
-  messageTemplates   MessageTemplate[]
-  pipelines          Pipeline[]
-  deals              Deal[]
-  broadcasts         Broadcast[]
-  automations        Automation[]
-  automationLogs     AutomationLog[]
-  automationPending  AutomationPendingExecution[]
-  flows              Flow[]
-  businessProfiles   BusinessProfile[]
-  portfolioItems     PortfolioItem[]
+  profile           Profile?
+  memberships       WorkspaceMember[]
+  refreshTokens     RefreshToken[]
+  tenantsOwned      Tenant[]                     @relation("TenantOwner")
+  invitedMembers    WorkspaceMember[]            @relation("Inviter")
+  contacts          Contact[]
+  tags              Tag[]
+  customFields      CustomField[]
+  contactNotes      ContactNote[]
+  whatsappConfigs   WhatsappConfig[]
+  messageTemplates  MessageTemplate[]
+  pipelines         Pipeline[]
+  deals             Deal[]
+  broadcasts        Broadcast[]
+  automations       Automation[]
+  automationLogs    AutomationLog[]
+  automationPending AutomationPendingExecution[]
+  flows             Flow[]
+  businessProfiles  BusinessProfile[]
+  portfolioItems    PortfolioItem[]
 
   @@index([email])
 }
@@ -65,89 +65,94 @@ model RefreshToken {
 }
 
 model Tenant {
-  id             String                @id @default(uuid())
-  name           String
-  slug           String                @unique
-  ownerUserId    String
-  owner          User                  @relation("TenantOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
-  plan           String                @default("free") // free, starter, pro, enterprise
-  settings       Json                  // Default JSON object {}
-  isActive       Boolean               @default(true)
-  createdAt      DateTime              @default(now())
-  updatedAt      DateTime              @updatedAt
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  ownerUserId String
+  owner       User     @relation("TenantOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  plan        String   @default("free") // free, starter, pro, enterprise
+  settings    Json // Default JSON object {}
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  workspaces     Workspace[]
-  roles          Role[]
-  profiles       Profile[]
-  configuration  TenantConfiguration?
-  contacts       Contact[]
-  tags           Tag[]
-  customFields   CustomField[]
-  contactNotes   ContactNote[]
-  conversations  Conversation[]
-  whatsappConfig WhatsappConfig[]
-  templates      MessageTemplate[]
-  pipelines      Pipeline[]
-  deals          Deal[]
-  broadcasts     Broadcast[]
-  automations    Automation[]
-  autoLogs       AutomationLog[]
-  autoPending    AutomationPendingExecution[]
-  flows          Flow[]
-  flowRuns       FlowRun[]
-  clinics        Clinic[]
-  businessProfs  BusinessProfile[]
-  portfolioItems PortfolioItem[]
+  workspaces                  Workspace[]
+  roles                       Role[]
+  profiles                    Profile[]
+  configuration               TenantConfiguration?
+  contacts                    Contact[]
+  tags                        Tag[]
+  customFields                CustomField[]
+  contactNotes                ContactNote[]
+  conversations               Conversation[]
+  whatsappConfig              WhatsappConfig[]
+  templates                   MessageTemplate[]
+  appointmentNotificationLogs AppointmentNotificationLog[]
+  leadFollowUps               LeadFollowUp[]
+  dripSequences               DripSequence[]
+  dripEnrollments             DripEnrollment[]
+  pipelines                   Pipeline[]
+  deals                       Deal[]
+  broadcasts                  Broadcast[]
+  automations                 Automation[]
+  autoLogs                    AutomationLog[]
+  autoPending                 AutomationPendingExecution[]
+  flows                       Flow[]
+  flowRuns                    FlowRun[]
+  clinics                     Clinic[]
+  businessProfs               BusinessProfile[]
+  portfolioItems              PortfolioItem[]
+  reviewBusinesses            ReviewBusiness[]
 
   @@index([ownerUserId])
 }
 
 model Workspace {
-  id         String            @id @default(uuid())
-  tenantId   String
-  tenant     Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  name       String
-  slug       String
-  settings   Json              // Default JSON object {}
-  isDefault  Boolean           @default(false)
-  createdAt  DateTime          @default(now())
-  updatedAt  DateTime          @updatedAt
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  slug      String
+  settings  Json // Default JSON object {}
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  members    WorkspaceMember[]
+  members WorkspaceMember[]
 
   @@unique([tenantId, slug])
   @@index([tenantId])
 }
 
 model Role {
-  id          String            @id @default(uuid())
+  id          String   @id @default(uuid())
   tenantId    String
-  tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name        String
   description String?
-  permissions Json              // Array of permission strings e.g. ["inbox:*"]
-  isSystem    Boolean           @default(false)
-  createdAt   DateTime          @default(now())
+  permissions Json // Array of permission strings e.g. ["inbox:*"]
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
 
-  members     WorkspaceMember[]
+  members WorkspaceMember[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
 }
 
 model WorkspaceMember {
-  id           String    @id @default(uuid())
-  workspaceId  String
-  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  userId       String
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  roleId       String
-  role         Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  invitedBy    String?
-  inviter      User?     @relation("Inviter", fields: [invitedBy], references: [id], onDelete: SetNull)
-  status       String    @default("active") // active, invited, suspended
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id          String    @id @default(uuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleId      String
+  role        Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  invitedBy   String?
+  inviter     User?     @relation("Inviter", fields: [invitedBy], references: [id], onDelete: SetNull)
+  status      String    @default("active") // active, invited, suspended
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@unique([workspaceId, userId])
   @@index([userId])
@@ -167,7 +172,7 @@ model Profile {
   businessName String?
   businessType String?
   phoneNumber  String?
-  betaFeatures Json     // Array of beta feature flags (stored as JSON array)
+  betaFeatures Json // Array of beta feature flags (stored as JSON array)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -197,7 +202,7 @@ model TenantConfiguration {
   aiProvider              String   @default("openai")
   aiApiKey                String?
   aiModel                 String?
-  aiTemperature           Decimal  @default(0.7) @db.Decimal(3,2)
+  aiTemperature           Decimal  @default(0.7) @db.Decimal(3, 2)
   aiSystemPrompt          String?  @db.Text
   aiPersonality           String?
   aiLanguage              String   @default("English")
@@ -225,34 +230,40 @@ model TenantConfiguration {
 // ==========================================
 
 model Contact {
-  id           String               @id @default(uuid())
-  tenantId     String
-  tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  userId       String
-  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  phone        String
-  name         String?
-  email        String?
-  company      String?
-  avatarUrl    String?
-  createdAt    DateTime             @default(now())
-  updatedAt    DateTime             @updatedAt
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phone     String
+  name      String?
+  email     String?
+  company   String?
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  tags         ContactTag[]
-  customValues ContactCustomValue[]
-  notes        ContactNote[]
-  conversations Conversation[]
-  deals        Deal[]
-  recipients   BroadcastRecipient[]
-  autoLogs     AutomationLog[]
-  autoPending  AutomationPendingExecution[]
-  flowRuns     FlowRun[]
-  appointments Appointment[]
-  intakes      PatientIntake[]
-  feedback     PatientFeedback[]
-  enquiries    BusinessEnquiry[]
-  aiChatLogs   AiChatLog[]
-  aiLogs       BusinessAILog[]
+  tags             ContactTag[]
+  customValues     ContactCustomValue[]
+  notes            ContactNote[]
+  conversations    Conversation[]
+  deals            Deal[]
+  recipients       BroadcastRecipient[]
+  autoLogs         AutomationLog[]
+  autoPending      AutomationPendingExecution[]
+  flowRuns         FlowRun[]
+  appointments     Appointment[]
+  leadFollowUps    LeadFollowUp[]
+  dripEnrollments  DripEnrollment[]
+  intakes          PatientIntake[]
+  feedback         PatientFeedback[]
+  patientProfile   PatientProfile?
+  consultations    Consultation[]
+  prescriptions    Prescription[]
+  patientDocuments PatientDocument[]
+  enquiries        BusinessEnquiry[]
+  aiChatLogs       AiChatLog[]
+  aiLogs           BusinessAILog[]
 
   // A phone number identifies one person within a workspace. Enforced at the
   // database level so a race between two concurrent creates cannot produce a
@@ -264,16 +275,16 @@ model Contact {
 }
 
 model Tag {
-  id        String       @id @default(uuid())
+  id        String   @id @default(uuid())
   tenantId  String
-  tenant    Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userId    String
-  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   name      String
-  color     String       @default("#3b82f6")
-  createdAt DateTime     @default(now())
+  color     String   @default("#3b82f6")
+  createdAt DateTime @default(now())
 
-  contacts  ContactTag[]
+  contacts ContactTag[]
 
   @@index([tenantId])
 }
@@ -292,17 +303,17 @@ model ContactTag {
 }
 
 model CustomField {
-  id           String               @id @default(uuid())
+  id           String   @id @default(uuid())
   tenantId     String
-  tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userId       String
-  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   fieldName    String
-  fieldType    String               @default("text")
+  fieldType    String   @default("text")
   fieldOptions Json?
-  createdAt    DateTime             @default(now())
+  createdAt    DateTime @default(now())
 
-  values       ContactCustomValue[]
+  values ContactCustomValue[]
 
   @@index([tenantId])
 }
@@ -338,26 +349,26 @@ model ContactNote {
 // ==========================================
 
 model Conversation {
-  id               String        @id @default(uuid())
-  tenantId         String
-  tenant           Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  userId           String
-  contactId        String
-  contact          Contact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  status           String        @default("open") // open, pending, closed
-  assignedAgentId  String?
-  lastMessageText  String?       @db.Text
-  lastMessageAt    DateTime?
-  unreadCount      Int           @default(0)
-  bookingState     Json?         // AI Healthcare/Business structured memory
-  bookingStage     String?       // current AI prompt sequence step
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  id              String    @id @default(uuid())
+  tenantId        String
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId          String
+  contactId       String
+  contact         Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  status          String    @default("open") // open, pending, closed
+  assignedAgentId String?
+  lastMessageText String?   @db.Text
+  lastMessageAt   DateTime?
+  unreadCount     Int       @default(0)
+  bookingState    Json? // AI Healthcare/Business structured memory
+  bookingStage    String? // current AI prompt sequence step
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  messages         Message[]
-  deals            Deal[]
-  flowRuns         FlowRun[]
-  reactions        MessageReaction[]
+  messages  Message[]
+  deals     Deal[]
+  flowRuns  FlowRun[]
+  reactions MessageReaction[]
 
   @@index([tenantId])
   @@index([contactId])
@@ -367,15 +378,15 @@ model Message {
   id                 String       @id @default(uuid())
   conversationId     String
   conversation       Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  senderType         String       // customer, agent, bot
+  senderType         String // customer, agent, bot
   senderId           String?
   contentType        String       @default("text") // text, image, document, audio, video, location, template, interactive
   contentText        String?      @db.Text
   mediaUrl           String?      @db.VarChar(500)
   templateName       String?
-  messageId          String?      // Meta message_id
+  messageId          String? // Meta message_id
   status             String       @default("sent") // sending, sent, delivered, read, failed
-  interactiveReplyId String?      // Target button/list selection payload
+  interactiveReplyId String? // Target button/list selection payload
   // Quoted message (WhatsApp reply-with-context). SetNull rather than
   // Cascade: deleting the quoted message must not delete the reply.
   replyToMessageId   String?
@@ -383,8 +394,8 @@ model Message {
   replies            Message[]    @relation("MessageReplies")
   createdAt          DateTime     @default(now())
 
-  lastPromptForRuns  FlowRun[]    @relation("LastPromptMessage")
-  reactions          MessageReaction[]
+  lastPromptForRuns FlowRun[]         @relation("LastPromptMessage")
+  reactions         MessageReaction[]
 
   @@index([conversationId])
   @@index([messageId])
@@ -403,7 +414,7 @@ model WhatsappConfig {
   wabaId        String?
   accessToken   String    @db.Text
   verifyToken   String?
-  metaAppSecret String?   @db.Text  // Per-tenant encrypted Meta App Secret for webhook signature verification
+  metaAppSecret String?   @db.Text // Per-tenant encrypted Meta App Secret for webhook signature verification
   status        String    @default("disconnected") // connected, disconnected
   connectedAt   DateTime?
   createdAt     DateTime  @default(now())
@@ -422,16 +433,34 @@ model MessageTemplate {
   name          String
   category      String   @default("Marketing") // Marketing, Utility, Authentication
   language      String   @default("en_US")
-  headerType    String?  // text, image, video, document
+  headerType    String? // text, image, video, document
   headerContent String?
   bodyText      String   @db.Text
   footerText    String?
-  buttons       Json?    // Structured buttons array
-  status        String   @default("Draft") // Draft, Pending, Approved, Rejected
+  buttons       Json? // Structured buttons array
+  status        String   @default("Draft") // Draft, Pending, Approved, Rejected, Paused, Disabled
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  // Appointment utility templates provisioned from the built-in library.
+  libraryKey      String?   @db.VarChar(80) // e.g. "appointment_reminder"
+  eventType       String?   @db.VarChar(40) // confirmation | reminder | cancelled | rescheduled | completed
+  vertical        String?   @db.VarChar(40) // clinic | dental | hospital | gym | salon | hotel | other
+  libraryVersion  Int?
+  version         Int       @default(1) // bumped when an approved/submitted template is edited
+  isEnabled       Boolean   @default(true)
+  metaTemplateId  String?   @db.VarChar(64)
+  wabaId          String?   @db.VarChar(64)
+  variables       Json? // [{ position, name, source, fallback, example }]
+  rejectionReason String?   @db.Text
+  submittedAt     DateTime?
+  approvedAt      DateTime?
+  rejectedAt      DateTime?
+
+  notificationLogs AppointmentNotificationLog[]
+
   @@index([tenantId])
+  @@index([tenantId, eventType])
 }
 
 // ==========================================
@@ -439,16 +468,16 @@ model MessageTemplate {
 // ==========================================
 
 model Pipeline {
-  id        String          @id @default(uuid())
+  id        String   @id @default(uuid())
   tenantId  String
-  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userId    String
-  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   name      String
-  createdAt DateTime        @default(now())
+  createdAt DateTime @default(now())
 
-  stages    PipelineStage[]
-  deals     Deal[]
+  stages PipelineStage[]
+  deals  Deal[]
 
   @@index([tenantId])
 }
@@ -462,33 +491,33 @@ model PipelineStage {
   color      String   @default("#3b82f6")
   createdAt  DateTime @default(now())
 
-  deals      Deal[]
+  deals Deal[]
 
   @@index([pipelineId])
 }
 
 model Deal {
-  id                String         @id @default(uuid())
+  id                String        @id @default(uuid())
   tenantId          String
-  tenant            Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userId            String
-  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   pipelineId        String
-  pipeline          Pipeline       @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  pipeline          Pipeline      @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
   stageId           String
-  stage             PipelineStage  @relation(fields: [stageId], references: [id])
+  stage             PipelineStage @relation(fields: [stageId], references: [id])
   contactId         String
-  contact           Contact        @relation(fields: [contactId], references: [id])
+  contact           Contact       @relation(fields: [contactId], references: [id])
   conversationId    String?
-  conversation      Conversation?  @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  conversation      Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
   title             String
-  value             Decimal        @default(0.00) @db.Decimal(12,2)
-  currency          String         @default("USD")
-  notes             String?        @db.Text
-  expectedCloseDate DateTime?      @db.Date
-  status            String         @default("active") // active, won, lost
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  value             Decimal       @default(0.00) @db.Decimal(12, 2)
+  currency          String        @default("USD")
+  notes             String?       @db.Text
+  expectedCloseDate DateTime?     @db.Date
+  status            String        @default("active") // active, won, lost
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
   @@index([tenantId])
   @@index([pipelineId])
@@ -500,49 +529,49 @@ model Deal {
 // ==========================================
 
 model Broadcast {
-  id                String               @id @default(uuid())
+  id                String    @id @default(uuid())
   tenantId          String
-  tenant            Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant            Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userId            String
-  user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   name              String
   templateName      String
-  templateLanguage  String               @default("en_US")
+  templateLanguage  String    @default("en_US")
   templateVariables Json?
   audienceFilter    Json?
   scheduledAt       DateTime?
-  status            String               @default("draft") // draft, scheduled, sending, sent, failed
-  totalRecipients   Int                  @default(0)
-  sentCount         Int                  @default(0)
-  deliveredCount    Int                  @default(0)
-  readCount         Int                  @default(0)
-  repliedCount      Int                  @default(0)
-  failedCount       Int                  @default(0)
-  createdAt         DateTime             @default(now())
-  updatedAt         DateTime             @updatedAt
+  status            String    @default("draft") // draft, scheduled, sending, sent, failed
+  totalRecipients   Int       @default(0)
+  sentCount         Int       @default(0)
+  deliveredCount    Int       @default(0)
+  readCount         Int       @default(0)
+  repliedCount      Int       @default(0)
+  failedCount       Int       @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  recipients        BroadcastRecipient[]
+  recipients BroadcastRecipient[]
 
   @@index([tenantId])
 }
 
 model BroadcastRecipient {
-  id           String    @id @default(uuid())
-  broadcastId  String
-  broadcast    Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
-  contactId    String
-  contact      Contact   @relation(fields: [contactId], references: [id])
-  status       String    @default("pending") // pending, sent, delivered, read, replied, failed
-  sentAt       DateTime?
-  deliveredAt  DateTime?
-  readAt       DateTime?
-  repliedAt    DateTime?
-  errorMessage String?   @db.Text
+  id                String    @id @default(uuid())
+  broadcastId       String
+  broadcast         Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  contactId         String
+  contact           Contact   @relation(fields: [contactId], references: [id])
+  status            String    @default("pending") // pending, sent, delivered, read, replied, failed
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  readAt            DateTime?
+  repliedAt         DateTime?
+  errorMessage      String?   @db.Text
   // Meta's `wamid.…`, recorded when the send is accepted. Without this the
   // delivery webhook has nothing to correlate a status callback against, so
   // delivered/read/replied reporting is impossible.
-  whatsappMessageId String? @db.VarChar(191)
-  createdAt    DateTime  @default(now())
+  whatsappMessageId String?   @db.VarChar(191)
+  createdAt         DateTime  @default(now())
 
   @@index([broadcastId])
   // The sender claims the next pending batch for one campaign.
@@ -556,90 +585,90 @@ model BroadcastRecipient {
 // ==========================================
 
 model Automation {
-  id              String                       @id @default(uuid())
-  tenantId        String
-  tenant          Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  userId          String
-  user            User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name            String
-  description     String?
-  triggerType     String
-  triggerConfig   Json
-  isActive        Boolean                      @default(false)
-  executionCount  Int                          @default(0)
-  lastExecutedAt  DateTime?
-  createdAt       DateTime                     @default(now())
-  updatedAt       DateTime                     @updatedAt
+  id             String    @id @default(uuid())
+  tenantId       String
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  triggerType    String
+  triggerConfig  Json
+  isActive       Boolean   @default(false)
+  executionCount Int       @default(0)
+  lastExecutedAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  steps           AutomationStep[]
-  logs            AutomationLog[]
-  pendingQueue    AutomationPendingExecution[]
+  steps        AutomationStep[]
+  logs         AutomationLog[]
+  pendingQueue AutomationPendingExecution[]
 
   @@index([tenantId])
   @@index([triggerType])
 }
 
 model AutomationStep {
-  id             String           @id @default(uuid())
-  automationId   String
-  automation     Automation       @relation(fields: [automationId], references: [id], onDelete: Cascade)
-  parentStepId   String?
-  parentStep     AutomationStep?  @relation("StepHierarchy", fields: [parentStepId], references: [id], onDelete: Cascade)
-  branch         String?          // yes, no
-  stepType       String
-  stepConfig     Json
-  position       Int
-  createdAt      DateTime         @default(now())
+  id           String          @id @default(uuid())
+  automationId String
+  automation   Automation      @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  parentStepId String?
+  parentStep   AutomationStep? @relation("StepHierarchy", fields: [parentStepId], references: [id], onDelete: Cascade)
+  branch       String? // yes, no
+  stepType     String
+  stepConfig   Json
+  position     Int
+  createdAt    DateTime        @default(now())
 
-  childSteps     AutomationStep[] @relation("StepHierarchy")
-  pendingExecs   AutomationPendingExecution[]
+  childSteps   AutomationStep[]             @relation("StepHierarchy")
+  pendingExecs AutomationPendingExecution[]
 
   @@index([automationId, position])
   @@index([parentStepId])
 }
 
 model AutomationLog {
-  id             String          @id @default(uuid())
-  tenantId       String
-  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  automationId   String
-  automation     Automation      @relation(fields: [automationId], references: [id], onDelete: Cascade)
-  userId         String
-  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  contactId      String?
-  contact        Contact?        @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  triggerEvent   String
-  stepsExecuted  Json
-  status         String          // success, partial, failed
-  errorMessage   String?         @db.Text
-  createdAt      DateTime        @default(now())
+  id            String     @id @default(uuid())
+  tenantId      String
+  tenant        Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  automationId  String
+  automation    Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contactId     String?
+  contact       Contact?   @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  triggerEvent  String
+  stepsExecuted Json
+  status        String // success, partial, failed
+  errorMessage  String?    @db.Text
+  createdAt     DateTime   @default(now())
 
-  pendingQueue   AutomationPendingExecution[]
+  pendingQueue AutomationPendingExecution[]
 
   @@index([tenantId])
   @@index([automationId, createdAt(sort: Desc)])
 }
 
 model AutomationPendingExecution {
-  id                String          @id @default(uuid())
-  tenantId          String
-  tenant            Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  automationId      String
-  automation        Automation      @relation(fields: [automationId], references: [id], onDelete: Cascade)
-  userId            String
-  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  contactId         String?
-  contact           Contact?        @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  logId             String?
-  log               AutomationLog?  @relation(fields: [logId], references: [id], onDelete: Cascade)
-  parentStepId      String?
-  parentStep        AutomationStep? @relation(fields: [parentStepId], references: [id], onDelete: SetNull)
-  branch            String?         // yes, no
-  nextStepPosition  Int
-  context           Json
-  status            String          @default("pending") // pending, running, done, failed
-  runAt             DateTime
-  createdAt         DateTime        @default(now())
+  id               String          @id @default(uuid())
+  tenantId         String
+  tenant           Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  automationId     String
+  automation       Automation      @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contactId        String?
+  contact          Contact?        @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  logId            String?
+  log              AutomationLog?  @relation(fields: [logId], references: [id], onDelete: Cascade)
+  parentStepId     String?
+  parentStep       AutomationStep? @relation(fields: [parentStepId], references: [id], onDelete: SetNull)
+  branch           String? // yes, no
+  nextStepPosition Int
+  context          Json
+  status           String          @default("pending") // pending, running, done, failed
+  runAt            DateTime
+  createdAt        DateTime        @default(now())
 
   @@index([runAt])
 }
@@ -649,68 +678,68 @@ model AutomationPendingExecution {
 // ==========================================
 
 model Flow {
-  id              String      @id @default(uuid())
-  tenantId        String
-  tenant          Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  userId          String
-  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name            String
-  description     String?
-  status          String      @default("draft") // draft, active, archived
-  triggerType     String      // keyword, first_inbound_message, manual
-  triggerConfig   Json
-  entryNodeId     String?
-  fallbackPolicy  Json
-  executionCount  Int         @default(0)
-  lastExecutedAt  DateTime?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id             String    @id @default(uuid())
+  tenantId       String
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  status         String    @default("draft") // draft, active, archived
+  triggerType    String // keyword, first_inbound_message, manual
+  triggerConfig  Json
+  entryNodeId    String?
+  fallbackPolicy Json
+  executionCount Int       @default(0)
+  lastExecutedAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  nodes           FlowNode[]
-  runs            FlowRun[]
+  nodes FlowNode[]
+  runs  FlowRun[]
 
   @@index([tenantId])
   @@index([tenantId, triggerType])
 }
 
 model FlowNode {
-  id         String   @id @default(uuid())
-  flowId     String
-  flow       Flow     @relation(fields: [flowId], references: [id], onDelete: Cascade)
-  nodeKey    String
-  nodeType   String   // start, send_buttons, send_list, send_message, collect_input, condition, set_tag, handoff, http_fetch, end
-  config     Json
-  positionX  Int      @default(0)
-  positionY  Int      @default(0)
-  createdAt  DateTime @default(now())
+  id        String   @id @default(uuid())
+  flowId    String
+  flow      Flow     @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  nodeKey   String
+  nodeType  String // start, send_buttons, send_list, send_message, collect_input, condition, set_tag, handoff, http_fetch, end
+  config    Json
+  positionX Int      @default(0)
+  positionY Int      @default(0)
+  createdAt DateTime @default(now())
 
   @@unique([flowId, nodeKey])
   @@index([flowId])
 }
 
 model FlowRun {
-  id                 String          @id @default(uuid())
-  tenantId           String
-  tenant             Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  flowId             String
-  flow               Flow            @relation(fields: [flowId], references: [id], onDelete: Cascade)
-  userId             String
-  contactId          String?
-  contact            Contact?        @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  conversationId     String?
-  conversation       Conversation?   @relation(fields: [conversationId], references: [id], onDelete: SetNull)
-  status             String          @default("active") // active, completed, handed_off, timed_out, paused_by_agent, failed
-  currentNodeKey     String?
+  id                  String        @id @default(uuid())
+  tenantId            String
+  tenant              Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  flowId              String
+  flow                Flow          @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  userId              String
+  contactId           String?
+  contact             Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  conversationId      String?
+  conversation        Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  status              String        @default("active") // active, completed, handed_off, timed_out, paused_by_agent, failed
+  currentNodeKey      String?
   lastPromptMessageId String?
-  lastPromptMessage  Message?        @relation("LastPromptMessage", fields: [lastPromptMessageId], references: [id], onDelete: SetNull)
-  vars               Json
-  repromptCount      Int             @default(0)
-  startedAt          DateTime        @default(now())
-  lastAdvancedAt     DateTime        @default(now())
-  endedAt            DateTime?
-  endReason          String?
+  lastPromptMessage   Message?      @relation("LastPromptMessage", fields: [lastPromptMessageId], references: [id], onDelete: SetNull)
+  vars                Json
+  repromptCount       Int           @default(0)
+  startedAt           DateTime      @default(now())
+  lastAdvancedAt      DateTime      @default(now())
+  endedAt             DateTime?
+  endReason           String?
 
-  events             FlowRunEvent[]
+  events FlowRunEvent[]
 
   @@index([tenantId])
   @@index([lastAdvancedAt])
@@ -718,13 +747,13 @@ model FlowRun {
 }
 
 model FlowRunEvent {
-  id          String   @id @default(uuid())
-  flowRunId   String
-  flowRun     FlowRun  @relation(fields: [flowRunId], references: [id], onDelete: Cascade)
-  eventType   String   // started, node_entered, message_sent, reply_received, fallback_fired, handoff, timeout, error, completed
-  nodeKey     String?
-  payload     Json
-  createdAt   DateTime @default(now())
+  id        String   @id @default(uuid())
+  flowRunId String
+  flowRun   FlowRun  @relation(fields: [flowRunId], references: [id], onDelete: Cascade)
+  eventType String // started, node_entered, message_sent, reply_received, fallback_fired, handoff, timeout, error, completed
+  nodeKey   String?
+  payload   Json
+  createdAt DateTime @default(now())
 
   @@index([flowRunId, eventType])
   @@index([flowRunId, createdAt(sort: Desc)])
@@ -735,38 +764,43 @@ model FlowRunEvent {
 // ==========================================
 
 model Clinic {
-  id                String          @id @default(uuid())
+  id                String   @id @default(uuid())
   tenantId          String
-  tenant            Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  userId            String          @unique
+  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId            String   @unique
   clinicName        String
   clinicType        String?
-  clinicDescription String?         @db.Text
+  clinicDescription String?  @db.Text
   phone             String?
   whatsappNumber    String?
   email             String?
   website           String?
-  address           String?         @db.Text
+  address           String?  @db.Text
   city              String?
   state             String?
   pincode           String?
   googleMapLink     String?
-  instagramUrl      String?         // Instagram profile URL (AI grounding)
-  facebookUrl       String?         // Facebook page URL (AI grounding)
-  aiKnowledgeBase   String?         @db.Text // Extra expert context to train AI replies
-  dateExceptions    Json?           // Holidays / exceptions context
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  instagramUrl      String? // Instagram profile URL (AI grounding)
+  facebookUrl       String? // Facebook page URL (AI grounding)
+  aiKnowledgeBase   String?  @db.Text // Extra expert context to train AI replies
+  dateExceptions    Json? // Holidays / exceptions context
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  timings           ClinicTiming[]
-  doctors           Doctor[]
-  services          ClinicService[]
-  faqs              ClinicFAQ[]
-  aiSettings        AISettings?
-  appointments      Appointment[]
-  intakes           PatientIntake[]
-  feedback          PatientFeedback[]
-  aiLogs            AiChatLog[]
+  timings              ClinicTiming[]
+  doctors              Doctor[]
+  services             ClinicService[]
+  faqs                 ClinicFAQ[]
+  aiSettings           AISettings?
+  appointments         Appointment[]
+  intakes              PatientIntake[]
+  feedback             PatientFeedback[]
+  aiLogs               AiChatLog[]
+  departments          ClinicDepartment[]
+  patientProfiles      PatientProfile[]
+  consultations        Consultation[]
+  prescriptions        Prescription[]
+  prescriptionSettings PrescriptionSettings?
 
   @@index([tenantId])
 }
@@ -788,40 +822,45 @@ model ClinicTiming {
 }
 
 model Doctor {
-  id                  String        @id @default(uuid())
-  clinicId            String
-  clinic              Clinic        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  doctorName          String
-  specialization      String?
-  qualification       String?
-  experience          String?
-  availableDays       Json?         // Array of weekday strings e.g. ["Monday", "Tuesday"]
-  availableStartTime  String?
-  availableEndTime    String?
-  consultationFee     Decimal       @default(0.00) @db.Decimal(12,2)
-  languagesSpoken     String?
-  profilePhoto        String?       @db.VarChar(500)
-  weeklySlots         Json?
-  dateExceptions      Json?
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
+  id                 String   @id @default(uuid())
+  clinicId           String
+  clinic             Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  doctorName         String
+  specialization     String?
+  qualification      String?
+  experience         String?
+  availableDays      Json? // Array of weekday strings e.g. ["Monday", "Tuesday"]
+  availableStartTime String?
+  availableEndTime   String?
+  consultationFee    Decimal  @default(0.00) @db.Decimal(12, 2)
+  languagesSpoken    String?
+  profilePhoto       String?  @db.VarChar(500)
+  weeklySlots        Json?
+  dateExceptions     Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-  appointments        Appointment[]
+  appointments          Appointment[]
+  departments           DoctorDepartment[]
+  detail                DoctorDetail?
+  consultations         Consultation[]
+  prescriptions         Prescription[]
+  prescriptionTemplates PrescriptionTemplate[]
 
   @@index([clinicId])
 }
 
 model ClinicService {
-  id             String   @id @default(uuid())
-  clinicId       String
-  clinic         Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  serviceName    String
-  description    String?  @db.Text
-  startingPrice  Decimal  @default(0.00) @db.Decimal(12,2)
-  duration       Int      @default(30) // minutes
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id            String   @id @default(uuid())
+  clinicId      String
+  clinic        Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  serviceName   String
+  description   String?  @db.Text
+  startingPrice Decimal  @default(0.00) @db.Decimal(12, 2)
+  duration      Int      @default(30) // minutes
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@index([clinicId])
 }
@@ -840,48 +879,51 @@ model ClinicFAQ {
 }
 
 model AISettings {
-  id                    String   @id @default(uuid())
-  clinicId              String   @unique
-  clinic                Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  aiEnabled             Boolean  @default(true)
-  aiTone                String   @default("polite")
-  supportedLanguages    Json?    // Array of language strings e.g. ["English", "Hindi"]
-  greetingMessage       String?  @db.Text
-  afterHoursMessage     String?  @db.Text
-  escalationKeywords    Json?    // e.g. ["agent", "human"]
-  emergencyKeywords     Json?    // e.g. ["heart attack", "accident"]
-  humanHandoverEnabled  Boolean  @default(true)
+  id                   String   @id @default(uuid())
+  clinicId             String   @unique
+  clinic               Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  aiEnabled            Boolean  @default(true)
+  aiTone               String   @default("polite")
+  supportedLanguages   Json? // Array of language strings e.g. ["English", "Hindi"]
+  greetingMessage      String?  @db.Text
+  afterHoursMessage    String?  @db.Text
+  escalationKeywords   Json? // e.g. ["agent", "human"]
+  emergencyKeywords    Json? // e.g. ["heart attack", "accident"]
+  humanHandoverEnabled Boolean  @default(true)
   // How inbound WhatsApp messages are routed: ai_first | flows_first | flows_only | ai_only
-  inboundRoutingMode    String   @default("ai_first")
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  inboundRoutingMode   String   @default("ai_first")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   @@index([clinicId])
 }
 
 model Appointment {
-  id              String            @id @default(uuid())
+  id              String   @id @default(uuid())
   clinicId        String
-  clinic          Clinic            @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  clinic          Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   contactId       String
-  contact         Contact           @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact         Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
   doctorId        String?
-  doctor          Doctor?           @relation(fields: [doctorId], references: [id], onDelete: SetNull)
-  appointmentDate DateTime          @db.Date
+  doctor          Doctor?  @relation(fields: [doctorId], references: [id], onDelete: SetNull)
+  appointmentDate DateTime @db.Date
   appointmentTime String
-  status          String            @default("scheduled") // scheduled, completed, cancelled
-  remindersSent   Json?             // Tracked notifications details
-  feedbackSent    Boolean           @default(false)
-  followupSent    Boolean           @default(false)
+  status          String   @default("scheduled") // scheduled, completed, cancelled
+  remindersSent   Json? // Tracked notifications details
+  feedbackSent    Boolean  @default(false)
+  followupSent    Boolean  @default(false)
   patientName     String?
   patientAge      String?
   reasonForVisit  String?
-  sheetsSynced    Boolean           @default(false)
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  sheetsSynced    Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  intakes         PatientIntake[]
-  feedback        PatientFeedback[]
+  intakes          PatientIntake[]
+  detail           AppointmentDetail?
+  feedback         PatientFeedback[]
+  notificationLogs AppointmentNotificationLog[]
+  consultation     Consultation?
 
   @@index([clinicId])
   @@index([contactId])
@@ -902,7 +944,7 @@ model PatientIntake {
   allergies          String?      @db.Text
   currentMedications String?      @db.Text
   medicalHistory     String?      @db.Text
-  urgencyLevel       String?      // emergency, urgent, routine, self_care
+  urgencyLevel       String? // emergency, urgent, routine, self_care
   triageResult       Json?
   collectedVia       String       @default("whatsapp")
   createdAt          DateTime     @default(now())
@@ -933,38 +975,38 @@ model PatientFeedback {
 // ==========================================
 
 model BusinessProfile {
-  id              String            @id @default(uuid())
+  id              String   @id @default(uuid())
   tenantId        String
-  tenant          Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  userId          String            @unique
-  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   businessType    String
   businessName    String?
   phone           String?
   whatsappNumber  String?
   email           String?
   website         String?
-  address         String?           @db.Text
+  address         String?  @db.Text
   city            String?
   state           String?
   pincode         String?
   googleMapLink   String?
-  instagramUrl    String?           // Instagram profile URL (AI grounding)
-  facebookUrl     String?           // Facebook page URL (AI grounding)
-  aiKnowledgeBase String?           @db.Text // Extra expert context to train AI replies
-  description     String?           @db.Text
-  institutionType String?           // Education spec
-  propertyType    String?           // Hotel spec
+  instagramUrl    String? // Instagram profile URL (AI grounding)
+  facebookUrl     String? // Facebook page URL (AI grounding)
+  aiKnowledgeBase String?  @db.Text // Extra expert context to train AI replies
+  description     String?  @db.Text
+  institutionType String? // Education spec
+  propertyType    String? // Hotel spec
   workingHours    Json?
   dateExceptions  Json?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  services        BusinessService[]
-  staff           BusinessStaff[]
-  faqs            BusinessFAQ[]
-  aiSettings      BusinessAISettings?
-  enquiries       BusinessEnquiry[]
+  services   BusinessService[]
+  staff      BusinessStaff[]
+  faqs       BusinessFAQ[]
+  aiSettings BusinessAISettings?
+  enquiries  BusinessEnquiry[]
 
   @@index([tenantId])
 }
@@ -975,7 +1017,7 @@ model BusinessService {
   business        BusinessProfile @relation(fields: [businessId], references: [id], onDelete: Cascade)
   name            String
   description     String?         @db.Text
-  price           Decimal?        @db.Decimal(12,2)
+  price           Decimal?        @db.Decimal(12, 2)
   durationMinutes Int?
   category        String?
   isActive        Boolean         @default(true)
@@ -1001,13 +1043,13 @@ model BusinessStaff {
 }
 
 model BusinessFAQ {
-  id          String          @id @default(uuid())
-  businessId  String
-  business    BusinessProfile @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  question    String          @db.Text
-  answer      String          @db.Text
-  keywords    String?         @db.Text
-  createdAt   DateTime        @default(now())
+  id         String          @id @default(uuid())
+  businessId String
+  business   BusinessProfile @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  question   String          @db.Text
+  answer     String          @db.Text
+  keywords   String?         @db.Text
+  createdAt  DateTime        @default(now())
 
   @@index([businessId])
 }
@@ -1032,34 +1074,34 @@ model BusinessAISettings {
 }
 
 model BusinessEnquiry {
-  id            String           @id @default(uuid())
+  id            String          @id @default(uuid())
   businessId    String
-  business      BusinessProfile  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business      BusinessProfile @relation(fields: [businessId], references: [id], onDelete: Cascade)
   contactId     String?
-  contact       Contact?         @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  contact       Contact?        @relation(fields: [contactId], references: [id], onDelete: SetNull)
   contactName   String?
   contactPhone  String?
   enquiryType   String?
-  preferredDate DateTime?        @db.Date
-  preferredTime String?          // HH:MM string
-  notes         String?          @db.Text
-  status        String           @default("pending") // pending, confirmed, cancelled
-  source        String           @default("whatsapp")
-  createdAt     DateTime         @default(now())
+  preferredDate DateTime?       @db.Date
+  preferredTime String? // HH:MM string
+  notes         String?         @db.Text
+  status        String          @default("pending") // pending, confirmed, cancelled
+  source        String          @default("whatsapp")
+  createdAt     DateTime        @default(now())
 
   @@index([businessId])
 }
 
 model BusinessAILog {
-  id              String          @id @default(uuid())
+  id              String   @id @default(uuid())
   businessId      String
   contactId       String?
-  contact         Contact?        @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  userMessage     String?         @db.Text
-  aiResponse      String?         @db.Text
+  contact         Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  userMessage     String?  @db.Text
+  aiResponse      String?  @db.Text
   detectedIntent  String?
-  confidenceScore Decimal?        @db.Decimal(3,2)
-  createdAt       DateTime        @default(now())
+  confidenceScore Decimal? @db.Decimal(3, 2)
+  createdAt       DateTime @default(now())
 
   @@index([businessId])
 }
@@ -1087,16 +1129,16 @@ model PortfolioItem {
 }
 
 model AiChatLog {
-  id              String          @id @default(uuid())
+  id              String   @id @default(uuid())
   clinicId        String
-  clinic          Clinic          @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  clinic          Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   patientId       String
-  patient         Contact         @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  userMessage     String          @db.Text
-  aiResponse      String          @db.Text
+  patient         Contact  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  userMessage     String   @db.Text
+  aiResponse      String   @db.Text
   detectedIntent  String?
-  confidenceScore Decimal?        @db.Decimal(3,2)
-  createdAt       DateTime        @default(now())
+  confidenceScore Decimal? @db.Decimal(3, 2)
+  createdAt       DateTime @default(now())
 
   @@index([clinicId])
 }
@@ -1107,7 +1149,7 @@ model MessageReaction {
   message        Message      @relation(fields: [messageId], references: [id], onDelete: Cascade)
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  actorType      String       // customer, agent
+  actorType      String // customer, agent
   actorId        String?
   emoji          String
   createdAt      DateTime     @default(now())
@@ -1179,4 +1221,578 @@ model CmsSetting {
   updatedAt DateTime @updatedAt
 }
 
+// ==========================================
+// HEALTHCARE: DEPARTMENTS, DOCTOR DETAILS, APPOINTMENT DETAILS
+// (additive — migration 20261119000000_clinic_departments)
+// ==========================================
 
+model ClinicDepartment {
+  id          String   @id @default(uuid())
+  clinicId    String
+  clinic      Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  name        String   @db.VarChar(120)
+  description String?  @db.Text
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  doctors      DoctorDepartment[]
+  appointments AppointmentDetail[]
+
+  @@unique([clinicId, name])
+  @@index([clinicId])
+}
+
+model DoctorDepartment {
+  doctorId     String
+  doctor       Doctor           @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  departmentId String
+  department   ClinicDepartment @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  createdAt    DateTime         @default(now())
+
+  @@id([doctorId, departmentId])
+  @@index([departmentId])
+}
+
+/// Doctor contact & professional details (1:1 with Doctor).
+model DoctorDetail {
+  doctorId           String    @id
+  doctor             Doctor    @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  email              String?   @db.VarChar(191)
+  phone              String?   @db.VarChar(32)
+  registrationNumber String?   @db.VarChar(80)
+  bio                String?   @db.Text
+  designation        String?   @db.VarChar(80)
+  /// Digital signature image; applied only to prescriptions the doctor finalizes.
+  signature          Bytes?    @db.MediumBlob
+  signatureMime      String?   @db.VarChar(40)
+  signatureUpdatedBy String?
+  signatureUpdatedAt DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+/// Booking metadata (1:1 with Appointment): public appointment ID, patient
+/// email/gender, chosen department and WhatsApp consent.
+model AppointmentDetail {
+  appointmentId   String            @id
+  appointment     Appointment       @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  appointmentRef  String            @unique @db.VarChar(32)
+  departmentId    String?
+  department      ClinicDepartment? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  patientEmail    String?           @db.VarChar(191)
+  patientGender   String?           @db.VarChar(20)
+  patientPhone    String?           @db.VarChar(32)
+  whatsappConsent Boolean           @default(false)
+  consentAt       DateTime?
+  source          String            @default("dashboard") @db.VarChar(40)
+  createdAt       DateTime          @default(now())
+
+  @@index([departmentId])
+}
+
+/// One row per appointment message attempt. `eventKey` makes every send
+/// idempotent (e.g. "r_1d@2026-11-20T10:00"), so ticks, retries and
+/// reschedules can never double-message a patient.
+model AppointmentNotificationLog {
+  id              String           @id @default(uuid())
+  tenantId        String
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  appointmentId   String
+  appointment     Appointment      @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  contactId       String?
+  eventType       String           @db.VarChar(40)
+  eventKey        String           @db.VarChar(120)
+  channel         String           @default("none") @db.VarChar(20) // text | template | none
+  templateId      String?
+  template        MessageTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  templateName    String?          @db.VarChar(120)
+  templateVersion Int?
+  phoneNumber     String?          @db.VarChar(32)
+  messageId       String?          @db.VarChar(128)
+  status          String           @default("pending") @db.VarChar(30) // pending | sent | failed | blocked_no_template | skipped_no_consent | skipped_window
+  attempts        Int              @default(0)
+  errorMessage    String?          @db.Text
+  scheduledAt     DateTime?
+  sentAt          DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([appointmentId, eventKey])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status])
+  @@index([templateId])
+}
+
+// ── Smart consultation & medical records ──────────────────────────────
+
+/// Medical profile for a patient (a clinic contact). One per contact.
+model PatientProfile {
+  id              String    @id @default(uuid())
+  tenantId        String
+  clinicId        String
+  clinic          Clinic    @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  contactId       String    @unique
+  contact         Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  patientCode     String    @db.VarChar(20) // e.g. P-000123, unique per tenant
+  gender          String?   @db.VarChar(20)
+  dateOfBirth     DateTime? @db.Date
+  ageYears        Int?
+  bloodGroup      String?   @db.VarChar(5)
+  allergies       String?   @db.Text
+  conditions      String?   @db.Text
+  medications     String?   @db.Text
+  surgicalHistory String?   @db.Text
+  familyHistory   String?   @db.Text
+  emergencyName   String?   @db.VarChar(120)
+  emergencyPhone  String?   @db.VarChar(32)
+  notes           String?   @db.Text
+  phoneVerified   Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  @@unique([tenantId, patientCode])
+  @@index([tenantId])
+  @@index([clinicId])
+}
+
+/// One consultation per appointment. Clinical sections are JSON so the
+/// structure can grow without migrations; finalized prescriptions keep a
+/// frozen snapshot for audit.
+model Consultation {
+  id             String      @id @default(uuid())
+  tenantId       String
+  clinicId       String
+  clinic         Clinic      @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  appointmentId  String      @unique
+  appointment    Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  contactId      String
+  contact        Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  doctorId       String?
+  doctor         Doctor?     @relation(fields: [doctorId], references: [id], onDelete: SetNull)
+  status         String      @default("in_progress") @db.VarChar(20) // in_progress | completed | cancelled
+  chiefComplaint Json?
+  vitals         Json?
+  history        Json?
+  examination    String?     @db.Text
+  diagnoses      Json?
+  investigations Json?
+  treatmentPlan  String?     @db.Text
+  followUpDate   DateTime?   @db.Date
+  revision       Int         @default(0) // autosave optimistic concurrency
+  startedBy      String?
+  completedBy    String?
+  startedAt      DateTime    @default(now())
+  completedAt    DateTime?
+  durationSec    Int?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  transcripts  ConsultationTranscript[]
+  prescription Prescription?
+
+  @@index([tenantId, status])
+  @@index([contactId])
+  @@index([doctorId])
+}
+
+/// Every voice/typed dictation, original text kept verbatim for audit.
+/// Audio itself is never stored.
+model ConsultationTranscript {
+  id             String       @id @default(uuid())
+  tenantId       String
+  consultationId String
+  consultation   Consultation @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+  source         String       @default("voice") @db.VarChar(20) // voice | typed
+  originalText   String       @db.Text
+  editedText     String?      @db.Text
+  aiOutput       Json?
+  model          String?      @db.VarChar(80)
+  audioSeconds   Int?
+  createdBy      String?
+  createdAt      DateTime     @default(now())
+
+  @@index([consultationId])
+  @@index([tenantId])
+}
+
+model Prescription {
+  id                String       @id @default(uuid())
+  tenantId          String
+  clinicId          String
+  clinic            Clinic       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  consultationId    String       @unique
+  consultation      Consultation @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+  contactId         String
+  contact           Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  doctorId          String?
+  doctor            Doctor?      @relation(fields: [doctorId], references: [id], onDelete: SetNull)
+  prescriptionNo    String       @db.VarChar(32)
+  status            String       @default("draft") @db.VarChar(20) // draft | finalized
+  medicines         Json?
+  advice            Json?
+  snapshot          Json? // frozen header/doctor/patient/clinical data at finalization
+  pdf               Bytes?       @db.MediumBlob
+  pdfSha256         String?      @db.VarChar(64)
+  verifyToken       String?      @db.VarChar(40)
+  finalizedAt       DateTime?
+  finalizedBy       String?
+  deliveryStatus    String       @default("not_sent") @db.VarChar(20) // not_sent | pending | uploaded | sent | delivered | read | failed | blocked
+  whatsappMessageId String?      @db.VarChar(128)
+  mediaId           String?      @db.VarChar(128)
+  deliveryError     String?      @db.Text
+  deliveryAttempts  Int          @default(0)
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  readAt            DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@unique([tenantId, prescriptionNo])
+  @@index([contactId])
+  @@index([whatsappMessageId])
+  @@index([tenantId, status])
+}
+
+/// One-time prescription branding per clinic.
+model PrescriptionSettings {
+  id             String   @id @default(uuid())
+  tenantId       String   @unique
+  clinicId       String   @unique
+  clinic         Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  clinicName     String?  @db.VarChar(160)
+  address        String?  @db.Text
+  phone          String?  @db.VarChar(40)
+  email          String?  @db.VarChar(191)
+  website        String?  @db.VarChar(191)
+  registrationNo String?  @db.VarChar(80)
+  headerStyle    String   @default("classic") @db.VarChar(20)
+  accentColor    String   @default("#0f766e") @db.VarChar(9)
+  footerText     String?  @db.Text
+  logo           Bytes?   @db.MediumBlob
+  logoMime       String?  @db.VarChar(40)
+  stamp          Bytes?   @db.MediumBlob
+  stampMime      String?  @db.VarChar(40)
+  updatedBy      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model MedicineCatalog {
+  id           String   @id @default(uuid())
+  tenantId     String
+  name         String   @db.VarChar(160)
+  genericName  String?  @db.VarChar(160)
+  brandName    String?  @db.VarChar(160)
+  strength     String?  @db.VarChar(60)
+  form         String?  @db.VarChar(40)
+  manufacturer String?  @db.VarChar(160)
+  units        String?  @db.VarChar(60)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([tenantId, name])
+}
+
+/// Reusable instruction/medicine sets a doctor can insert (never auto-applied).
+model PrescriptionTemplate {
+  id        String   @id @default(uuid())
+  tenantId  String
+  doctorId  String?
+  doctor    Doctor?  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  name      String   @db.VarChar(120)
+  medicines Json?
+  advice    Json?
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model PatientDocument {
+  id             String    @id @default(uuid())
+  tenantId       String
+  contactId      String
+  contact        Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  consultationId String?
+  kind           String    @default("other") @db.VarChar(30) // prescription | lab_report | scan | discharge | medical_report | other
+  title          String    @db.VarChar(160)
+  fileName       String    @db.VarChar(191)
+  mimeType       String    @db.VarChar(80)
+  size           Int
+  data           Bytes     @db.MediumBlob
+  uploadedBy     String?
+  createdAt      DateTime  @default(now())
+  deletedAt      DateTime?
+
+  @@index([tenantId, contactId])
+}
+
+// ==========================================
+// GOOGLE REVIEW MODULE (additive, isolated)
+// Every table carries tenantId and is registered as `direct` in
+// src/server/kernel/tenant-scope.ts. Only ReviewBusiness has a Prisma
+// relation to Tenant; the rest cascade through ReviewBusiness.
+// ==========================================
+
+model ReviewBusiness {
+  id              String   @id @default(uuid())
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name            String   @db.VarChar(160)
+  category        String?  @db.VarChar(120)
+  description     String?  @db.Text
+  address         String?  @db.VarChar(300)
+  googleReviewUrl String?  @db.Text
+  website         String?  @db.VarChar(300)
+  phone           String?  @db.VarChar(40)
+  logoUrl         String?  @db.MediumText
+  services        Json?
+  defaultLanguage String   @default("en") @db.VarChar(8)
+  status          String   @default("active") @db.VarChar(20) // active | inactive
+  publicToken     String   @unique @db.VarChar(40)
+  deletedAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  campaigns   ReviewCampaign[]
+  qrCodes     ReviewQRCode[]
+  jobs        ReviewAutomationJob[]
+  events      ReviewEngagementEvent[]
+  aiRequests  ReviewAIRequest[]
+  approvals   ReviewCustomerApproval[]
+
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, status])
+}
+
+model ReviewCampaign {
+  id          String   @id @default(uuid())
+  tenantId    String
+  businessId  String
+  business    ReviewBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name        String   @db.VarChar(160)
+  description String?  @db.VarChar(500)
+  status      String   @default("active") @db.VarChar(20) // active | paused
+  deletedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  qrCodes   ReviewQRCode[]
+  jobs      ReviewAutomationJob[]
+  events    ReviewEngagementEvent[]
+  approvals ReviewCustomerApproval[]
+
+  @@index([tenantId, businessId])
+}
+
+model ReviewQRCode {
+  id         String   @id @default(uuid())
+  tenantId   String
+  businessId String
+  business   ReviewBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  campaignId String?
+  campaign   ReviewCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  label      String   @db.VarChar(160)
+  placement  String?  @db.VarChar(60) // reception, billing, invoice, whatsapp, website...
+  token      String   @unique @db.VarChar(40)
+  fgColor    String   @default("#0f172a") @db.VarChar(9)
+  bgColor    String   @default("#ffffff") @db.VarChar(9)
+  includeLogo Boolean @default(false)
+  status     String   @default("active") @db.VarChar(20)
+  deletedAt  DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  jobs      ReviewAutomationJob[]
+  events    ReviewEngagementEvent[]
+  aiRequests ReviewAIRequest[]
+  approvals ReviewCustomerApproval[]
+
+  @@index([tenantId, businessId])
+  @@index([campaignId])
+}
+
+model ReviewCustomerApproval {
+  id          String   @id @default(uuid())
+  tenantId    String
+  businessId  String
+  business    ReviewBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  campaignId  String?
+  campaign    ReviewCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  qrCodeId    String?
+  qrCode      ReviewQRCode? @relation(fields: [qrCodeId], references: [id], onDelete: SetNull)
+  visitorId   String   @db.VarChar(64)
+  rating      Int
+  language    String   @db.VarChar(8)
+  feedbackText String? @db.Text
+  finalText   String   @db.Text
+  edited      Boolean  @default(false)
+  consentAt   DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  jobs ReviewAutomationJob[]
+
+  @@index([tenantId, businessId, createdAt])
+}
+
+model ReviewAutomationJob {
+  id          String   @id @default(uuid())
+  tenantId    String
+  businessId  String
+  business    ReviewBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  campaignId  String?
+  campaign    ReviewCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  qrCodeId    String?
+  qrCode      ReviewQRCode? @relation(fields: [qrCodeId], references: [id], onDelete: SetNull)
+  approvalId  String?
+  approval    ReviewCustomerApproval? @relation(fields: [approvalId], references: [id], onDelete: SetNull)
+  // pending | queued | initializing | browser_launched | navigating | preparing_review |
+  // awaiting_customer_confirmation | completed | failed | cancelled
+  status      String   @default("pending") @db.VarChar(40)
+  attempts    Int      @default(0)
+  maxAttempts Int      @default(3)
+  lastError   String?  @db.Text
+  nextRunAt   DateTime @default(now())
+  lockedAt    DateTime?
+  lockedBy    String?  @db.VarChar(80)
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  durationMs  Int?
+  screenshotPath String? @db.VarChar(400)
+  result      Json?
+  cancelRequested Boolean @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  logs ReviewAutomationLog[]
+
+  @@index([tenantId, status, createdAt])
+  @@index([status, nextRunAt])
+  @@index([businessId])
+}
+
+model ReviewAutomationLog {
+  id        String   @id @default(uuid())
+  tenantId  String
+  jobId     String
+  job       ReviewAutomationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  level     String   @default("info") @db.VarChar(10) // info | warn | error
+  message   String   @db.VarChar(500)
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([jobId, createdAt])
+  @@index([tenantId, createdAt])
+}
+
+model ReviewEngagementEvent {
+  id         String   @id @default(uuid())
+  tenantId   String
+  businessId String
+  business   ReviewBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  campaignId String?
+  campaign   ReviewCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  qrCodeId   String?
+  qrCode     ReviewQRCode? @relation(fields: [qrCodeId], references: [id], onDelete: SetNull)
+  visitorId  String   @db.VarChar(64)
+  // page_view | rating_selected | feedback_submitted | ai_generated | draft_approved |
+  // review_copied | google_opened | customer_reported_done
+  eventType  String   @db.VarChar(40)
+  language   String?  @db.VarChar(8)
+  rating     Int?
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, businessId, createdAt])
+  @@index([tenantId, eventType, createdAt])
+  @@index([qrCodeId, eventType])
+}
+
+model ReviewAIRequest {
+  id          String   @id @default(uuid())
+  tenantId    String
+  businessId  String
+  business    ReviewBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  qrCodeId    String?
+  qrCode      ReviewQRCode? @relation(fields: [qrCodeId], references: [id], onDelete: SetNull)
+  kind        String   @db.VarChar(20) // generate | translate | shorten | expand
+  language    String   @db.VarChar(8)
+  rating      Int?
+  inputChars  Int      @default(0)
+  outputCount Int      @default(0)
+  tokensUsed  Int      @default(0)
+  success     Boolean  @default(true)
+  error       String?  @db.VarChar(300)
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, businessId, createdAt])
+}
+
+/// Sales-nurture state for one conversation: how many "are you still
+/// interested?" nudges went out after the customer's last message. Resets
+/// when the customer replies (`inboundAt` changes).
+model LeadFollowUp {
+  id             String   @id @default(uuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversationId String   @unique
+  contactId      String
+  contact        Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  /// The customer message these nudges answer; a newer one restarts the cycle.
+  inboundAt      DateTime
+  step           Int      @default(0)
+  status         String   @default("active") @db.VarChar(20) // active | exhausted | stopped
+  stopReason     String?  @db.VarChar(60)
+  lastSentAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([contactId])
+}
+
+
+/// A drip sequence: timed WhatsApp messages sent to enrolled contacts.
+/// `steps` = [{ delayHours, kind: "template" | "text", templateName?, language?, params?, text? }];
+/// delayHours counts from enrolment (step 1) or from the previous step.
+model DripSequence {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String   @db.VarChar(120)
+  status      String   @default("active") @db.VarChar(20) // active | paused
+  stopOnReply Boolean  @default(true)
+  steps       Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  enrollments DripEnrollment[]
+
+  @@index([tenantId, status])
+}
+
+model DripEnrollment {
+  id         String       @id @default(uuid())
+  tenantId   String
+  tenant     Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sequenceId String
+  sequence   DripSequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  contactId  String
+  contact    Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  step       Int          @default(0) // index of the next step to send
+  status     String       @default("active") @db.VarChar(20) // active | completed | stopped
+  stopReason String?      @db.VarChar(60)
+  nextRunAt  DateTime
+  lastError  String?      @db.VarChar(500)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@unique([sequenceId, contactId])
+  @@index([status, nextRunAt])
+  @@index([tenantId])
+  @@index([contactId])
+}

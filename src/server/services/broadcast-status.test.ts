@@ -84,7 +84,17 @@ describe('canTransitionBroadcast', () => {
   });
 
   it('rejects an unknown current status', () => {
-    expect(canTransitionBroadcast('paused', 'sending')).toBe(false);
+    expect(canTransitionBroadcast('archived', 'sending')).toBe(false);
+  });
+
+  it('allows pause, resume and cancel along the expected paths only', () => {
+    expect(canTransitionBroadcast('sending', 'paused')).toBe(true);
+    expect(canTransitionBroadcast('paused', 'sending')).toBe(true);
+    expect(canTransitionBroadcast('paused', 'cancelled')).toBe(true);
+    expect(canTransitionBroadcast('scheduled', 'cancelled')).toBe(true);
+    expect(canTransitionBroadcast('draft', 'paused')).toBe(false);
+    expect(canTransitionBroadcast('cancelled', 'sending')).toBe(false);
+    expect(canTransitionBroadcast('sent', 'cancelled')).toBe(false);
   });
 });
 

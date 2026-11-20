@@ -37,6 +37,10 @@ vi.mock('@/lib/prisma', () => ({
       }),
       update: vi.fn(async () => ({})),
     },
+    refreshToken: {
+      deleteMany: vi.fn(async () => ({ count: 0 })),
+      create: vi.fn(async () => ({})),
+    },
   },
 }));
 

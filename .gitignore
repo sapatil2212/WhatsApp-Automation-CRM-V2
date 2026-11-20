@@ -46,3 +46,10 @@ next-env.d.ts
 # scratch
 scratch/
 
+
+# Inbox attachments uploaded by agents (served by /api/inbox/media)
+/storage/
+
+# Google Review worker runtime files (screenshots, heartbeat, PM2 logs)
+/.runtime/
+/logs/

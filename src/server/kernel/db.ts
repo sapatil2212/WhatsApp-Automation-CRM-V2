@@ -42,6 +42,7 @@ import {
   UNIQUE_OPERATIONS,
   getTenantScope,
 } from './tenant-scope';
+import { registerInboxRealtime } from '../realtime/inbox-events';
 
 const log = getLogger('kernel.db');
 
@@ -64,6 +65,10 @@ export const systemDb: PrismaClient = globalForPrisma.__systemPrisma ?? new Pris
 if (!globalForPrisma.__systemPrisma) {
   globalForPrisma.__systemPrisma = systemDb;
 }
+
+// Pushes inbox writes (messages, conversations, reactions, notes, tags) to
+// the tenant's socket.io room. Idempotent per client instance.
+registerInboxRealtime(systemDb);
 
 type AnyArgs = Record<string, unknown>;
 
@@ -275,7 +280,7 @@ export async function applyWhereGuard(input: {
       return where;
     case 'parent': {
       const existing = asRecord(where[input.scope.relation]);
-      where[input.scope.relation] = { ...existing, tenantId: input.tenantId };
+      where[input.scope.relation] = { ...existing, ...ownerFilter(input.scope.parentModel, input.tenantId) };
       return where;
     }
     case 'scalarParent': {
@@ -286,6 +291,20 @@ export async function applyWhereGuard(input: {
     default:
       throw new InternalError('Unreachable tenant scope kind.');
   }
+}
+
+/**
+ * The filter that proves a row of `model` belongs to the tenant, following
+ * parent chains: Clinic → `{ tenantId }`, Doctor → `{ clinic: { tenantId } }`,
+ * so a grandchild like DoctorDetail is guarded as
+ * `{ doctor: { clinic: { tenantId } } }` (Doctor has no tenantId column).
+ */
+export function ownerFilter(model: string, tenantId: string, depth = 0): AnyArgs {
+  const scope = getTenantScope(model as Parameters<typeof getTenantScope>[0]);
+  if (!scope || depth > 4) throw new InternalError(`Cannot build a tenant filter for parent model "${model}".`);
+  if (scope.kind === 'direct') return { tenantId };
+  if (scope.kind === 'parent') return { [scope.relation]: ownerFilter(scope.parentModel, tenantId, depth + 1) };
+  throw new InternalError(`Parent model "${model}" must be direct or relation-scoped to be used as a parent.`);
 }
 
 export type TenantDb = ReturnType<typeof buildTenantClient>;

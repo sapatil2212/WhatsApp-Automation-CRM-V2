@@ -17,7 +17,7 @@ import { booleanQuerySchema, idSchema, requiredText, searchSchema } from './comm
 export const listTemplatesQuerySchema = paginationQuerySchema.extend({
   search: searchSchema,
   category: z.enum(TEMPLATE_CATEGORIES).optional(),
-  status: z.enum(['Draft', 'Pending', 'Approved', 'Rejected']).optional(),
+  status: z.enum(['Draft', 'Pending', 'Approved', 'Rejected', 'Paused', 'Disabled']).optional(),
   /** Pickers that can only offer templates Meta will accept. */
   sendableOnly: booleanQuerySchema,
 });

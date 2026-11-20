@@ -23,11 +23,23 @@ export const listRecipientsQuerySchema = paginationQuerySchema.extend({
 });
 export type ListRecipientsQuery = z.infer<typeof listRecipientsQuerySchema>;
 
+export const slotMappingSchema = z.object({
+  source: z.enum(['static', 'name', 'first_name', 'phone', 'email', 'company', 'custom_field']),
+  value: z.string().max(1024).optional(),
+  fallback: z.string().max(1024).optional(),
+});
+
+export const personalizationSchema = z
+  .record(z.string().regex(/^(body_\d{1,2}|header_1|header_media|button_\d)$/, 'Unknown template slot.'), slotMappingSchema)
+  .default({});
+
 const templateSelection = {
   templateName: requiredText(512, 'Template name'),
   templateLanguage: z.string().trim().max(20).default('en_US'),
   /** Positional values for `{{1}}…{{n}}`. */
   templateVariables: z.array(z.string().max(1024)).max(20).default([]),
+  /** Per-contact mappings; when present it supersedes `templateVariables`. */
+  personalization: personalizationSchema,
 };
 
 export const createBroadcastBodySchema = z.object({
@@ -55,6 +67,7 @@ export const updateBroadcastBodySchema = nonEmptyPatch(
     templateName: requiredText(512, 'Template name').optional(),
     templateLanguage: z.string().trim().max(20).optional(),
     templateVariables: z.array(z.string().max(1024)).max(20).optional(),
+    personalization: z.record(z.string(), slotMappingSchema).optional(),
     audience: audienceSchema.optional(),
     /** `null` clears the schedule. */
     scheduledAt: z.coerce.date().nullable().optional(),
@@ -66,6 +79,23 @@ export const previewAudienceBodySchema = z.object({
   audience: audienceSchema,
 });
 export type PreviewAudienceBody = z.infer<typeof previewAudienceBodySchema>;
+
+export const testSendBodySchema = z.object({
+  templateName: requiredText(512, 'Template name'),
+  templateLanguage: z.string().trim().max(20).default('en_US'),
+  personalization: personalizationSchema,
+  phone: z.string().trim().min(6).max(20),
+});
+export type TestSendBody = z.infer<typeof testSendBodySchema>;
+
+export const importAudienceBodySchema = z.object({
+  rows: z
+    .array(z.object({ phone: z.string().trim().max(32), name: z.string().trim().max(160).optional() }))
+    .min(1)
+    .max(10_000),
+  defaultCountryCode: z.string().regex(/^\d{1,4}$/).optional(),
+});
+export type ImportAudienceBody = z.infer<typeof importAudienceBodySchema>;
 
 export const broadcastParamsSchema = z.object({ id: idSchema });
 export type BroadcastParams = z.infer<typeof broadcastParamsSchema>;

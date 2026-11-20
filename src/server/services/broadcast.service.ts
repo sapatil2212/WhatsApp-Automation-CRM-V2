@@ -52,6 +52,15 @@ import {
   resolveFinalBroadcastStatus,
 } from './broadcast-status';
 import type { TemplateService } from './template.service';
+import {
+  buildSendComponents,
+  fromStoredVariables,
+  templateSlots,
+  toStoredVariables,
+  validatePersonalization,
+  type CampaignTemplateShape,
+  type Personalization,
+} from '@/lib/campaigns/personalization';
 
 /** Per-recipient outcome from the transport. */
 export interface BroadcastSendOutcome {
@@ -65,14 +74,52 @@ export interface BroadcastTransport {
     templateName: string;
     language: string;
     params: string[];
+    /** Full Meta components (header / body / button params). Wins over `params`. */
+    components?: Array<Record<string, unknown>>;
   }): Promise<{ whatsappMessageId: string }>;
 }
+
+/**
+ * Broadcasts currently being dispatched by this process. The cron ticker and
+ * the campaign page can both drive `dispatch()`; this lock stops them from
+ * claiming the same pending rows at once (which would double-send, because
+ * the send happens before the conditional status write). The app runs as a
+ * single Node process (server.js); a multi-instance deployment would need a
+ * DB-level claim instead.
+ */
+const dispatching = new Set<string>();
+
+/** How often (in sends) a running batch re-checks for pause / cancel. */
+const STATUS_CHECK_EVERY = 3;
 
 export interface BroadcastServiceDeps {
   broadcasts: BroadcastRepository;
   audience: AudienceRepository;
   templates: Pick<TemplateService, 'assertSendable'>;
   transport?: BroadcastTransport;
+}
+
+type SendableTemplate = Awaited<ReturnType<TemplateService['assertSendable']>>;
+
+function shapeOf(t: SendableTemplate): CampaignTemplateShape {
+  return {
+    bodyText: t.bodyText,
+    headerType: t.headerType,
+    headerContent: t.headerContent,
+    buttons: (t.buttons ?? []).map((b) => ({ type: b.type, text: b.text, url: b.url ?? undefined })),
+  };
+}
+
+/** Legacy positional values -> static body mappings. */
+function legacyToPersonalization(values: string[]): Personalization {
+  return Object.fromEntries(values.map((v, i) => [`body_${i + 1}`, { source: 'static' as const, value: v }]));
+}
+
+/** Positional body values for the param-count gate (fallbacks stand in for dynamic data). */
+function bodyParamsFor(slots: ReturnType<typeof templateSlots>, p: Personalization): string[] {
+  return slots
+    .filter((s) => s.kind === 'body')
+    .map((s) => (p[s.key]?.source === 'static' ? p[s.key]?.value ?? '' : p[s.key]?.fallback ?? 'x'));
 }
 
 /** Preview sample size — enough to sanity-check a segment, small enough to be cheap. */
@@ -148,11 +195,10 @@ export class BroadcastService {
     // Approval gate: the wizard listed every template regardless of status,
     // so Draft and Rejected templates were selectable and every send failed
     // at Meta with #132001.
-    await this.deps.templates.assertSendable(
-      body.templateName,
-      body.templateLanguage,
-      body.templateVariables,
-    );
+    const personalization = Object.keys(body.personalization ?? {}).length
+      ? (body.personalization as Personalization)
+      : legacyToPersonalization(body.templateVariables);
+    const template = await this.assertPersonalized(body.templateName, body.templateLanguage, personalization);
 
     const reach = await this.deps.audience.count(body.audience);
     if (reach === 0) {
@@ -171,7 +217,7 @@ export class BroadcastService {
       name: body.name,
       templateName: body.templateName,
       templateLanguage: body.templateLanguage,
-      templateVariables: toInputJson(toVariableMap(body.templateVariables)),
+      templateVariables: toInputJson(toStoredVariables(templateSlots(shapeOf(template)), personalization)),
       audienceFilter: toInputJson(body.audience),
       scheduledAt: body.scheduledAt ?? null,
       status: body.scheduledAt ? 'scheduled' : 'draft',
@@ -208,12 +254,19 @@ export class BroadcastService {
       });
     }
 
-    if (body.templateName || body.templateVariables) {
-      await this.deps.templates.assertSendable(
+    let storedVariables: Record<string, unknown> | undefined;
+    if (body.templateName || body.templateVariables || body.personalization) {
+      const personalization: Personalization = body.personalization
+        ? (body.personalization as Personalization)
+        : body.templateVariables
+          ? legacyToPersonalization(body.templateVariables)
+          : fromStoredVariables(existing.templateVariables);
+      const template = await this.assertPersonalized(
         body.templateName ?? existing.templateName,
         body.templateLanguage ?? existing.templateLanguage,
-        body.templateVariables ?? [],
+        personalization,
       );
+      storedVariables = toStoredVariables(templateSlots(shapeOf(template)), personalization);
     }
 
     // Changing the audience after creation would leave the already-frozen
@@ -229,9 +282,7 @@ export class BroadcastService {
       ...(body.name !== undefined ? { name: body.name } : {}),
       ...(body.templateName !== undefined ? { templateName: body.templateName } : {}),
       ...(body.templateLanguage !== undefined ? { templateLanguage: body.templateLanguage } : {}),
-      ...(body.templateVariables !== undefined
-        ? { templateVariables: toInputJson(toVariableMap(body.templateVariables)) }
-        : {}),
+      ...(storedVariables !== undefined ? { templateVariables: toInputJson(storedVariables) } : {}),
       ...(body.scheduledAt !== undefined
         ? {
             scheduledAt: body.scheduledAt,
@@ -270,10 +321,10 @@ export class BroadcastService {
     const existing = await this.deps.broadcasts.findById(id);
     assertBroadcastTransition(existing.status, 'sending');
 
-    await this.deps.templates.assertSendable(
+    await this.assertPersonalized(
       existing.templateName,
       existing.templateLanguage,
-      toVariableArray(existing.templateVariables),
+      fromStoredVariables(existing.templateVariables),
     );
 
     const claimed = await this.deps.broadcasts.transitionStatus(id, existing.status, 'sending');
@@ -295,6 +346,31 @@ export class BroadcastService {
       throw new ValidationError('WhatsApp is not connected for this workspace.');
     }
 
+    if (dispatching.has(id)) {
+      // Another pass for this campaign is already in flight in this process.
+      const current = await this.deps.broadcasts.findById(id);
+      return {
+        broadcastId: id,
+        status: current.status as BroadcastSendResultDto['status'],
+        attempted: 0,
+        sent: 0,
+        failed: 0,
+        hasMore: current.status === 'sending',
+      };
+    }
+    dispatching.add(id);
+    try {
+      return await this.dispatchBatch(id, batchSize, transport);
+    } finally {
+      dispatching.delete(id);
+    }
+  }
+
+  private async dispatchBatch(
+    id: string,
+    batchSize: number,
+    transport: BroadcastTransport,
+  ): Promise<BroadcastSendResultDto> {
     const broadcast = await this.deps.broadcasts.findById(id);
     if (broadcast.status !== 'sending') {
       throw new ConflictError(`A ${broadcast.status} campaign is not dispatching.`, {
@@ -302,13 +378,36 @@ export class BroadcastService {
       });
     }
 
-    const params = toVariableArray(broadcast.templateVariables);
+    const personalization = fromStoredVariables(broadcast.templateVariables);
+    let template: SendableTemplate;
+    try {
+      template = await this.assertPersonalized(broadcast.templateName, broadcast.templateLanguage, personalization);
+    } catch (error) {
+      // Template paused / rejected / deleted mid-campaign: stop instead of
+      // burning every remaining recipient on a guaranteed Meta error.
+      await this.deps.broadcasts.transitionStatus(id, 'sending', 'failed');
+      throw error;
+    }
+    const shape = shapeOf(template);
+    const params = bodyParamsFor(templateSlots(shape), personalization);
     const batch = await this.deps.broadcasts.claimPendingBatch(id, batchSize);
+    const customIndex = await this.deps.broadcasts.customValuesFor(batch.map((r) => r.contactId));
 
     let sent = 0;
     let failed = 0;
+    let stopped = false;
 
-    for (const recipient of batch) {
+    for (let index = 0; index < batch.length; index++) {
+      const recipient = batch[index];
+      // Pause / cancel must take effect quickly, not after the whole batch:
+      // re-read the status every few sends and leave the rest pending.
+      if (index > 0 && index % STATUS_CHECK_EVERY === 0) {
+        const current = await this.deps.broadcasts.findById(id);
+        if (current.status !== 'sending') {
+          stopped = true;
+          break;
+        }
+      }
       const phone = recipient.contact?.phone;
 
       if (!phone) {
@@ -324,11 +423,19 @@ export class BroadcastService {
       }
 
       try {
+        const components = buildSendComponents(shape, personalization, {
+          name: recipient.contact?.name,
+          phone,
+          email: recipient.contact?.email,
+          company: recipient.contact?.company,
+          custom: customIndex.get(recipient.contactId),
+        });
         const { whatsappMessageId } = await transport.sendTemplate({
           to: phone,
           templateName: broadcast.templateName,
           language: broadcast.templateLanguage,
           params,
+          components,
         });
         sent += 1;
         await this.deps.broadcasts.recordRecipientResult({
@@ -357,6 +464,18 @@ export class BroadcastService {
     const remaining = await this.deps.broadcasts.countPending(id);
     let status = broadcast.status;
 
+    if (stopped) {
+      const current = await this.deps.broadcasts.findById(id);
+      return {
+        broadcastId: id,
+        status: current.status as BroadcastSendResultDto['status'],
+        attempted: sent + failed,
+        sent,
+        failed,
+        hasMore: false,
+      };
+    }
+
     if (remaining === 0) {
       const finalRow = await this.deps.broadcasts.findById(id);
       status = resolveFinalBroadcastStatus({
@@ -375,6 +494,88 @@ export class BroadcastService {
       failed,
       hasMore: remaining > 0,
     };
+  }
+
+  /**
+   * Pauses a sending campaign. The in-flight batch stops within a few
+   * messages; untouched recipients stay pending for `resume`.
+   */
+  async pause(id: string): Promise<BroadcastDto> {
+    const existing = await this.deps.broadcasts.findById(id);
+    assertBroadcastTransition(existing.status, 'paused');
+    if (!(await this.deps.broadcasts.transitionStatus(id, 'sending', 'paused'))) {
+      throw new ConflictError('This campaign is no longer sending.');
+    }
+    return this.getById(id);
+  }
+
+  /** Resumes a paused campaign (template approval is re-checked first). */
+  async resume(id: string): Promise<BroadcastDto> {
+    const existing = await this.deps.broadcasts.findById(id);
+    if (existing.status !== 'paused') {
+      throw new ConflictError(`A ${existing.status} campaign cannot be resumed.`, { details: { status: existing.status } });
+    }
+    return this.start(id);
+  }
+
+  /**
+   * Stops a draft, scheduled, sending or paused campaign permanently.
+   * Messages already sent are kept; everyone still pending is marked
+   * cancelled and removed from the campaign total.
+   */
+  async cancel(id: string): Promise<BroadcastDto> {
+    const existing = await this.deps.broadcasts.findById(id);
+    assertBroadcastTransition(existing.status, 'cancelled');
+    if (!(await this.deps.broadcasts.transitionStatus(id, existing.status, 'cancelled'))) {
+      throw new ConflictError('The campaign changed state while cancelling. Refresh and try again.');
+    }
+    // Let an in-flight batch notice the new status and stop, so its last
+    // results are recorded before the remaining rows are cancelled.
+    for (let waited = 0; dispatching.has(id) && waited < 15_000; waited += 200) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    await this.deps.broadcasts.cancelPendingRecipients(id);
+    return this.getById(id);
+  }
+
+  /**
+   * Sends the configured template to one phone so the user sees the real
+   * message before launching. Dynamic slots use their fallbacks.
+   */
+  async testSend(input: {
+    templateName: string;
+    templateLanguage: string;
+    personalization: Personalization;
+    phone: string;
+  }): Promise<{ whatsappMessageId: string }> {
+    const transport = this.deps.transport;
+    if (!transport) throw new ValidationError('WhatsApp is not connected for this workspace.');
+    const template = await this.assertPersonalized(input.templateName, input.templateLanguage, input.personalization);
+    const shape = shapeOf(template);
+    const components = buildSendComponents(shape, input.personalization, { phone: input.phone, custom: {} });
+    return transport.sendTemplate({
+      to: input.phone,
+      templateName: input.templateName,
+      language: input.templateLanguage,
+      params: bodyParamsFor(templateSlots(shape), input.personalization),
+      components,
+    });
+  }
+
+  /** Approval gate plus "every slot Meta needs has a usable value". */
+  private async assertPersonalized(
+    name: string,
+    language: string,
+    personalization: Personalization,
+  ): Promise<SendableTemplate> {
+    // First pass with a generous param list: only checks approval/existence.
+    const probe = await this.deps.templates.assertSendable(name, language, Array(20).fill('x'));
+    const slots = templateSlots(shapeOf(probe));
+    const issues = validatePersonalization(slots, personalization);
+    if (issues.length) {
+      throw new ValidationError(issues[0].message, { details: { issues } });
+    }
+    return probe;
   }
 
   /**
@@ -461,27 +662,4 @@ export class BroadcastService {
       throw new NotFoundError('Campaign');
     }
   }
-}
-
-/**
- * Positional array ⇄ the `{ "1": … }` map the column already holds.
- * Preserved rather than migrated so existing rows keep working.
- */
-function toVariableMap(values: string[]): Record<string, string> {
-  return Object.fromEntries(values.map((value, index) => [String(index + 1), value]));
-}
-
-function toVariableArray(stored: unknown): string[] {
-  if (stored === null || stored === undefined || typeof stored !== 'object' || Array.isArray(stored)) {
-    return [];
-  }
-  const record = stored as Record<string, unknown>;
-  const keys = Object.keys(record)
-    .map(Number)
-    .filter((key) => Number.isInteger(key) && key >= 1)
-    .sort((a, b) => a - b);
-  return keys.map((key) => {
-    const value = record[String(key)];
-    return typeof value === 'string' ? value : '';
-  });
 }

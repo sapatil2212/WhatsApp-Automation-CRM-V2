@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { CheckCheck, Check, Phone, Video, MoreVertical, ArrowLeft, Sparkles, Smile, Paperclip, Mic, Signal, Wifi, BatteryFull } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -221,13 +220,12 @@ export function AIChatSimulation() {
               }}>TODAY</span>
             </div>
 
-            <AnimatePresence initial={false}>
+            <>
               {visible.map((msg) => {
                 if (msg.sender === "system") {
                   return (
-                    <motion.div key={msg.id}
-                      initial={{ opacity: 0, scale: 0.94 }}
-                      animate={{ opacity: 1, scale: 1 }}
+                    <div key={msg.id}
+                      className="chat-pop"
                       style={{ display: "flex", justifyContent: "center", margin: "4px 0" }}
                     >
                       <span style={{
@@ -236,16 +234,14 @@ export function AIChatSimulation() {
                         boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
                         maxWidth: "90%", textAlign: "center", lineHeight: 1.5,
                       }}>{msg.text}</span>
-                    </motion.div>
+                    </div>
                   );
                 }
 
                 const isUser = msg.sender === "user";
                 return (
-                  <motion.div key={msg.id}
-                    initial={{ opacity: 0, y: 10, scale: 0.96 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    transition={{ type: "spring", stiffness: 380, damping: 28 }}
+                  <div key={msg.id}
+                    className="chat-pop"
                     style={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start" }}
                   >
                     <div style={{
@@ -296,18 +292,16 @@ export function AIChatSimulation() {
                         )}
                       </div>
                     </div>
-                  </motion.div>
+                  </div>
                 );
               })}
-            </AnimatePresence>
+            </>
 
             {/* Typing indicator */}
-            <AnimatePresence>
+            <>
               {typing && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 4 }}
+                <div
+                  className="chat-pop"
                   style={{ display: "flex", justifyContent: "flex-start" }}
                 >
                   <div style={{
@@ -326,9 +320,9 @@ export function AIChatSimulation() {
                       }} />
                     ))}
                   </div>
-                </motion.div>
+                </div>
               )}
-            </AnimatePresence>
+            </>
           </div>
 
           {/* ── Input bar ── */}
@@ -378,6 +372,14 @@ export function AIChatSimulation() {
         @keyframes bounce {
           0%, 60%, 100% { transform: translateY(0); }
           30% { transform: translateY(-5px); }
+        }
+        @keyframes chat-pop {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .chat-pop { animation: chat-pop 0.2s ease-out; }
+        @media (prefers-reduced-motion: reduce) {
+          .chat-pop { animation: none; }
         }
       `}</style>
 

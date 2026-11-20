@@ -1,508 +1,416 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import type { Contact, Tag, ContactTag } from '@/types';
+import {
+  ArrowDownAZ, ArrowUpDown, ChevronLeft, ChevronRight, Download, Eye, Filter, Loader2, Mail, Megaphone,
+  MoreHorizontal, Pencil, Plus, Search, Sparkles, Tag as TagIcon, Trash2, UserPlus, Users, X,
+} from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import {
-  Search,
-  Plus,
-  Upload,
-  Download,
-  MoreHorizontal,
-  Pencil,
-  Trash2,
-  Loader2,
-  Users,
-  ChevronLeft,
-  ChevronRight,
-} from 'lucide-react';
-import { ContactForm } from '@/components/contacts/contact-form';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ContactDetailView } from '@/components/contacts/contact-detail-view';
-import { ImportModal } from '@/components/contacts/import-modal';
+import { ContactEditor, type ContactRow, type TagItem } from '@/components/contacts/contact-editor';
+import { AiImportDialog } from '@/components/contacts/ai-import-dialog';
+import { api } from '@/lib/campaigns/api';
 
-const PAGE_SIZE = 25;
+type Sort = 'createdAt:desc' | 'createdAt:asc' | 'name:asc' | 'name:desc' | 'updatedAt:desc';
+const SORT_LABEL: Record<Sort, string> = {
+  'createdAt:desc': 'Newest first',
+  'createdAt:asc': 'Oldest first',
+  'name:asc': 'Name A–Z',
+  'name:desc': 'Name Z–A',
+  'updatedAt:desc': 'Recently updated',
+};
 
-interface ContactWithTags extends Contact {
-  tags?: Tag[];
+interface Stats { total: number; newThisWeek: number; untagged: number; withEmail: number; aiAvailable: boolean }
+
+const AVATAR_COLORS = ['bg-emerald-500', 'bg-sky-500', 'bg-violet-500', 'bg-amber-500', 'bg-rose-500', 'bg-teal-500', 'bg-indigo-500'];
+function initials(c: ContactRow) {
+  const src = (c.name || '').trim();
+  if (!src) return '#';
+  const parts = src.split(/\s+/);
+  return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
+}
+function avatarColor(id: string) {
+  let h = 0;
+  for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length];
+}
+function formatPhone(p: string) {
+  const d = p.replace(/\D/g, '');
+  if (d.startsWith('91') && d.length === 12) return `+91 ${d.slice(2, 7)} ${d.slice(7)}`;
+  if (d.startsWith('1') && d.length === 11) return `+1 ${d.slice(1, 4)} ${d.slice(4, 7)} ${d.slice(7)}`;
+  return `+${d}`;
 }
 
 export default function ContactsPage() {
-  const supabase = useMemo(() => createClient(), []);
-
-  const [contacts, setContacts] = useState<ContactWithTags[]>([]);
+  const router = useRouter();
+  const [rows, setRows] = useState<ContactRow[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [tags, setTags] = useState<TagItem[]>([]);
+
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(0);
-  const [totalCount, setTotalCount] = useState(0);
+  const [debounced, setDebounced] = useState('');
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [sort, setSort] = useState<Sort>('createdAt:desc');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  // Modals
-  const [formOpen, setFormOpen] = useState(false);
-  const [editContact, setEditContact] = useState<Contact | null>(null);
-  const [editContactTags, setEditContactTags] = useState<ContactTag[]>([]);
-  const [detailOpen, setDetailOpen] = useState(false);
-  const [detailContactId, setDetailContactId] = useState<string | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editing, setEditing] = useState<ContactRow | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<Contact | null>(null);
-  const [deleting, setDeleting] = useState(false);
+  const [confirm, setConfirm] = useState<null | { ids: string[]; label: string }>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
-  // All tags for display
-  const [tagsMap, setTagsMap] = useState<Record<string, Tag>>({});
+  useEffect(() => {
+    const t = window.setTimeout(() => { setDebounced(search.trim()); setPage(1); }, 300);
+    return () => window.clearTimeout(t);
+  }, [search]);
 
-  const fetchTags = useCallback(async () => {
-    const { data } = await supabase.from('tags').select('*');
-    if (data) {
-      const map: Record<string, Tag> = {};
-      data.forEach((t: any) => (map[t.id] = t));
-      setTagsMap(map);
-    }
-  }, [supabase]);
+  const loadTags = useCallback(async () => {
+    try { setTags((await api<TagItem[]>('/api/tags')).data); } catch { /* non-blocking */ }
+  }, []);
+  const loadStats = useCallback(async () => {
+    try { setStats((await api<Stats>('/api/contacts/stats')).data); } catch { /* non-blocking */ }
+  }, []);
 
-  const fetchContacts = useCallback(async () => {
+  const load = useCallback(async () => {
     setLoading(true);
-
-    const from = page * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
-
-    let query = supabase
-      .from('contacts')
-      .select('*', { count: 'exact' })
-      .order('created_at', { ascending: false })
-      .range(from, to);
-
-    if (search.trim()) {
-      const term = `%${search.trim()}%`;
-      query = query.or(`name.ilike.${term},phone.ilike.${term},email.ilike.${term}`);
-    }
-
-    const { data, count, error } = await query;
-
-    console.log('[DEBUG fetchContacts] response:', { data, count, error, dataType: typeof data, isArray: Array.isArray(data), dataLength: data?.length });
-
-    if (error) {
-      console.log('[DEBUG fetchContacts] error branch hit:', error);
-      toast.error('Failed to load contacts');
+    const [sortBy, sortDirection] = sort.split(':');
+    const q = new URLSearchParams({ page: String(page), pageSize: String(pageSize), sortBy, sortDirection });
+    if (debounced) q.set('search', debounced);
+    if (tagFilter.length) q.set('tagIds', tagFilter.join(','));
+    try {
+      const res = await api<ContactRow[]>(`/api/contacts?${q}`);
+      setRows(res.data);
+      setTotal(res.meta?.pagination?.total ?? res.data.length);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to load contacts');
+    } finally {
       setLoading(false);
-      return;
     }
+  }, [page, pageSize, sort, debounced, tagFilter]);
 
-    setTotalCount(count ?? 0);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadTags(); loadStats(); }, [loadTags, loadStats]);
 
-    if (!data || data.length === 0) {
-      setContacts([]);
-      setLoading(false);
-      return;
-    }
+  const refreshAll = useCallback(() => { load(); loadStats(); loadTags(); }, [load, loadStats, loadTags]);
 
-    // Fetch tags for these contacts
-    const contactIds = data.map((c: any) => c.id);
-    const { data: contactTags } = await supabase
-      .from('contact_tags')
-      .select('contact_id, tag_id')
-      .in('contact_id', contactIds);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const allOnPage = rows.length > 0 && rows.every((r) => selected.has(r.id));
+  const selectedIds = useMemo(() => [...selected], [selected]);
 
-    const tagsByContact: Record<string, string[]> = {};
-    contactTags?.forEach((ct: any) => {
-      if (!tagsByContact[ct.contact_id]) tagsByContact[ct.contact_id] = [];
-      tagsByContact[ct.contact_id].push(ct.tag_id);
+  function toggle(id: string) {
+    setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }
+  function toggleAll() {
+    setSelected((s) => {
+      const n = new Set(s);
+      if (allOnPage) rows.forEach((r) => n.delete(r.id));
+      else rows.forEach((r) => n.add(r.id));
+      return n;
     });
-
-    const enriched: ContactWithTags[] = data.map((c: any) => ({
-      ...c,
-      tags: (tagsByContact[c.id] ?? [])
-        .map((tid) => tagsMap[tid])
-        .filter(Boolean),
-    }));
-
-    setContacts(enriched);
-    setLoading(false);
-  }, [supabase, page, search, tagsMap]);
-
-  // Load-once-on-mount-ish data fetches. Each setter inside runs
-  // inside an async promise completion (Supabase await), not
-  // synchronously in the effect body, so the cascade the lint rule
-  // warns about doesn't apply here.
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchTags();
-  }, [fetchTags]);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchContacts();
-  }, [fetchContacts]);
-
-  function openAddForm() {
-    setEditContact(null);
-    setEditContactTags([]);
-    setFormOpen(true);
   }
 
-  async function openEditForm(contact: Contact) {
-    const { data } = await supabase
-      .from('contact_tags')
-      .select('*')
-      .eq('contact_id', contact.id);
-    setEditContact(contact);
-    setEditContactTags(data ?? []);
-    setFormOpen(true);
-  }
-
-  function openDetail(contactId: string) {
-    setDetailContactId(contactId);
-    setDetailOpen(true);
-  }
-
-  function confirmDelete(contact: Contact) {
-    setDeleteTarget(contact);
-    setDeleteConfirmOpen(true);
-  }
-
-  async function handleDelete() {
-    if (!deleteTarget) return;
-    setDeleting(true);
-
-    const { error } = await supabase
-      .from('contacts')
-      .delete()
-      .eq('id', deleteTarget.id);
-
-    if (error) {
-      toast.error('Failed to delete contact');
-    } else {
-      toast.success('Contact deleted');
-      fetchContacts();
+  async function bulk(action: 'delete' | 'addTags' | 'removeTags', ids: string[], tagIds: string[] = []) {
+    setBulkBusy(true);
+    try {
+      const res = await api<{ affected: number }>('/api/contacts/bulk', { method: 'POST', json: { action, ids, tagIds } });
+      const n = res.data.affected;
+      toast.success(action === 'delete' ? `Deleted ${n} contact${n === 1 ? '' : 's'}` : action === 'addTags' ? `Tagged ${ids.length} contact${ids.length === 1 ? '' : 's'}` : 'Tag removed');
+      if (action === 'delete') setSelected(new Set());
+      refreshAll();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Action failed');
+    } finally {
+      setBulkBusy(false);
     }
-
-    setDeleting(false);
-    setDeleteConfirmOpen(false);
-    setDeleteTarget(null);
   }
 
-  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
-  const hasNext = page < totalPages - 1;
-  const hasPrev = page > 0;
+  function exportSelected() {
+    const list = rows.filter((r) => selected.has(r.id));
+    const csv = [['Name', 'Phone', 'Email', 'Company', 'Tags', 'Created'], ...list.map((r) => [r.name ?? '', `+${r.phone}`, r.email ?? '', r.company ?? '', r.tags.map((t) => t.name).join('; '), r.createdAt])]
+      .map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))
+      .join('\r\n');
+    const url = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'contacts-selected.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const filtersActive = Boolean(debounced) || tagFilter.length > 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-white">Contacts</h1>
-          <p className="text-sm text-slate-400 mt-1">
-            Manage your contact list. {totalCount > 0 && `${totalCount} total contacts.`}
-          </p>
+          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><Users className="size-6 text-primary" /> Contacts</h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">Your audience for conversations, campaigns and pipelines.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => {
-              window.open('/api/contacts/export', '_blank');
-              toast.success('Downloading contacts export...');
-            }}
-            className="border-slate-700 text-slate-300 hover:bg-slate-800"
-          >
-            <Download className="size-4" />
-            Export CSV
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setImportOpen(true)}
-            className="border-slate-700 text-slate-300 hover:bg-slate-800"
-          >
-            <Upload className="size-4" />
-            Import
-          </Button>
-          <Button
-            onClick={openAddForm}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground"
-          >
-            <Plus className="size-4" />
-            Add Contact
-          </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => { window.open('/api/contacts/export', '_blank'); }} className="gap-1.5"><Download className="size-4" /> Export</Button>
+          <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-1.5"><Sparkles className="size-4 text-primary" /> AI import</Button>
+          <Button onClick={() => { setEditing(null); setEditorOpen(true); }} className="gap-1.5"><Plus className="size-4" /> Add contact</Button>
         </div>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-slate-500" />
-        <Input
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            // Reset pagination when the query changes — the result
-            // set shrinks/grows, page N may no longer be valid.
-            setPage(0);
-          }}
-          placeholder="Search by name, phone, or email..."
-          className="pl-8 bg-slate-900 border-slate-700 text-white placeholder:text-slate-500"
-        />
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[
+          { label: 'Total contacts', value: stats?.total, icon: Users },
+          { label: 'Added this week', value: stats?.newThisWeek, icon: UserPlus },
+          { label: 'Without tags', value: stats?.untagged, icon: TagIcon, action: () => {} },
+          { label: 'With email', value: stats?.withEmail, icon: Mail },
+        ].map((s) => (
+          <div key={s.label} className="rounded-2xl border border-border/70 bg-card p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{s.label}</p>
+              <s.icon className="size-4 text-primary" />
+            </div>
+            <p className="mt-2 text-2xl font-bold tabular-nums">{s.value === undefined ? '—' : s.value.toLocaleString()}</p>
+          </div>
+        ))}
       </div>
 
-      {/* Table */}
-      <div className="rounded-lg border border-slate-800 overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="border-slate-800 hover:bg-transparent">
-              <TableHead className="text-slate-400">Name</TableHead>
-              <TableHead className="text-slate-400">Phone</TableHead>
-              <TableHead className="text-slate-400 hidden md:table-cell">Email</TableHead>
-              <TableHead className="text-slate-400 hidden lg:table-cell">Company</TableHead>
-              <TableHead className="text-slate-400 hidden md:table-cell">Tags</TableHead>
-              <TableHead className="text-slate-400 hidden lg:table-cell">Created</TableHead>
-              <TableHead className="text-slate-400 w-12" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow className="border-slate-800">
-                <TableCell colSpan={7} className="text-center py-12">
-                  <div className="flex flex-col items-center gap-2">
-                    <Loader2 className="size-6 animate-spin text-primary" />
-                    <p className="text-sm text-slate-500">Loading contacts...</p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : contacts.length === 0 ? (
-              <TableRow className="border-slate-800">
-                <TableCell colSpan={7} className="text-center py-12">
-                  <div className="flex flex-col items-center gap-2">
-                    <Users className="size-8 text-slate-600" />
-                    <p className="text-sm text-slate-500">
-                      {search ? 'No contacts match your search.' : 'No contacts yet.'}
-                    </p>
-                    {!search && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={openAddForm}
-                        className="mt-2 border-slate-700 text-slate-300 hover:bg-slate-800"
-                      >
-                        <Plus className="size-3.5" />
-                        Add your first contact
-                      </Button>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : (
-              contacts.map((contact) => (
-                <TableRow
-                  key={contact.id}
-                  className="border-slate-800 hover:bg-slate-900/50 cursor-pointer"
-                  onClick={() => openDetail(contact.id)}
-                >
-                  <TableCell className="text-white font-medium">
-                    {contact.name || <span className="text-slate-500 italic">Unnamed</span>}
-                  </TableCell>
-                  <TableCell className="text-slate-300 font-mono text-xs">
-                    {contact.phone}
-                  </TableCell>
-                  <TableCell className="text-slate-400 hidden md:table-cell text-sm">
-                    {contact.email || <span className="text-slate-600">-</span>}
-                  </TableCell>
-                  <TableCell className="text-slate-400 hidden lg:table-cell text-sm">
-                    {contact.company || <span className="text-slate-600">-</span>}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    <div className="flex flex-wrap gap-1">
-                      {contact.tags && contact.tags.length > 0 ? (
-                        contact.tags.slice(0, 3).map((tag) => (
-                          <span
-                            key={tag.id}
-                            className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
-                            style={{
-                              backgroundColor: tag.color + '20',
-                              color: tag.color,
-                            }}
-                          >
-                            {tag.name}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-slate-600 text-xs">-</span>
-                      )}
-                      {contact.tags && contact.tags.length > 3 && (
-                        <span className="text-[10px] text-slate-500">
-                          +{contact.tags.length - 3}
-                        </span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-slate-500 text-xs hidden lg:table-cell">
-                    {new Date(contact.created_at).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })}
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        render={
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            className="text-slate-400 hover:text-white"
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        }
-                      >
-                        <MoreHorizontal className="size-4" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent
-                        align="end"
-                        className="bg-slate-900 border-slate-700"
-                      >
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEditForm(contact);
-                          }}
-                          className="text-slate-300 focus:bg-slate-800 focus:text-white"
-                        >
-                          <Pencil className="size-4" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator className="bg-slate-700" />
-                        <DropdownMenuItem
-                          variant="destructive"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            confirmDelete(contact);
-                          }}
-                        >
-                          <Trash2 className="size-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[220px] flex-1 sm:max-w-sm">
+          <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, phone, email, company…" className="h-9 pl-8 pr-8" aria-label="Search contacts" />
+          {search && <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label="Clear search"><X className="size-4" /></button>}
+        </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger render={<Button variant="outline" className="h-9 gap-1.5" />}>
+            <Filter className="size-4" /> Tags{tagFilter.length ? ` (${tagFilter.length})` : ''}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="max-h-72 w-56 overflow-y-auto">
+            {tags.length === 0 && <p className="px-2 py-1.5 text-xs text-muted-foreground">No tags yet</p>}
+            {tags.map((t) => {
+              const on = tagFilter.includes(t.id);
+              return (
+                <DropdownMenuItem key={t.id} closeOnClick={false} onClick={() => { setTagFilter((f) => (on ? f.filter((x) => x !== t.id) : [...f, t.id])); setPage(1); }}>
+                  <span className={`flex size-4 items-center justify-center rounded border ${on ? 'border-primary bg-primary text-primary-foreground' : 'border-border'}`}>{on && '✓'}</span>
+                  <span className="size-2 rounded-full" style={{ backgroundColor: t.color }} />
+                  <span className="flex-1 truncate">{t.name}</span>
+                  <span className="text-[10px] text-muted-foreground">{t.contactCount}</span>
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <Select value={sort} onValueChange={(v) => { setSort((v ?? 'createdAt:desc') as Sort); setPage(1); }}>
+          <SelectTrigger className="h-9 w-[170px] gap-1.5"><ArrowUpDown className="size-3.5 text-muted-foreground" /><SelectValue /></SelectTrigger>
+          <SelectContent>{(Object.keys(SORT_LABEL) as Sort[]).map((s) => <SelectItem key={s} value={s}>{SORT_LABEL[s]}</SelectItem>)}</SelectContent>
+        </Select>
+
+        {filtersActive && (
+          <Button variant="ghost" size="sm" onClick={() => { setSearch(''); setTagFilter([]); }} className="h-9 text-muted-foreground">Clear filters</Button>
+        )}
+        <p className="ml-auto text-xs text-muted-foreground">{total.toLocaleString()} {filtersActive ? 'matching' : 'total'}</p>
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-slate-500">
-            Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, totalCount)} of{' '}
-            {totalCount}
-          </p>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="icon-sm"
-              disabled={!hasPrev}
-              onClick={() => setPage((p) => p - 1)}
-              className="border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-white disabled:opacity-30"
-            >
-              <ChevronLeft className="size-4" />
-            </Button>
-            <span className="text-xs text-slate-400 px-2">
-              Page {page + 1} of {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="icon-sm"
-              disabled={!hasNext}
-              onClick={() => setPage((p) => p + 1)}
-              className="border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-white disabled:opacity-30"
-            >
-              <ChevronRight className="size-4" />
+      {/* Bulk bar */}
+      {selected.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2">
+          <span className="text-sm font-medium">{selected.size} selected</span>
+          <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())} className="h-7 text-xs">Clear</Button>
+          <div className="ml-auto flex flex-wrap gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8 gap-1.5" disabled={bulkBusy} />}>
+                <TagIcon className="size-3.5" /> Add tag
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="max-h-64 overflow-y-auto">
+                {tags.map((t) => (
+                  <DropdownMenuItem key={t.id} onClick={() => bulk('addTags', selectedIds, [t.id])}>
+                    <span className="size-2 rounded-full" style={{ backgroundColor: t.color }} /> {t.name}
+                  </DropdownMenuItem>
+                ))}
+                {tags.length === 0 && <p className="px-2 py-1.5 text-xs text-muted-foreground">Create a tag first</p>}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="h-8 gap-1.5" disabled={bulkBusy} />}>
+                <X className="size-3.5" /> Remove tag
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="max-h-64 overflow-y-auto">
+                {tags.map((t) => (
+                  <DropdownMenuItem key={t.id} onClick={() => bulk('removeTags', selectedIds, [t.id])}>
+                    <span className="size-2 rounded-full" style={{ backgroundColor: t.color }} /> {t.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={exportSelected}><Download className="size-3.5" /> Export</Button>
+            <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={() => router.push('/campaigns/new')}><Megaphone className="size-3.5" /> Campaign</Button>
+            <Button variant="destructive" size="sm" className="h-8 gap-1.5" disabled={bulkBusy} onClick={() => setConfirm({ ids: selectedIds, label: `${selected.size} contacts` })}>
+              {bulkBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />} Delete
             </Button>
           </div>
         </div>
       )}
 
-      {/* Contact Form Dialog */}
-      <ContactForm
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        contact={editContact}
-        contactTags={editContactTags}
-        onSaved={() => {
-          fetchContacts();
-          fetchTags();
-        }}
+      {/* Table */}
+      <div className="overflow-hidden rounded-2xl border border-border/70 bg-card">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[860px] table-fixed text-sm">
+            <colgroup>
+              <col className="w-12" />
+              <col className="w-[28%]" />
+              <col className="w-[17%]" />
+              <col className="w-[17%]" />
+              <col className="w-[22%]" />
+              <col className="w-[11%]" />
+              <col className="w-14" />
+            </colgroup>
+            <thead className="border-b border-border bg-muted/50 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3">
+                  <input type="checkbox" className="size-4 cursor-pointer accent-[var(--primary)] align-middle" checked={allOnPage} onChange={toggleAll} aria-label="Select all on this page" />
+                </th>
+                <th className="px-3 py-3"><button onClick={() => setSort(sort === 'name:asc' ? 'name:desc' : 'name:asc')} className="inline-flex items-center gap-1 hover:text-foreground">Contact <ArrowDownAZ className="size-3" /></button></th>
+                <th className="px-3 py-3">Phone</th>
+                <th className="px-3 py-3">Company</th>
+                <th className="px-3 py-3">Tags</th>
+                <th className="px-3 py-3"><button onClick={() => setSort(sort === 'createdAt:desc' ? 'createdAt:asc' : 'createdAt:desc')} className="inline-flex items-center gap-1 hover:text-foreground">Added <ArrowUpDown className="size-3" /></button></th>
+                <th className="px-3 py-3"><span className="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/70">
+              {loading && rows.length === 0 ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <tr key={i}>
+                    <td colSpan={7} className="px-4 py-3"><div className="h-8 animate-pulse rounded-lg bg-muted/70" /></td>
+                  </tr>
+                ))
+              ) : rows.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-16 text-center">
+                    <Users className="mx-auto size-9 text-muted-foreground/60" />
+                    <p className="mt-3 text-sm font-medium">{filtersActive ? 'No contacts match these filters' : 'No contacts yet'}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{filtersActive ? 'Try a different search or tag.' : 'Add one manually or import a file — AI will find the contacts for you.'}</p>
+                    {!filtersActive && (
+                      <div className="mt-4 flex justify-center gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setImportOpen(true)} className="gap-1.5"><Sparkles className="size-3.5 text-primary" /> AI import</Button>
+                        <Button size="sm" onClick={() => { setEditing(null); setEditorOpen(true); }} className="gap-1.5"><Plus className="size-3.5" /> Add contact</Button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ) : (
+                rows.map((c) => {
+                  const isSel = selected.has(c.id);
+                  return (
+                    <tr
+                      key={c.id}
+                      onClick={() => setDetailId(c.id)}
+                      className={`group cursor-pointer transition-colors ${isSel ? 'bg-primary/5' : 'hover:bg-muted/50'} ${loading ? 'opacity-60' : ''}`}
+                    >
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <input type="checkbox" className="size-4 cursor-pointer accent-[var(--primary)] align-middle" checked={isSel} onChange={() => toggle(c.id)} aria-label={`Select ${c.name || c.phone}`} />
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <span className={`flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-foreground ${avatarColor(c.id)}`}>{initials(c)}</span>
+                          <div className="min-w-0">
+                            <p className="truncate font-medium">{c.name || <span className="italic text-muted-foreground">Unnamed</span>}</p>
+                            <p className="truncate text-xs text-muted-foreground">{c.email || '—'}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="truncate px-3 py-3 font-mono text-xs tabular-nums text-foreground/80">{formatPhone(c.phone)}</td>
+                      <td className="truncate px-3 py-3 text-foreground/80">{c.company || <span className="text-muted-foreground">—</span>}</td>
+                      <td className="px-3 py-3">
+                        <div className="flex flex-wrap gap-1">
+                          {c.tags.slice(0, 3).map((t) => (
+                            <span key={t.id} className="inline-flex max-w-[120px] items-center truncate rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ backgroundColor: `${t.color}1f`, color: t.color }}>{t.name}</span>
+                          ))}
+                          {c.tags.length > 3 && <span className="text-[11px] text-muted-foreground">+{c.tags.length - 3}</span>}
+                          {c.tags.length === 0 && <span className="text-xs text-muted-foreground">—</span>}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-xs text-muted-foreground">{new Date(c.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                      <td className="px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" className="text-muted-foreground" aria-label="Contact actions" />}>
+                            <MoreHorizontal className="size-4" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => setDetailId(c.id)}><Eye className="size-4" /> View details</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => { setEditing(c); setEditorOpen(true); }}><Pencil className="size-4" /> Edit</DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem variant="destructive" onClick={() => setConfirm({ ids: [c.id], label: c.name || formatPhone(c.phone) })}><Trash2 className="size-4" /> Delete</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/70 px-4 py-3 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <span>Rows per page</span>
+            <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v) || 25); setPage(1); }}>
+              <SelectTrigger className="h-8 w-[72px]"><SelectValue /></SelectTrigger>
+              <SelectContent>{[10, 25, 50, 100].map((n) => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <span>{total === 0 ? '0' : `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)}`} of {total.toLocaleString()}</span>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="icon-sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} aria-label="Previous page"><ChevronLeft className="size-4" /></Button>
+            <span className="px-2">Page {page} of {totalPages}</span>
+            <Button variant="outline" size="icon-sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)} aria-label="Next page"><ChevronRight className="size-4" /></Button>
+          </div>
+        </div>
+      </div>
+
+      <ContactEditor
+        open={editorOpen}
+        onOpenChange={setEditorOpen}
+        contact={editing}
+        tags={tags}
+        onTagCreated={(t) => setTags((ts) => [...ts, t].sort((a, b) => a.name.localeCompare(b.name)))}
+        onSaved={() => refreshAll()}
       />
 
-      {/* Contact Detail Sheet */}
       <ContactDetailView
-        open={detailOpen}
-        onOpenChange={setDetailOpen}
-        contactId={detailContactId}
-        onUpdated={fetchContacts}
+        open={Boolean(detailId)}
+        onOpenChange={(o) => { if (!o) setDetailId(null); }}
+        contactId={detailId}
+        onUpdated={refreshAll}
       />
 
-      {/* Import Modal */}
-      <ImportModal
-        open={importOpen}
-        onOpenChange={setImportOpen}
-        onImported={fetchContacts}
-      />
+      <AiImportDialog open={importOpen} onOpenChange={setImportOpen} tags={tags} aiAvailable={stats?.aiAvailable ?? true} onImported={refreshAll} />
 
-      {/* Delete Confirmation */}
-      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <DialogContent className="bg-slate-900 border-slate-700 text-slate-200 sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-white">Delete Contact</DialogTitle>
-            <DialogDescription className="text-slate-400">
-              Are you sure you want to delete{' '}
-              <span className="text-slate-200 font-medium">
-                {deleteTarget?.name || deleteTarget?.phone}
-              </span>
-              ? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="bg-slate-900 border-slate-700">
-            <Button
-              variant="outline"
-              onClick={() => setDeleteConfirmOpen(false)}
-              className="border-slate-700 text-slate-300 hover:bg-slate-800"
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={deleting}
-            >
-              {deleting && <Loader2 className="size-4 animate-spin" />}
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmationDialog
+        isOpen={Boolean(confirm)}
+        onOpenChange={(o) => { if (!o) setConfirm(null); }}
+        title={`Delete ${confirm?.label ?? ''}?`}
+        description="Their conversations, notes and tags are removed too. This cannot be undone."
+        confirmText="Delete"
+        variant="destructive"
+        onConfirm={async () => { if (confirm) { await bulk('delete', confirm.ids); setSelected((s) => { const n = new Set(s); confirm.ids.forEach((id) => n.delete(id)); return n; }); } setConfirm(null); }}
+      />
     </div>
   );
 }

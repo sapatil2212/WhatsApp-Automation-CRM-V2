@@ -19,7 +19,7 @@ export function AiConfigPanel() {
   const [config, setConfig] = useState<AiConfig>({
     aiProvider: "gemini",
     aiApiKey: "",
-    aiModel: "gemini-2.5-flash",
+    aiModel: "Automatic (Flash-Lite / Flash / Pro)",
     aiTemperature: 0.7,
     aiSystemPrompt: "",
     aiPersonality: "Helpful, professional, and friendly",
@@ -40,9 +40,9 @@ export function AiConfigPanel() {
           const body = await res.json();
           if (body.data) {
             setConfig({
-              aiProvider: body.data.aiProvider || "gemini",
-              aiApiKey: body.data.aiApiKey || "",
-              aiModel: body.data.aiModel || "gemini-2.5-flash",
+              aiProvider: "gemini",
+              aiApiKey: "",
+              aiModel: "Automatic (Flash-Lite / Flash / Pro)",
               aiTemperature: Number(body.data.aiTemperature ?? 0.7),
               aiSystemPrompt: body.data.aiSystemPrompt || "",
               aiPersonality: body.data.aiPersonality || "Helpful, professional, and friendly",
@@ -51,7 +51,7 @@ export function AiConfigPanel() {
             });
           }
         }
-      } catch (err: any) {
+      } catch {
         setError("Failed to load AI settings.");
       } finally {
         setLoading(false);
@@ -83,14 +83,14 @@ export function AiConfigPanel() {
       });
 
       if (!res.ok) {
-        const d = await res.json();
+        const d = await res.json() as { error?: { message?: string }; message?: string };
         throw new Error(d.error?.message || d.message || "Failed to save settings");
       }
 
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 3000);
-    } catch (err: any) {
-      setError(err.message || "An error occurred while saving.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred while saving.");
     } finally {
       setSaving(false);
     }
@@ -138,22 +138,9 @@ export function AiConfigPanel() {
             <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
               AI Provider
             </label>
-            <select
-              value={config.aiProvider}
-              onChange={(e) => {
-                const p = e.target.value as "gemini" | "openai" | "openrouter";
-                setConfig({
-                  ...config,
-                  aiProvider: p,
-                  aiModel: p === "gemini" ? "gemini-2.5-flash" : p === "openai" ? "gpt-4o-mini" : "meta-llama/llama-3.3-70b-instruct:free",
-                });
-              }}
-              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
-            >
-              <option value="gemini">Google Gemini (Recommended / Default)</option>
-              <option value="openai">OpenAI (GPT-4o mini, GPT-4o)</option>
-              <option value="openrouter">OpenRouter (Llama 3.3, Mistral, Claude)</option>
-            </select>
+            <div className="w-full rounded-lg border border-input bg-muted/40 px-3 py-2 text-sm text-foreground">
+              Google Gemini (server-managed)
+            </div>
           </div>
 
           <div>
@@ -163,26 +150,18 @@ export function AiConfigPanel() {
             <input
               type="text"
               value={config.aiModel || ""}
-              onChange={(e) => setConfig({ ...config, aiModel: e.target.value })}
-              placeholder={config.aiProvider === "gemini" ? "gemini-2.5-flash" : "gpt-4o-mini"}
-              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+              readOnly
+              className="w-full rounded-lg border border-input bg-muted/40 px-3 py-2 text-sm text-muted-foreground"
             />
           </div>
         </div>
 
         <div>
           <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-            <Key className="h-3.5 w-3.5" /> Custom API Key (Optional)
+            <Key className="h-3.5 w-3.5" /> Server API Key
           </label>
-          <input
-            type="password"
-            value={config.aiApiKey || ""}
-            onChange={(e) => setConfig({ ...config, aiApiKey: e.target.value })}
-            placeholder="Leave empty to use server default platform keys"
-            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
-          />
-          <p className="text-xs text-muted-foreground mt-1">
-            If provided, your workspace uses its own dedicated quota instead of platform shared pool.
+          <p className="rounded-lg border border-input bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            AI uses the server&apos;s <code>GEMINI_API_KEY</code>. The key is never exposed to this browser.
           </p>
         </div>
       </div>

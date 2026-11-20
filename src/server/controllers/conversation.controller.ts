@@ -22,14 +22,14 @@
 
 import { z } from 'zod';
 
-import { ValidationError, createHandler, result } from '../kernel';
+import { ExternalApiError, ValidationError, createHandler, getLogger, result } from '../kernel';
 import {
   conversationDetailDtoSchema,
   conversationDtoSchema,
   messageDtoSchema,
   unreadSummaryDtoSchema,
 } from '../dtos/conversation.dto';
-import { ConversationService } from '../services/conversation.service';
+import { ConversationService, type OutboundTransport, type ReactionSender } from '../services/conversation.service';
 import { WhatsappTransport } from '../services/whatsapp-transport';
 import {
   conversationParamsSchema,
@@ -43,16 +43,68 @@ import {
 import type { TenantDb } from '../kernel';
 import { paged } from './controller-kit';
 
+const log = getLogger('conversation.controller');
+
+type InboxTransport = OutboundTransport & ReactionSender;
+
+/**
+ * Local development only: when Meta rejects a send (no real number, expired
+ * sandbox token) or WhatsApp is not connected, the message is still recorded
+ * with a `sandbox-` id so the inbox can be exercised end to end. This mirrors
+ * what the legacy `/api/whatsapp/send` route did. Never active in production.
+ */
+function withDevSandbox(real: InboxTransport | null): InboxTransport | null {
+  if (process.env.NODE_ENV !== 'development') return real;
+  const sandboxId = () => ({ whatsappMessageId: `sandbox-${Date.now()}-${Math.random().toString(36).slice(2, 8)}` });
+  const guard = async <T extends { whatsappMessageId: string }>(op: string, call?: () => Promise<T>) => {
+    if (!call) {
+      log.warn('dev sandbox: WhatsApp not connected, recording send locally', { op });
+      return sandboxId();
+    }
+    try {
+      return await call();
+    } catch (error) {
+      if (!(error instanceof ExternalApiError)) throw error;
+      log.warn('dev sandbox: Meta rejected the send, recording it locally', { op, err: error });
+      return sandboxId();
+    }
+  };
+  return {
+    sendText: (input) => guard('text', real ? () => real.sendText(input) : undefined),
+    sendTemplate: (input) => guard('template', real ? () => real.sendTemplate(input) : undefined),
+    sendMedia: (input) => guard('media', real ? () => real.sendMedia(input) : undefined),
+    sendReaction: (input) => guard('reaction', real ? () => real.sendReaction(input) : undefined),
+  };
+}
+
 /**
  * Resolves a send-capable service. A tenant that has not connected WhatsApp
  * gets one clear 400 here instead of an opaque failure deep inside a send.
  */
 async function sendingService(db: TenantDb, userId: string): Promise<ConversationService> {
-  const transport = await WhatsappTransport.forTenant(db);
+  const transport = withDevSandbox(await WhatsappTransport.forTenant(db));
   if (!transport) {
     throw new ValidationError('Connect your WhatsApp Business account in Settings before sending.');
   }
   return ConversationService.create(db, userId, transport);
+}
+
+/**
+ * An agent replying is the strongest "a human is here" signal: pause any
+ * active Flow run for the contact (same as the legacy send route did).
+ * Best-effort — the message already reached Meta.
+ */
+async function pauseFlowsForAgentReply(db: TenantDb, conversationId: string): Promise<void> {
+  try {
+    const conversation = await db.conversation.findFirst({ where: { id: conversationId }, select: { contactId: true } });
+    if (!conversation) return;
+    await db.flowRun.updateMany({
+      where: { contactId: conversation.contactId, status: 'active' },
+      data: { status: 'paused_by_agent', endedAt: new Date(), endReason: 'agent_replied' },
+    });
+  } catch (error) {
+    log.warn('pause-on-agent-send failed', { err: error });
+  }
 }
 
 export const conversationController = {
@@ -123,8 +175,12 @@ export const conversationController = {
     response: messageDtoSchema,
     status: 201,
     message: 'Message sent.',
-    handle: async ({ ctx, db, params, body }) =>
-      (await sendingService(db, ctx.userId)).sendMessage(params.id, body),
+    rateLimit: { limit: 60, windowMs: 60_000, key: ({ ctx }) => `inbox-send:${ctx?.userId ?? 'anon'}` },
+    handle: async ({ ctx, db, params, body }) => {
+      const message = await (await sendingService(db, ctx.userId)).sendMessage(params.id, body);
+      await pauseFlowsForAgentReply(db, params.id);
+      return message;
+    },
   }),
 
   setReaction: createHandler({

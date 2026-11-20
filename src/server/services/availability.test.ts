@@ -4,12 +4,15 @@ import {
   addDays,
   computeDaySlots,
   isSlotAvailable,
+  localNow,
+  todayIn,
   toMinutes,
   toTimeString,
   weekdayOf,
   type DayTiming,
   type SlotComputationInput,
 } from './availability';
+import { applyPreset, defaultDay, defaultSchedule } from '@/lib/healthcare/schedule';
 
 /** 2026-05-22 is a Friday. */
 const FRIDAY = '2026-05-22';
@@ -245,5 +248,59 @@ describe('isSlotAvailable', () => {
     // Outside opening hours.
     expect(isSlotAvailable(args, '08:00')).toBe(false);
     expect(isSlotAvailable(args, '12:00')).toBe(false);
+  });
+});
+
+describe('computeDaySlots — v2 weekly schedule', () => {
+  const schedule = () => {
+    const s = applyPreset(defaultSchedule(), 'clear');
+    s.days.Friday = defaultDay(true, 30);
+    s.days.Friday.sessions.morning = { enabled: true, start: '09:00', end: '11:00', slotMinutes: 30, breaks: [{ id: 'b', name: 'Tea', start: '10:00', end: '10:30' }] };
+    s.days.Friday.sessions.afternoon.enabled = false;
+    s.days.Friday.sessions.evening = { enabled: true, start: '18:00', end: '19:00', slotMinutes: 20, breaks: [] };
+    return s;
+  };
+  const v2 = (overrides: Partial<SlotComputationInput> = {}) =>
+    input({ doctor: { ...input().doctor, weeklySlots: schedule() }, ...overrides });
+
+  it('uses the doctor schedule (sessions, breaks, per-session slot length)', () => {
+    expect(computeDaySlots(v2()).slots).toEqual(['09:00', '09:30', '10:30', '18:00', '18:20', '18:40']);
+  });
+
+  it('is not narrowed by clinic weekly hours', () => {
+    // Clinic timing row says 09:00–12:00, the evening session still shows.
+    expect(computeDaySlots(v2()).slots).toContain('18:00');
+  });
+
+  it('still honours clinic closures and doctor leave', () => {
+    expect(computeDaySlots(v2({ clinicDateExceptions: { [FRIDAY]: 'Holiday' } })).slots).toEqual([]);
+    expect(computeDaySlots(v2({ doctor: { ...input().doctor, weeklySlots: schedule(), dateExceptions: { [FRIDAY]: 'Leave' } } })).slots).toEqual([]);
+  });
+
+  it('returns none on a day the doctor is off', () => {
+    const r = computeDaySlots(v2({ date: SATURDAY }));
+    expect(r.slots).toEqual([]);
+    expect(r.closedReason).toContain('does not consult');
+  });
+
+  it('blocks booked and overlapping times', () => {
+    // 18:10 was booked under an older 10-minute schedule; it overlaps both 18:00 and 18:20 (20m slots).
+    expect(computeDaySlots(v2({ bookedTimes: ['09:30', '18:10'] })).slots).toEqual(['09:00', '10:30', '18:40']);
+  });
+
+  it('hides past slots using the clinic timezone, not UTC', () => {
+    // 04:00 UTC = 09:30 in Asia/Kolkata on the same Friday.
+    const now = new Date(`${FRIDAY}T04:00:00.000Z`);
+    expect(computeDaySlots(v2({ now, timeZone: 'Asia/Kolkata' })).slots).toEqual(['10:30', '18:00', '18:20', '18:40']);
+    // Read as UTC, 04:00 is before every slot.
+    expect(computeDaySlots(v2({ now })).slots[0]).toBe('09:00');
+  });
+});
+
+describe('localNow / todayIn', () => {
+  it('reads the date and time in the given zone', () => {
+    const now = new Date('2026-05-21T20:00:00.000Z'); // 01:30 next day in India
+    expect(localNow(now, 'Asia/Kolkata')).toEqual({ date: FRIDAY, minutes: 90 });
+    expect(todayIn('UTC', now)).toBe('2026-05-21');
   });
 });

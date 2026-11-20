@@ -12,6 +12,10 @@
  * this service turns a lost race into a 409 the caller can act on.
  */
 
+import { exceptionsToRecord } from '@/lib/healthcare/exceptions';
+
+/** Timezone appointment times are expressed in (clinic-local). */
+export const CLINIC_TIME_ZONE = process.env.APP_TIMEZONE || 'Asia/Kolkata';
 import { ConflictError, NotFoundError, ValidationError, type Page, type TenantDb } from '../kernel';
 import { toDateOnly } from '../dtos/common.dto';
 import {
@@ -44,6 +48,7 @@ import type {
 import {
   addDays,
   computeDaySlots,
+  todayIn,
   todayUtc,
   type DayTiming,
   type DoctorAvailabilityInput,
@@ -103,13 +108,14 @@ export class AppointmentService {
       availableStartTime: doctorDto.availableStartTime,
       availableEndTime: doctorDto.availableEndTime,
       dateExceptions: doctorDto.dateExceptions,
+      weeklySlots: doctorDto.weeklySlots as Record<string, unknown>,
     };
 
     return {
       doctor: doctorDto,
       timings: timingDtos,
       slotMinutes,
-      clinicDateExceptions: asRecord(clinic.dateExceptions),
+      clinicDateExceptions: exceptionsToRecord(clinic.dateExceptions),
       doctorAvailability,
     };
   }
@@ -149,7 +155,11 @@ export class AppointmentService {
     const clinic = await this.requireClinic();
     const context = await this.loadSlotContext(clinic.id, query.doctorId);
 
-    const startDate = query.from ? (toDateOnly(query.from) ?? todayUtc(now)) : todayUtc(now);
+    // Dates are clinic-local: "today" is read in the clinic's timezone and
+    // past dates are never offered.
+    const today = todayIn(CLINIC_TIME_ZONE, now);
+    const requested = query.from ? toDateOnly(query.from) : null;
+    const startDate = requested && requested > today ? requested : today;
     const endDate = addDays(startDate, query.days - 1);
 
     const booked = await this.deps.appointments.findBookedSlots(
@@ -178,6 +188,7 @@ export class AppointmentService {
         slotMinutes: context.slotMinutes,
         bookedTimes: bookedByDate.get(date) ?? [],
         now,
+        timeZone: CLINIC_TIME_ZONE,
       });
     });
 
@@ -217,6 +228,7 @@ export class AppointmentService {
       slotMinutes: context.slotMinutes,
       bookedTimes,
       now: input.now,
+      timeZone: CLINIC_TIME_ZONE,
     });
 
     if (!day.slots.includes(input.time)) {
@@ -482,8 +494,4 @@ export class AppointmentService {
   }
 }
 
-function asRecord(value: unknown): Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-}
+

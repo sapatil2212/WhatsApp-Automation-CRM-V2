@@ -1,237 +1,86 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { decrypt } from '@/lib/whatsapp/encryption'
+import { prisma } from '@/lib/prisma'
+import { listMessageTemplates, type MetaTemplateListEntry } from '@/lib/whatsapp/meta-api'
+import { fromMetaCategory, toLocalStatus } from '@/lib/whatsapp/template-payload'
+import { requireTenant, requireWhatsAppCreds } from '@/lib/whatsapp/template-context'
 
 /**
- * Sync message templates from Meta → local message_templates table.
+ * Pull templates from Meta (the source of truth for status) into this
+ * tenant's local catalog, upserting by (tenant, name, language).
  *
- * Why this exists:
- *   The Settings → Message Templates UI only writes to Supabase. It does
- *   NOT submit templates for approval to Meta. Users would create a
- *   template locally, try to broadcast with it, and hit Meta's error
- *   #132001 "Template name does not exist in the translation" — because
- *   Meta had never seen the template, or had it approved under a
- *   different language code than what we stored locally.
- *
- *   This route pulls the source of truth (Meta's approved templates)
- *   and upserts them into the local catalog by (user_id, name, language).
- *   After a sync, every local template row is guaranteed to match
- *   something Meta will actually accept on send.
- *
- * Scope:
- *   - Read-only against Meta. We never push local → Meta (template
- *     submission happens in Meta's WhatsApp Manager and requires human
- *     review).
- *   - Only approved templates are surfaced by default. We return
- *     everything Meta returns and let the UI filter — so the user can
- *     see their Pending / Rejected templates and understand why.
- *   - Locally-created templates (no Meta counterpart) are NOT deleted —
- *     they remain visible so the user can notice drift and clean up
- *     manually.
+ * Also returns per-template details the catalog has no column for —
+ * rejection reason, quality rating, Meta id — so the UI can explain *why*
+ * a template was rejected. Local-only templates are never deleted.
  */
 
-const META_API_VERSION = 'v21.0'
-const META_API_BASE = `https://graph.facebook.com/${META_API_VERSION}`
-
-interface MetaTemplateComponent {
+interface MetaComponent {
   type: string
   text?: string
   format?: string
-  buttons?: any[]
+  buttons?: unknown[]
 }
 
-interface MetaTemplate {
-  id: string
-  name: string
-  language: string
-  status: 'APPROVED' | 'PENDING' | 'REJECTED' | 'PAUSED'
-  category: string
-  components?: MetaTemplateComponent[]
-}
-
-/**
- * Meta's template categories are upper-snake (MARKETING / UTILITY /
- * AUTHENTICATION); our DB CHECK constraint is TitleCase. Normalize.
- */
-function normalizeCategory(
-  meta: string,
-): 'Marketing' | 'Utility' | 'Authentication' {
-  const upper = meta.toUpperCase()
-  if (upper === 'UTILITY') return 'Utility'
-  if (upper === 'AUTHENTICATION') return 'Authentication'
-  return 'Marketing'
-}
-
-/**
- * Meta's template status is UPPERCASE; our DB uses TitleCase.
- */
-function normalizeStatus(
-  meta: string,
-): 'Draft' | 'Pending' | 'Approved' | 'Rejected' {
-  switch (meta.toUpperCase()) {
-    case 'APPROVED':
-      return 'Approved'
-    case 'PENDING':
-    case 'IN_APPEAL':
-    case 'PENDING_DELETION':
-      return 'Pending'
-    case 'REJECTED':
-    case 'DISABLED':
-    case 'PAUSED':
-      return 'Rejected'
-    default:
-      return 'Draft'
-  }
-}
+const PAGE_CAP = 20
 
 export async function POST() {
   try {
-    const supabase = await createClient()
+    const ctx = await requireTenant()
+    if (!ctx.ok) return ctx.response
+    const { tenantId, userId } = ctx.value
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
+    const creds = await requireWhatsAppCreds(tenantId)
+    if (!creds.ok) return creds.response
 
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const metaTemplates: MetaTemplateListEntry[] = []
+    let cursor: string | undefined
+    let pages = 0
+    do {
+      pages++
+      const page = await listMessageTemplates({ ...creds.value, after: cursor })
+      metaTemplates.push(...page.templates)
+      cursor = page.nextCursor ?? undefined
+    } while (cursor && pages < PAGE_CAP)
 
-    // whatsapp_config holds waba_id + encrypted access_token.
-    const { data: config, error: configError } = await supabase
-      .from('whatsapp_config')
-      .select('*')
-      .eq('user_id', user.id)
-      .single()
+    const existing = await prisma.messageTemplate.findMany({
+      where: { tenantId },
+      select: { id: true, name: true, language: true, status: true },
+    })
+    const byKey = new Map(existing.map((t) => [`${t.name}:${t.language}`, t]))
 
-    if (configError || !config) {
-      return NextResponse.json(
-        {
-          error:
-            'WhatsApp not configured. Connect your WhatsApp Business account in Settings first.',
-        },
-        { status: 400 },
-      )
-    }
-
-    if (!config.waba_id) {
-      return NextResponse.json(
-        {
-          error:
-            'WABA (WhatsApp Business Account) ID missing. Re-connect your account in Settings.',
-        },
-        { status: 400 },
-      )
-    }
-
-    const accessToken = decrypt(config.access_token)
-
-    // Paginate through every template Meta has for this WABA. Meta
-    // returns at most 100 per page; `paging.next` is a full URL. Cap
-    // at 20 pages (2k templates) as a safety against infinite loops
-    // from a misbehaving upstream.
-    const metaTemplates: MetaTemplate[] = []
-    let nextUrl:
-      | string
-      | null = `${META_API_BASE}/${config.waba_id}/message_templates?limit=100&fields=id,name,language,status,category,components`
-    const PAGE_CAP = 20
-    let pageCount = 0
-
-    while (nextUrl && pageCount < PAGE_CAP) {
-      pageCount++
-      const metaRes: Response = await fetch(nextUrl, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      })
-
-      if (!metaRes.ok) {
-        let metaErr = `Meta API error: ${metaRes.status}`
-        try {
-          const body = await metaRes.json()
-          if (body?.error?.message) metaErr = body.error.message
-        } catch {
-          // response wasn't JSON — keep the fallback
-        }
-        return NextResponse.json({ error: metaErr }, { status: 502 })
-      }
-
-      const metaBody: {
-        data?: MetaTemplate[]
-        paging?: { next?: string }
-      } = await metaRes.json()
-      if (metaBody.data) metaTemplates.push(...metaBody.data)
-      nextUrl = metaBody.paging?.next ?? null
-    }
-
-    // For each Meta template: upsert by (user_id, name, language).
-    // No UNIQUE constraint on that triple, so we match manually.
     let inserted = 0
     let updated = 0
-    const errors: { name: string; language: string; message: string }[] = []
+    const changes: Array<{ name: string; language: string; from: string | null; to: string }> = []
+    const errors: Array<{ name: string; language: string; message: string }> = []
 
     for (const t of metaTemplates) {
-      const body = (t.components ?? []).find((c) => c.type === 'BODY')
-      const header = (t.components ?? []).find((c) => c.type === 'HEADER')
-      const footer = (t.components ?? []).find((c) => c.type === 'FOOTER')
-      const buttonsComp = (t.components ?? []).find((c) => c.type === 'BUTTONS')
-
-      const row = {
-        user_id: user.id,
+      const components = (t.components ?? []) as MetaComponent[]
+      const find = (type: string) => components.find((c) => c.type === type)
+      const header = find('HEADER')
+      const status = toLocalStatus(t.status)
+      const data = {
         name: t.name,
-        category: normalizeCategory(t.category),
+        category: fromMetaCategory(t.category),
         language: t.language,
-        header_type: header?.format?.toLowerCase() ?? null,
-        header_content: header?.text ?? null,
-        body_text: body?.text ?? '',
-        footer_text: footer?.text ?? null,
-        buttons: buttonsComp?.buttons ?? null,
-        status: normalizeStatus(t.status),
-        updated_at: new Date().toISOString(),
+        headerType: header?.format?.toLowerCase() ?? null,
+        headerContent: header?.text ?? null,
+        bodyText: find('BODY')?.text ?? '',
+        footerText: find('FOOTER')?.text ?? null,
+        buttons: (find('BUTTONS')?.buttons as object | undefined) ?? undefined,
+        status,
       }
-
-      const { data: existing, error: lookupErr } = await supabase
-        .from('message_templates')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('name', t.name)
-        .eq('language', t.language)
-        .maybeSingle()
-
-      if (lookupErr) {
-        errors.push({
-          name: t.name,
-          language: t.language,
-          message: lookupErr.message,
-        })
-        continue
-      }
-
-      if (existing?.id) {
-        const { error: updErr } = await supabase
-          .from('message_templates')
-          .update(row)
-          .eq('id', existing.id)
-        if (updErr) {
-          errors.push({
-            name: t.name,
-            language: t.language,
-            message: updErr.message,
-          })
-        } else {
+      const local = byKey.get(`${t.name}:${t.language}`)
+      try {
+        if (local) {
+          await prisma.messageTemplate.update({ where: { id: local.id }, data })
           updated++
-        }
-      } else {
-        const { error: insErr } = await supabase
-          .from('message_templates')
-          .insert(row)
-        if (insErr) {
-          errors.push({
-            name: t.name,
-            language: t.language,
-            message: insErr.message,
-          })
+          if (local.status !== status) changes.push({ name: t.name, language: t.language, from: local.status, to: status })
         } else {
+          await prisma.messageTemplate.create({ data: { ...data, tenantId, userId } })
           inserted++
+          changes.push({ name: t.name, language: t.language, from: null, to: status })
         }
+      } catch (err) {
+        errors.push({ name: t.name, language: t.language, message: err instanceof Error ? err.message : 'write failed' })
       }
     }
 
@@ -240,17 +89,24 @@ export async function POST() {
       total: metaTemplates.length,
       inserted,
       updated,
+      changes,
       errors,
-      truncated: pageCount >= PAGE_CAP && nextUrl !== null,
+      truncated: Boolean(cursor),
+      synced_at: new Date().toISOString(),
+      details: metaTemplates.map((t) => ({
+        meta_id: t.id,
+        name: t.name,
+        language: t.language,
+        meta_status: t.status,
+        rejected_reason: t.rejected_reason && t.rejected_reason !== 'NONE' ? t.rejected_reason : null,
+        quality: t.quality_score?.score ?? null,
+      })),
     })
   } catch (error) {
     console.error('Error syncing WhatsApp templates:', error)
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error ? error.message : 'Failed to sync templates',
-      },
-      { status: 500 },
+      { error: error instanceof Error ? error.message : 'Failed to sync templates' },
+      { status: 502 },
     )
   }
 }

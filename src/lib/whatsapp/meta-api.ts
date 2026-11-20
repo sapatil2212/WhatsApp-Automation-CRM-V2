@@ -27,21 +27,50 @@ interface MetaErrorResponse {
   error?: { message?: string; code?: number; type?: string }
 }
 
+/**
+ * Error thrown for a non-2xx Graph API response. Keeps Meta's numeric code
+ * and subcode so callers can branch (e.g. duplicate template name), and
+ * prefers Meta's human-readable `error_user_title/msg` when present — for
+ * template submissions those explain *why* the payload was refused.
+ */
+export class MetaApiError extends Error {
+  readonly httpStatus: number
+  readonly code?: number
+  readonly subcode?: number
+  constructor(message: string, httpStatus: number, code?: number, subcode?: number) {
+    super(message)
+    this.name = 'MetaApiError'
+    this.httpStatus = httpStatus
+    this.code = code
+    this.subcode = subcode
+  }
+}
+
 async function throwMetaError(response: Response, fallback: string): Promise<never> {
   let message = fallback
+  let code: number | undefined
+  let subcode: number | undefined
   try {
     const data = await response.json()
     console.error('Raw Meta API Error payload:', JSON.stringify(data, null, 2))
-    if (data.error?.message) {
-      message = data.error.message
-      if (data.error.error_data) {
-        message += ` (Details: ${JSON.stringify(data.error.error_data)})`
+    const err = data?.error
+    if (err) {
+      code = typeof err.code === 'number' ? err.code : undefined
+      subcode = typeof err.error_subcode === 'number' ? err.error_subcode : undefined
+      if (err.error_user_msg) {
+        message = err.error_user_title ? `${err.error_user_title}: ${err.error_user_msg}` : err.error_user_msg
+      } else if (err.message) {
+        message = err.message
+        if (err.error_data) {
+          const details = typeof err.error_data === 'string' ? err.error_data : err.error_data.details ?? JSON.stringify(err.error_data)
+          message += ` (${details})`
+        }
       }
     }
   } catch {
     // response body wasn't JSON — keep the fallback
   }
-  throw new Error(message)
+  throw new MetaApiError(message, response.status, code, subcode)
 }
 
 // ============================================================
@@ -292,6 +321,10 @@ export interface MetaTemplateComponentInput {
   text?: string
   example?: Record<string, unknown>
   buttons?: MetaTemplateButtonInput[]
+  /** AUTHENTICATION BODY: append "For your security, do not share this code." */
+  add_security_recommendation?: boolean
+  /** AUTHENTICATION FOOTER: "This code expires in N minutes." (1–90) */
+  code_expiration_minutes?: number
 }
 
 /**
@@ -301,8 +334,10 @@ export interface MetaTemplateComponentInput {
  * coupon/authentication templates.
  */
 export interface MetaTemplateButtonInput {
-  type: 'QUICK_REPLY' | 'URL' | 'PHONE_NUMBER' | 'COPY_CODE'
+  type: 'QUICK_REPLY' | 'URL' | 'PHONE_NUMBER' | 'COPY_CODE' | 'OTP'
   text: string
+  /** OTP buttons on authentication templates. */
+  otp_type?: 'COPY_CODE'
   /** Required for URL buttons. May contain a single {{1}} dynamic suffix. */
   url?: string
   /** Required for URL buttons that use a {{1}} variable — a sample value. */
@@ -413,6 +448,131 @@ export async function deleteMessageTemplate(
   }
 }
 
+export interface EditMessageTemplateArgs {
+  templateId: string
+  accessToken: string
+  category?: MetaTemplateCategory
+  components: MetaTemplateComponentInput[]
+}
+
+/**
+ * Edit an existing template (only REJECTED / PAUSED / APPROVED templates can
+ * be edited, and APPROVED ones at most once per day). Editing re-queues it
+ * for review, so the status returns to PENDING.
+ */
+export async function editMessageTemplate(args: EditMessageTemplateArgs): Promise<void> {
+  const { templateId, accessToken, category, components } = args
+  const response = await fetch(`${META_API_BASE}/${templateId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ ...(category ? { category } : {}), components }),
+  })
+  if (!response.ok) {
+    await throwMetaError(response, `Meta API error: ${response.status}`)
+  }
+}
+
+/**
+ * Upload a sample header image/video/document with Meta's Resumable Upload
+ * API and return the `header_handle` a media-header template requires.
+ * (A plain URL is NOT accepted as `header_handle`.)
+ *
+ * The app id is read from META_APP_ID or, failing that, resolved from the
+ * access token itself.
+ */
+export async function uploadTemplateMedia(args: {
+  accessToken: string
+  bytes: ArrayBuffer
+  mimeType: string
+  fileName?: string
+}): Promise<string> {
+  const { accessToken, bytes, mimeType, fileName } = args
+
+  let appId = (process.env.META_APP_ID ?? '').trim()
+  if (!appId) {
+    const appRes = await fetch(`${META_API_BASE}/app?fields=id`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    if (!appRes.ok) await throwMetaError(appRes, 'Could not resolve the Meta app id for media upload. Set META_APP_ID.')
+    appId = String((await appRes.json()).id ?? '')
+  }
+  if (!appId) throw new MetaApiError('Could not resolve the Meta app id for media upload. Set META_APP_ID.', 400)
+
+  const params = new URLSearchParams({
+    file_length: String(bytes.byteLength),
+    file_type: mimeType,
+    ...(fileName ? { file_name: fileName } : {}),
+  })
+  const sessionRes = await fetch(`${META_API_BASE}/${appId}/uploads?${params.toString()}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  if (!sessionRes.ok) await throwMetaError(sessionRes, `Meta upload session failed: ${sessionRes.status}`)
+  const sessionId = String((await sessionRes.json()).id ?? '')
+
+  const uploadRes = await fetch(`${META_API_BASE}/${sessionId}`, {
+    method: 'POST',
+    headers: { Authorization: `OAuth ${accessToken}`, file_offset: '0' },
+    body: bytes,
+  })
+  if (!uploadRes.ok) await throwMetaError(uploadRes, `Meta media upload failed: ${uploadRes.status}`)
+  const handle = String((await uploadRes.json()).h ?? '')
+  if (!handle) throw new MetaApiError('Meta did not return a media handle.', 502)
+  return handle
+}
+
+/**
+ * Uploads a file to the sender phone number's media store and returns the
+ * Meta `media_id` (used by template document headers and media messages).
+ */
+export async function uploadMessageMedia(args: {
+  phoneNumberId: string
+  accessToken: string
+  bytes: Uint8Array
+  mimeType: string
+  fileName: string
+}): Promise<string> {
+  const form = new FormData()
+  form.append('messaging_product', 'whatsapp')
+  form.append('type', args.mimeType)
+  form.append('file', new Blob([args.bytes as BlobPart], { type: args.mimeType }), args.fileName)
+  const response = await fetch(`${META_API_BASE}/${args.phoneNumberId}/media`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${args.accessToken}` },
+    body: form,
+  })
+  if (!response.ok) await throwMetaError(response, `Meta media upload failed: ${response.status}`)
+  const data = await response.json()
+  const id = String(data.id ?? '')
+  if (!id) throw new MetaApiError('Meta did not return a media id.', 502)
+  return id
+}
+
+/** Sends a previously uploaded document by media id (inside the 24h window). */
+export async function sendDocumentById(args: {
+  phoneNumberId: string
+  accessToken: string
+  to: string
+  mediaId: string
+  fileName: string
+  caption?: string
+}): Promise<MetaSendResult> {
+  const response = await fetch(`${META_API_BASE}/${args.phoneNumberId}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${args.accessToken}` },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: args.to,
+      type: 'document',
+      document: { id: args.mediaId, filename: args.fileName, ...(args.caption ? { caption: args.caption } : {}) },
+    }),
+  })
+  if (!response.ok) await throwMetaError(response, `Meta API error: ${response.status}`)
+  const data = await response.json()
+  return { messageId: data.messages[0].id }
+}
+
 export interface ListMessageTemplatesArgs {
   wabaId: string
   accessToken: string
@@ -420,6 +580,8 @@ export interface ListMessageTemplatesArgs {
   after?: string
   /** Meta caps this at 100. */
   limit?: number
+  /** Exact-name filter. */
+  name?: string
 }
 
 export interface MetaTemplateListEntry {
@@ -429,6 +591,8 @@ export interface MetaTemplateListEntry {
   status: string
   category: string
   components?: unknown[]
+  rejected_reason?: string
+  quality_score?: { score?: string; date?: number }
 }
 
 export interface ListMessageTemplatesResult {
@@ -453,12 +617,13 @@ export interface ListMessageTemplatesResult {
 export async function listMessageTemplates(
   args: ListMessageTemplatesArgs,
 ): Promise<ListMessageTemplatesResult> {
-  const { wabaId, accessToken, after, limit = 100 } = args
+  const { wabaId, accessToken, after, limit = 100, name } = args
   const params = new URLSearchParams({
     limit: String(Math.min(limit, 100)),
-    fields: 'id,name,language,status,category,components',
+    fields: 'id,name,language,status,category,components,rejected_reason,quality_score',
   })
   if (after) params.set('after', after)
+  if (name) params.set('name', name)
 
   const response = await fetch(
     `${META_API_BASE}/${wabaId}/message_templates?${params.toString()}`,

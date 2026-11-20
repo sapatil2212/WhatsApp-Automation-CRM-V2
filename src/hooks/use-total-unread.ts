@@ -43,10 +43,13 @@ export function useTotalUnread(): number {
     };
 
     socket.on("conversation", handleConversationUpdate);
+    // Emitted by the inbox realtime broadcaster on every conversation write.
+    socket.on("inbox:conversation", handleConversationUpdate);
 
     return () => {
       cancelled = true;
       socket.off("conversation", handleConversationUpdate);
+      socket.off("inbox:conversation", handleConversationUpdate);
     };
   }, [tenantId, fetchUnreadCount]);
 

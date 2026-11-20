@@ -6,14 +6,9 @@ import { PipelineBoard } from "@/components/pipelines/pipeline-board";
 import { PipelineSettings } from "@/components/pipelines/pipeline-settings";
 import { DealForm } from "@/components/pipelines/deal-form";
 import { PipelineAnalytics } from "@/components/pipelines/pipeline-analytics";
+import { NewPipelineDialog } from "@/components/pipelines/new-pipeline-dialog";
+import { formatMoney } from "@/components/pipelines/deal-card";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,8 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { GitBranch, Plus, ChevronDown, Settings } from "lucide-react";
+import { Check, ChevronDown, Columns3, GitBranch, List, Plus, Search, Settings, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 
 export default function PipelinesPage() {
@@ -35,8 +29,10 @@ export default function PipelinesPage() {
 
   // Dialog / sheet state
   const [newPipelineOpen, setNewPipelineOpen] = useState(false);
-  const [newPipelineName, setNewPipelineName] = useState("");
-  const [creating, setCreating] = useState(false);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "open" | "won" | "lost">("open");
+  const [view, setView] = useState<"board" | "list">("board");
+  const [now] = useState(() => Date.now());
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Deal form state is lifted here so both the top-bar "Add Deal" and
@@ -236,204 +232,164 @@ export default function PipelinesPage() {
     setDealFormOpen(true);
   }, []);
 
-  // ── Create pipeline ───────────────────────────────────────────────────────
-
-  async function handleCreatePipeline() {
-    const name = newPipelineName.trim();
-    if (!name) return;
-    setCreating(true);
-
-    try {
-      const res = await fetch("/api/pipelines", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, withDefaultStages: true }),
-      });
-
-      if (!res.ok) {
-        toast.error("Failed to create pipeline");
-        setCreating(false);
-        return;
-      }
-
-      const { pipeline } = await res.json();
-      setNewPipelineName("");
-      setNewPipelineOpen(false);
-      setSelectedPipelineId(pipeline.id);
-      await refreshPipelines();
-      setCreating(false);
-      toast.success("Pipeline created");
-    } catch {
-      toast.error("Failed to create pipeline");
-      setCreating(false);
-    }
-  }
-
   const selectedPipeline = pipelines.find((p) => p.id === selectedPipelineId);
 
-  // ── Skeleton loader ───────────────────────────────────────────────────────
+  const visibleDeals = deals.filter((d) => {
+    const st = d.status ?? "active";
+    const isOpen = st !== "won" && st !== "lost";
+    if (statusFilter === "open" && !isOpen) return false;
+    if (statusFilter === "won" && st !== "won") return false;
+    if (statusFilter === "lost" && st !== "lost") return false;
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+    return [d.title, d.contact?.name, d.contact?.phone, d.notes].some((v) => (v ?? "").toLowerCase().includes(q));
+  });
+  const stageById = new Map(stages.map((s) => [s.id, s]));
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <div className="flex items-center justify-between">
-          <div className="h-8 w-48 animate-pulse rounded bg-slate-800" />
-          <div className="h-9 w-28 animate-pulse rounded-lg bg-slate-800" />
+          <div className="h-9 w-56 animate-pulse rounded-lg bg-muted" />
+          <div className="h-9 w-40 animate-pulse rounded-lg bg-muted" />
         </div>
-        <div className="flex gap-3">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-96 w-72 animate-pulse rounded-xl bg-slate-800/50" />
-          ))}
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => <div key={i} className="h-20 animate-pulse rounded-2xl bg-muted/60" />)}
+        </div>
+        <div className="flex gap-3 overflow-hidden">
+          {[1, 2, 3, 4, 5].map((i) => <div key={i} className="h-96 w-72 shrink-0 animate-pulse rounded-2xl bg-muted/50" />)}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          {/* Pipeline selector dropdown */}
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Pipelines</p>
           <DropdownMenu>
-            <DropdownMenuTrigger
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-800 transition-colors data-[popup-open]:bg-slate-800"
-            >
-              <GitBranch className="h-4 w-4 text-primary" />
-              <span className="font-semibold">
-                {selectedPipeline?.name ?? "Select Pipeline"}
-              </span>
-              <ChevronDown className="h-4 w-4 text-slate-400" />
+            <DropdownMenuTrigger className="mt-0.5 inline-flex items-center gap-2 rounded-lg px-1 text-2xl font-bold tracking-tight transition-colors hover:text-primary data-[popup-open]:text-primary">
+              <GitBranch className="size-5 text-primary" />
+              {selectedPipeline?.name ?? "Select pipeline"}
+              <ChevronDown className="size-4 text-muted-foreground" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="start"
-              className="w-64 border-slate-700 bg-slate-900 text-slate-200"
-            >
-              {pipelines.length === 0 && (
-                <DropdownMenuItem disabled className="text-slate-500">
-                  No pipelines yet
-                </DropdownMenuItem>
-              )}
+            <DropdownMenuContent align="start" className="w-72">
               {pipelines.map((p) => (
-                <DropdownMenuItem
-                  key={p.id}
-                  onClick={() => setSelectedPipelineId(p.id)}
-                  className={
-                    p.id === selectedPipelineId
-                      ? "text-primary"
-                      : "text-slate-300"
-                  }
-                >
-                  <GitBranch className="mr-2 h-3.5 w-3.5" />
-                  {p.name}
+                <DropdownMenuItem key={p.id} onClick={() => setSelectedPipelineId(p.id)}>
+                  <GitBranch className="size-3.5 text-muted-foreground" />
+                  <span className="flex-1 truncate">{p.name}</span>
+                  {p.id === selectedPipelineId && <Check className="size-3.5 text-primary" />}
                 </DropdownMenuItem>
               ))}
-              <DropdownMenuSeparator className="bg-slate-700" />
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setNewPipelineOpen(true)}><Plus className="size-3.5" /> New pipeline</DropdownMenuItem>
               {selectedPipeline && (
-                <DropdownMenuItem
-                  onClick={() => setSettingsOpen(true)}
-                  className="text-slate-300"
-                >
-                  <Settings className="mr-2 h-3.5 w-3.5" />
-                  Manage Pipelines
-                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSettingsOpen(true)}><Settings className="size-3.5" /> Edit stages &amp; settings</DropdownMenuItem>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setNewPipelineOpen(true)}
-            className="border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
-          >
-            <Plus className="mr-1 h-4 w-4" />
-            Add Pipeline
-          </Button>
-          <Button
-            onClick={() => handleAddDeal()}
-            disabled={!selectedPipelineId || stages.length === 0}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            <Plus className="mr-1 h-4 w-4" />
-            Add Deal
-          </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {selectedPipeline && (
+            <Button variant="outline" onClick={() => setSettingsOpen(true)} className="gap-1.5"><Settings className="size-4" /> Stages</Button>
+          )}
+          <Button variant="outline" onClick={() => setNewPipelineOpen(true)} className="gap-1.5"><Sparkles className="size-4 text-primary" /> New pipeline</Button>
+          <Button onClick={() => handleAddDeal()} disabled={!selectedPipelineId || stages.length === 0} className="gap-1.5"><Plus className="size-4" /> Add deal</Button>
         </div>
       </div>
 
-      {/* Board */}
       {pipelines.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-700 py-20">
-          <GitBranch className="h-12 w-12 text-slate-600" />
-          <h3 className="mt-4 text-lg font-medium text-white">
-            No pipelines yet
-          </h3>
-          <p className="mt-2 text-sm text-slate-400">
-            Create a pipeline to start tracking deals
-          </p>
-          <Button
-            onClick={() => setNewPipelineOpen(true)}
-            className="mt-4 bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            <Plus className="mr-1 h-4 w-4" />
-            Create Pipeline
-          </Button>
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card px-6 py-20 text-center">
+          <span className="flex size-12 items-center justify-center rounded-2xl bg-primary/10"><GitBranch className="size-6 text-primary" /></span>
+          <h3 className="mt-4 text-lg font-semibold">Track every deal from first message to won</h3>
+          <p className="mt-1 max-w-md text-sm text-muted-foreground">Pick a professional template or describe your process and AI designs the stages for you.</p>
+          <Button onClick={() => setNewPipelineOpen(true)} className="mt-5 gap-1.5"><Sparkles className="size-4" /> Create your first pipeline</Button>
         </div>
       ) : (
         <>
           <PipelineAnalytics stages={stages} deals={deals} />
-          <PipelineBoard
-            stages={stages}
-            deals={deals}
-            onDealMoved={handleDealMoved}
-            onAddDeal={handleAddDeal}
-            onEditDeal={handleEditDeal}
-          />
+
+          {/* Toolbar */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative min-w-[220px] flex-1 sm:max-w-xs">
+              <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search deals or contacts…" className="h-9 pl-8 pr-8" aria-label="Search deals" />
+              {query && <button onClick={() => setQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label="Clear search"><X className="size-4" /></button>}
+            </div>
+            <div className="flex rounded-lg border border-border bg-card p-0.5">
+              {(["open", "won", "lost", "all"] as const).map((f) => (
+                <button key={f} onClick={() => setStatusFilter(f)} aria-pressed={statusFilter === f} className={`rounded-md px-3 py-1 text-xs font-medium capitalize transition-colors ${statusFilter === f ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"}`}>
+                  {f}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">{visibleDeals.length} deal{visibleDeals.length === 1 ? "" : "s"}</p>
+            <div className="ml-auto flex rounded-lg border border-border bg-card p-0.5">
+              <button onClick={() => setView("board")} aria-pressed={view === "board"} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium ${view === "board" ? "bg-accent text-foreground" : "text-muted-foreground"}`}><Columns3 className="size-3.5" /> Board</button>
+              <button onClick={() => setView("list")} aria-pressed={view === "list"} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium ${view === "list" ? "bg-accent text-foreground" : "text-muted-foreground"}`}><List className="size-3.5" /> List</button>
+            </div>
+          </div>
+
+          {view === "board" ? (
+            <PipelineBoard
+              stages={stages}
+              deals={visibleDeals}
+              onDealMoved={handleDealMoved}
+              onAddDeal={handleAddDeal}
+              onEditDeal={handleEditDeal}
+            />
+          ) : (
+            <div className="overflow-hidden rounded-2xl border border-border/70 bg-card">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] text-sm">
+                  <thead className="border-b border-border bg-muted/50 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <tr>
+                      <th className="px-4 py-3">Deal</th>
+                      <th className="px-3 py-3">Contact</th>
+                      <th className="px-3 py-3">Stage</th>
+                      <th className="px-3 py-3 text-right">Value</th>
+                      <th className="px-3 py-3">Expected close</th>
+                      <th className="px-3 py-3">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/70">
+                    {visibleDeals.length === 0 && (
+                      <tr><td colSpan={6} className="px-4 py-12 text-center text-sm text-muted-foreground">No deals match these filters.</td></tr>
+                    )}
+                    {visibleDeals.map((d) => {
+                      const st = stageById.get(d.stage_id);
+                      const isOpen = !d.status || (d.status !== "won" && d.status !== "lost");
+                      const overdue = Boolean(d.expected_close_date && isOpen && new Date(d.expected_close_date).getTime() < now - 86_400_000);
+                      return (
+                        <tr key={d.id} onClick={() => handleEditDeal(d)} className="cursor-pointer transition-colors hover:bg-muted/50">
+                          <td className="px-4 py-3 font-medium">{d.title}</td>
+                          <td className="px-3 py-3 text-muted-foreground">{d.contact?.name || (d.contact?.phone ? `+${d.contact.phone}` : "—")}</td>
+                          <td className="px-3 py-3">
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-0.5 text-xs"><span className="size-2 rounded-full" style={{ backgroundColor: st?.color }} />{st?.name ?? "—"}</span>
+                          </td>
+                          <td className="px-3 py-3 text-right font-semibold tabular-nums">{formatMoney(d.value, d.currency)}</td>
+                          <td className={`px-3 py-3 text-xs ${overdue ? "font-medium text-red-600 dark:text-red-400" : "text-muted-foreground"}`}>{d.expected_close_date ? new Date(d.expected_close_date).toLocaleDateString() : "—"}{overdue ? " · overdue" : ""}</td>
+                          <td className="px-3 py-3 text-xs capitalize">{isOpen ? "open" : d.status}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </>
       )}
 
-      {/* New Pipeline Dialog */}
-      <Dialog open={newPipelineOpen} onOpenChange={setNewPipelineOpen}>
-        <DialogContent className="sm:max-w-sm bg-slate-900 border-slate-700">
-          <DialogHeader>
-            <DialogTitle className="text-white">New Pipeline</DialogTitle>
-          </DialogHeader>
-          <div className="py-2">
-            <Label className="text-slate-300">Pipeline Name</Label>
-            <Input
-              value={newPipelineName}
-              onChange={(e) => setNewPipelineName(e.target.value)}
-              placeholder="e.g., Enterprise Sales"
-              className="mt-2 bg-slate-800 border-slate-700 text-white"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleCreatePipeline();
-              }}
-            />
-            <p className="mt-2 text-xs text-slate-400">
-              Default stages (New Lead → Won) will be created automatically.
-            </p>
-          </div>
-          <DialogFooter className="bg-slate-900/50 border-slate-700">
-            <Button
-              variant="outline"
-              onClick={() => setNewPipelineOpen(false)}
-              className="border-slate-700 text-slate-300 hover:bg-slate-800"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleCreatePipeline}
-              disabled={creating || !newPipelineName.trim()}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              {creating ? "Creating..." : "Create Pipeline"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <NewPipelineDialog
+        open={newPipelineOpen}
+        onOpenChange={setNewPipelineOpen}
+        onCreated={async (id) => { setSelectedPipelineId(id); await refreshPipelines(); }}
+      />
 
-      {/* Pipeline Settings */}
       {selectedPipeline && (
         <PipelineSettings
           open={settingsOpen}
@@ -449,7 +405,6 @@ export default function PipelinesPage() {
         />
       )}
 
-      {/* Deal Form (Sheet) */}
       <DealForm
         open={dealFormOpen}
         onOpenChange={setDealFormOpen}

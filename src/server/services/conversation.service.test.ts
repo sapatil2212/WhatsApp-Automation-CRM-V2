@@ -195,7 +195,7 @@ describe('sendMessage — service window', () => {
     expect(deps.transport.sendTemplate).toHaveBeenCalled();
   });
 
-  it('refuses to send on a closed conversation', async () => {
+  it('sends on a resolved conversation and reopens it', async () => {
     deps.conversations.findForSend.mockResolvedValueOnce({
       id: 'conv-1',
       status: 'closed',
@@ -204,9 +204,9 @@ describe('sendMessage — service window', () => {
       messages: [{ createdAt: hoursAgo(1) }],
     } as never);
 
-    await expect(service.sendMessage('conv-1', { contentType: 'text', text: 'Hi' })).rejects.toBeInstanceOf(
-      ConflictError,
-    );
+    await service.sendMessage('conv-1', { contentType: 'text', text: 'Hi' });
+    expect(deps.transport.sendText).toHaveBeenCalled();
+    expect(deps.conversations.update).toHaveBeenCalledWith('conv-1', { status: 'open' });
   });
 
   it('rejects a contact with no phone number', async () => {

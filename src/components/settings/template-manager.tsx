@@ -47,7 +47,7 @@ const categoryColors: Record<string, string> = {
 };
 
 const statusColors: Record<string, string> = {
-  Draft: 'bg-slate-600/20 text-slate-400 border-slate-600/30',
+  Draft: 'bg-slate-600/20 text-muted-foreground border-border',
   Pending: 'bg-yellow-600/20 text-yellow-400 border-yellow-600/30',
   Approved: 'bg-primary/20 text-primary border-primary/30',
   Rejected: 'bg-red-600/20 text-red-400 border-red-600/30',
@@ -262,8 +262,8 @@ export function TemplateManager() {
     <div className="space-y-4 mt-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-lg font-semibold text-white">Message Templates</h2>
-          <p className="text-sm text-slate-400 max-w-2xl">
+          <h2 className="text-lg font-semibold text-foreground">Message Templates</h2>
+          <p className="text-sm text-muted-foreground max-w-2xl">
             Build WhatsApp templates with headers, variables, and call-to-action
             buttons, then submit them to Meta for approval right here. Use
             &quot;Sync from Meta&quot; to pull the latest approval status.
@@ -274,7 +274,7 @@ export function TemplateManager() {
             variant="outline"
             onClick={handleSyncFromMeta}
             disabled={syncing}
-            className="border-slate-200 dark:border-slate-700 bg-transparent text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60"
+            className="border-slate-200 dark:border-slate-700 bg-transparent text-muted-foreground dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60"
             title="Pull approval status from your Meta WhatsApp Business Account"
           >
             <RefreshCw className={`size-4 ${syncing ? 'animate-spin' : ''}`} />
@@ -294,10 +294,10 @@ export function TemplateManager() {
       </div>
 
       {templates.length === 0 ? (
-        <Card className="bg-slate-900/40 border-slate-800">
+        <Card className="bg-muted/40 border-border">
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-            <p className="text-slate-400 text-sm">No templates yet.</p>
-            <p className="text-slate-400 text-xs mt-1">
+            <p className="text-muted-foreground text-sm">No templates yet.</p>
+            <p className="text-muted-foreground text-xs mt-1">
               Create your first template and submit it for Meta approval.
             </p>
           </CardContent>
@@ -305,11 +305,11 @@ export function TemplateManager() {
       ) : (
         <div className="grid gap-3">
           {templates.map((template) => (
-            <Card key={template.id} className="bg-slate-900/40 border-slate-800">
+            <Card key={template.id} className="bg-muted/40 border-border">
               <CardContent className="flex items-start justify-between pt-4">
                 <div className="space-y-2 min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-medium text-slate-200">{template.name}</h3>
+                    <h3 className="font-medium text-foreground/90">{template.name}</h3>
                     <Badge className={`text-xs border ${categoryColors[template.category] || ''}`}>
                       {template.category}
                     </Badge>
@@ -317,19 +317,19 @@ export function TemplateManager() {
                       {template.status || 'Draft'}
                     </Badge>
                     {template.language && (
-                      <span className="text-xs text-slate-400 uppercase">{template.language}</span>
+                      <span className="text-xs text-muted-foreground uppercase">{template.language}</span>
                     )}
                   </div>
-                  <p className="text-sm text-slate-400 line-clamp-2">{template.body_text}</p>
+                  <p className="text-sm text-muted-foreground line-clamp-2">{template.body_text}</p>
                   {template.footer_text && (
-                    <p className="text-xs text-slate-400 italic">{template.footer_text}</p>
+                    <p className="text-xs text-muted-foreground italic">{template.footer_text}</p>
                   )}
                   {Array.isArray(template.buttons) && template.buttons.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 pt-1">
                       {(template.buttons as Array<Record<string, unknown>>).map((b, i) => (
                         <span
                           key={i}
-                          className="inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-800/60 px-2 py-0.5 text-[11px] text-slate-300"
+                          className="inline-flex items-center gap-1 rounded-md border border-border bg-muted px-2 py-0.5 text-[11px] text-foreground/90"
                         >
                           {b.type === 'URL' ? (
                             <Link2 className="size-3" />
@@ -348,7 +348,7 @@ export function TemplateManager() {
                   variant="ghost"
                   size="icon"
                   onClick={() => handleDelete(template.id)}
-                  className="text-slate-400 hover:text-red-400 hover:bg-red-950/30 shrink-0 ml-2"
+                  className="text-muted-foreground hover:text-red-400 hover:bg-red-950/30 shrink-0 ml-2"
                 >
                   <Trash2 className="size-4" />
                 </Button>
@@ -362,7 +362,7 @@ export function TemplateManager() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-slate-200">New Message Template</DialogTitle>
+            <DialogTitle className="text-foreground/90">New Message Template</DialogTitle>
             <DialogDescription>
               Templates are submitted to Meta for review. Approval typically takes
               a few minutes to a few hours.
@@ -374,18 +374,18 @@ export function TemplateManager() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-slate-200">Template Name</Label>
+                  <Label className="text-foreground/90">Template Name</Label>
                   <Input
                     placeholder="order_confirmation"
                     value={form.name}
                     onChange={(e) => updateForm({ name: e.target.value })}
                   />
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-[11px] text-muted-foreground">
                     Lowercase letters, numbers, underscores only.
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-slate-200">Language</Label>
+                  <Label className="text-foreground/90">Language</Label>
                   <Input
                     list="template-language-codes"
                     placeholder="en_US"
@@ -401,7 +401,7 @@ export function TemplateManager() {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-slate-200">Category</Label>
+                <Label className="text-foreground/90">Category</Label>
                 <Select
                   value={form.category}
                   onValueChange={(val) =>
@@ -423,7 +423,7 @@ export function TemplateManager() {
 
               {/* Header */}
               <div className="space-y-2">
-                <Label className="text-slate-200">Header (optional)</Label>
+                <Label className="text-foreground/90">Header (optional)</Label>
                 <Select
                   value={form.header_type}
                   onValueChange={(val) =>
@@ -471,7 +471,7 @@ export function TemplateManager() {
 
               {/* Body */}
               <div className="space-y-2">
-                <Label className="text-slate-200">Body Text</Label>
+                <Label className="text-foreground/90">Body Text</Label>
                 <Textarea
                   placeholder="Hi {{1}}, your order {{2}} has shipped!"
                   value={form.body_text}
@@ -479,15 +479,15 @@ export function TemplateManager() {
                   rows={4}
                   className="resize-none"
                 />
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-muted-foreground">
                   Use {'{{1}}'}, {'{{2}}'} for variables. Meta requires a sample
                   value for each.
                 </p>
                 {bodyVarCount > 0 && (
-                  <div className="grid gap-2 rounded-md border border-slate-800 bg-slate-900/40 p-3">
+                  <div className="grid gap-2 rounded-md border border-border bg-muted/40 p-3">
                     {Array.from({ length: bodyVarCount }).map((_, i) => (
                       <div key={i} className="flex items-center gap-2">
-                        <span className="text-xs text-slate-400 w-10">{`{{${i + 1}}}`}</span>
+                        <span className="text-xs text-muted-foreground w-10">{`{{${i + 1}}}`}</span>
                         <Input
                           placeholder={`Sample for variable ${i + 1}`}
                           value={form.body_example[i] ?? ''}
@@ -505,7 +505,7 @@ export function TemplateManager() {
 
               {/* Footer */}
               <div className="space-y-2">
-                <Label className="text-slate-200">Footer (optional)</Label>
+                <Label className="text-foreground/90">Footer (optional)</Label>
                 <Input
                   placeholder="e.g. Reply STOP to unsubscribe"
                   value={form.footer_text}
@@ -516,14 +516,14 @@ export function TemplateManager() {
 
               {/* Buttons */}
               <div className="space-y-2">
-                <Label className="text-slate-200">Buttons (optional)</Label>
+                <Label className="text-foreground/90">Buttons (optional)</Label>
                 <div className="flex flex-wrap gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={() => addButton('QUICK_REPLY')}
-                    className="border-slate-700 text-slate-300"
+                    className="border-border text-foreground/90"
                   >
                     <MessageSquareReply className="size-3.5" /> Quick reply
                   </Button>
@@ -532,7 +532,7 @@ export function TemplateManager() {
                     variant="outline"
                     size="sm"
                     onClick={() => addButton('URL')}
-                    className="border-slate-700 text-slate-300"
+                    className="border-border text-foreground/90"
                   >
                     <Link2 className="size-3.5" /> Visit website
                   </Button>
@@ -541,7 +541,7 @@ export function TemplateManager() {
                     variant="outline"
                     size="sm"
                     onClick={() => addButton('PHONE_NUMBER')}
-                    className="border-slate-700 text-slate-300"
+                    className="border-border text-foreground/90"
                   >
                     <Phone className="size-3.5" /> Call phone
                   </Button>
@@ -550,10 +550,10 @@ export function TemplateManager() {
                 {form.buttons.map((btn, i) => (
                   <div
                     key={i}
-                    className="space-y-2 rounded-md border border-slate-800 bg-slate-900/40 p-3"
+                    className="space-y-2 rounded-md border border-border bg-muted/40 p-3"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-slate-300">
+                      <span className="text-xs font-medium text-foreground/90">
                         {btn.type === 'URL'
                           ? 'Visit website'
                           : btn.type === 'PHONE_NUMBER'
@@ -565,7 +565,7 @@ export function TemplateManager() {
                         variant="ghost"
                         size="icon"
                         onClick={() => removeButton(i)}
-                        className="size-6 text-slate-400 hover:text-red-400"
+                        className="size-6 text-muted-foreground hover:text-red-400"
                       >
                         <Trash2 className="size-3.5" />
                       </Button>
@@ -606,26 +606,26 @@ export function TemplateManager() {
 
             {/* ── Live preview ── */}
             <div className="space-y-2">
-              <Label className="text-slate-200">Preview</Label>
+              <Label className="text-foreground/90">Preview</Label>
               <div className="rounded-xl bg-[#0b141a] p-3">
                 <div className="max-w-[260px] rounded-lg rounded-tl-none bg-[#202c33] p-2.5 shadow">
                   {form.header_type === 'text' && form.header_text && (
-                    <p className="mb-1 text-sm font-semibold text-slate-100">
+                    <p className="mb-1 text-sm font-semibold text-foreground/90">
                       {fillPreview(form.header_text, [form.header_text_example])}
                     </p>
                   )}
                   {(form.header_type === 'image' ||
                     form.header_type === 'video' ||
                     form.header_type === 'document') && (
-                    <div className="mb-1 flex h-20 items-center justify-center rounded bg-slate-700/50 text-[11px] uppercase text-slate-400">
+                    <div className="mb-1 flex h-20 items-center justify-center rounded bg-muted text-[11px] uppercase text-muted-foreground">
                       {form.header_type}
                     </div>
                   )}
-                  <p className="whitespace-pre-wrap text-sm text-slate-100">
+                  <p className="whitespace-pre-wrap text-sm text-foreground/90">
                     {fillPreview(form.body_text || 'Your message body…', form.body_example)}
                   </p>
                   {form.footer_text && (
-                    <p className="mt-1 text-[11px] text-slate-400">{form.footer_text}</p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">{form.footer_text}</p>
                   )}
                 </div>
                 {form.buttons.length > 0 && (
@@ -648,7 +648,7 @@ export function TemplateManager() {
                   </div>
                 )}
               </div>
-              <div className="flex items-start gap-1.5 rounded-md border border-slate-800 bg-slate-900/40 p-2 text-[11px] text-slate-400">
+              <div className="flex items-start gap-1.5 rounded-md border border-border bg-muted/40 p-2 text-[11px] text-muted-foreground">
                 <Info className="size-3.5 shrink-0 mt-0.5" />
                 <span>
                   Marketing templates with variables face stricter review. Keep
@@ -663,7 +663,7 @@ export function TemplateManager() {
             <Button
               variant="outline"
               onClick={() => setDialogOpen(false)}
-              className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60"
+              className="border-slate-200 dark:border-slate-700 text-muted-foreground dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60"
             >
               Cancel
             </Button>

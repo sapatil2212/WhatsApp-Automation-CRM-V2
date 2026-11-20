@@ -12,9 +12,11 @@ import type { NextConfig } from "next";
  *   - HSTS: only meaningful on HTTPS (no-op on http://localhost).
  *   - X-Content-Type-Options / X-Frame-Options / Referrer-Policy:
  *     baseline OWASP hardening, no behavioural cost.
- *   - Permissions-Policy: we don't use camera / microphone / etc, so
- *     deny them. A supply-chain compromise or a forgotten plugin
- *     can't silently opt back in.
+ *   - Permissions-Policy: camera / geolocation / payment / usb are
+ *     denied; the microphone is allowed for our own origin only
+ *     (doctors dictate prescriptions in Consultation).
+ *   - X-Frame-Options SAMEORIGIN: the app embeds its own prescription
+ *     PDFs in an iframe; other sites still cannot frame it.
  */
 const SECURITY_HEADERS = [
   {
@@ -22,11 +24,11 @@ const SECURITY_HEADERS = [
     value: "max-age=63072000; includeSubDomains; preload",
   },
   { key: "X-Content-Type-Options", value: "nosniff" },
-  { key: "X-Frame-Options", value: "DENY" },
+  { key: "X-Frame-Options", value: "SAMEORIGIN" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   {
     key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+    value: "camera=(), microphone=(self), geolocation=(), payment=(), usb=()",
   },
   {
     key: "Content-Security-Policy-Report-Only",
@@ -46,7 +48,7 @@ const SECURITY_HEADERS = [
       // Supabase REST + realtime (WSS). All Meta API calls happen
       // server-side, so graph.facebook.com does not belong here.
       "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
-      "frame-ancestors 'none'",
+      "frame-ancestors 'self'",
       "base-uri 'self'",
       "form-action 'self'",
     ].join("; "),
@@ -54,6 +56,10 @@ const SECURITY_HEADERS = [
 ] as const;
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // Business-setup documents can be up to 50 MB; the proxy buffers bodies.
+    proxyClientMaxBodySize: "55mb",
+  },
   async redirects() {
     return [
       {

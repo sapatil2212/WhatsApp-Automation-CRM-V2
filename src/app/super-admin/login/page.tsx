@@ -23,8 +23,8 @@ export default function SuperAdminLoginPage() {
         body: JSON.stringify({ email, password }),
       });
       if (!res.ok) {
-        const d = await res.json();
-        setError(d.error ?? "Invalid credentials");
+        const d = await res.json().catch(() => ({}));
+        setError(d.error ?? `Authentication failed (${res.status})`);
       } else {
         router.push("/super-admin");
       }

@@ -232,7 +232,7 @@ export function TeamManager() {
           members.map((member) => (
             <div key={member.id} className="p-4 sm:p-5 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3.5 min-w-0">
-                <div className="h-10 w-10 rounded-full bg-slate-700 text-white flex items-center justify-center font-semibold text-sm shrink-0">
+                <div className="h-10 w-10 rounded-full bg-muted text-foreground flex items-center justify-center font-semibold text-sm shrink-0">
                   {member.fullName?.charAt(0).toUpperCase() || member.email.charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0">
@@ -268,7 +268,7 @@ export function TeamManager() {
                   size="sm"
                   disabled={deletingId === member.id}
                   onClick={() => handleRemove(member.id)}
-                  className="text-slate-400 hover:text-red-400 hover:bg-red-500/10 h-8 w-8 p-0"
+                  className="text-muted-foreground hover:text-red-400 hover:bg-red-500/10 h-8 w-8 p-0"
                   title="Remove from workspace"
                 >
                   {deletingId === member.id ? (

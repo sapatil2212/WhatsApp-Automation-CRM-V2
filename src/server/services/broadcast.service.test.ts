@@ -52,6 +52,7 @@ function makeDeps() {
     addRecipients: vi.fn(async (_id: string, ids: string[]) => ids.length),
     listRecipients: vi.fn(),
     claimPendingBatch: vi.fn(async (): Promise<ClaimedRecipient[]> => []),
+    customValuesFor: vi.fn(async () => new Map<string, Record<string, string | null>>()),
     countPending: vi.fn(async () => 0),
     // Explicit signature so `mock.calls[0][0]` is typed rather than `[]`.
     recordRecipientResult: vi.fn(async (_input: RecordResultInput): Promise<void> => undefined),
@@ -61,6 +62,7 @@ function makeDeps() {
     ),
     findRecipientsForContact: vi.fn(),
     findDueScheduled: vi.fn(async (): Promise<Array<{ id: string; status: string }>> => []),
+    cancelPendingRecipients: vi.fn(async () => 7),
   };
   const audience = {
     buildWhere: vi.fn(),
@@ -76,7 +78,11 @@ function makeDeps() {
       }),
     ),
   };
-  const templates = { assertSendable: vi.fn(async () => ({}) as never) };
+  const templates = {
+    assertSendable: vi.fn(
+      async () => ({ bodyText: 'Hi {{1}}', headerType: 'none', headerContent: null, buttons: [] }) as never,
+    ),
+  };
   const transport = {
     sendTemplate: vi.fn(async () => ({ whatsappMessageId: 'wamid.X' })),
   };
@@ -98,7 +104,7 @@ beforeEach(() => {
 
 describe('previewAudience', () => {
   it('reports reach, exclusions and a sample', async () => {
-    expect(await service.previewAudience({ type: 'all' })).toEqual({
+    expect(await service.previewAudience({ type: 'all', excludeTagIds: [] })).toEqual({
       reach: 3,
       excluded: 2,
       sample: [{ id: 'c-1', phone: '9199', name: 'Asha' }],
@@ -107,7 +113,7 @@ describe('previewAudience', () => {
 
   it('never reports negative exclusions', async () => {
     deps.audience.countBeforeExclusions.mockResolvedValueOnce(1);
-    expect((await service.previewAudience({ type: 'all' })).excluded).toBe(0);
+    expect((await service.previewAudience({ type: 'all', excludeTagIds: [] })).excluded).toBe(0);
   });
 });
 
@@ -117,7 +123,8 @@ describe('create', () => {
     templateName: 'summer_sale',
     templateLanguage: 'en_US',
     templateVariables: ['Asha'],
-    audience: { type: 'all' as const },
+    personalization: {},
+    audience: { type: 'all' as const, excludeTagIds: [] },
   };
 
   it('refuses a template that is not approved, before anything is written', async () => {
@@ -148,15 +155,20 @@ describe('create', () => {
       .mockResolvedValueOnce({ ids: ['c-3'], nextCursor: null });
 
     await service.create(body);
-    expect(deps.audience.pageIds).toHaveBeenNthCalledWith(1, { type: 'all' }, 500, undefined);
-    expect(deps.audience.pageIds).toHaveBeenNthCalledWith(2, { type: 'all' }, 500, 'c-2');
+    expect(deps.audience.pageIds).toHaveBeenNthCalledWith(1, { type: 'all', excludeTagIds: [] }, 500, undefined);
+    expect(deps.audience.pageIds).toHaveBeenNthCalledWith(2, { type: 'all', excludeTagIds: [] }, 500, 'c-2');
     expect(deps.broadcasts.addRecipients).toHaveBeenCalledTimes(2);
   });
 
   it('stores positional variables in the map shape the column already uses', async () => {
+    deps.templates.assertSendable.mockResolvedValue(
+      { bodyText: 'Hi {{1}}, ref {{2}}.', headerType: 'none', headerContent: null, buttons: [] } as never,
+    );
     await service.create({ ...body, templateVariables: ['Asha', 'A-1'] });
     expect(deps.broadcasts.create).toHaveBeenCalledWith(
-      expect.objectContaining({ templateVariables: { '1': 'Asha', '2': 'A-1' } }),
+      expect.objectContaining({
+        templateVariables: expect.objectContaining({ '1': 'Asha', '2': 'A-1' }),
+      }),
     );
   });
 
@@ -185,7 +197,7 @@ describe('update', () => {
   });
 
   it('refuses an audience change, which would desync the frozen recipient set', async () => {
-    await expect(service.update('bc-1', { audience: { type: 'all' } })).rejects.toBeInstanceOf(ConflictError);
+    await expect(service.update('bc-1', { audience: { type: 'all', excludeTagIds: [] } })).rejects.toBeInstanceOf(ConflictError);
   });
 
   it('re-checks template approval when the template changes', async () => {
@@ -233,7 +245,7 @@ describe('start', () => {
 
   it('re-validates template approval at start, not just at creation', async () => {
     await service.start('bc-1');
-    expect(deps.templates.assertSendable).toHaveBeenCalledWith('summer_sale', 'en_US', ['Asha']);
+    expect(deps.templates.assertSendable).toHaveBeenCalledWith('summer_sale', 'en_US', expect.any(Array));
   });
 });
 
@@ -280,7 +292,22 @@ describe('dispatch', () => {
       templateName: 'summer_sale',
       language: 'en_US',
       params: ['Asha'],
+      components: [{ type: 'body', parameters: [{ type: 'text', text: 'Asha' }] }],
     });
+  });
+
+  it('never runs two dispatch passes for the same campaign at once', async () => {
+    let release!: () => void;
+    deps.broadcasts.claimPendingBatch.mockImplementationOnce(
+      () => new Promise((resolve) => { release = () => resolve([] as never); }),
+    );
+    const first = service.dispatch('bc-1', 50);
+    await new Promise((r) => setTimeout(r, 0));
+    const second = await service.dispatch('bc-1', 50);
+    expect(second.attempted).toBe(0);
+    expect(deps.broadcasts.claimPendingBatch).toHaveBeenCalledTimes(1);
+    release();
+    await first;
   });
 
   it('records a per-recipient failure and keeps going', async () => {
@@ -428,5 +455,54 @@ describe('applyDeliveryStatus', () => {
     });
     expect(applied).toBe(false);
     expect(deps.broadcasts.advanceRecipientStatus).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('pause / resume / cancel', () => {
+  it('pauses only a sending campaign', async () => {
+    deps.broadcasts.findById.mockResolvedValue(broadcastRow({ status: 'sending' }) as never);
+    await service.pause('bc-1');
+    expect(deps.broadcasts.transitionStatus).toHaveBeenCalledWith('bc-1', 'sending', 'paused');
+
+    deps.broadcasts.findById.mockResolvedValue(broadcastRow({ status: 'draft' }) as never);
+    await expect(service.pause('bc-1')).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it('resumes a paused campaign back to sending after re-checking the template', async () => {
+    deps.broadcasts.findById.mockResolvedValue(broadcastRow({ status: 'paused' }) as never);
+    await service.resume('bc-1');
+    expect(deps.templates.assertSendable).toHaveBeenCalled();
+    expect(deps.broadcasts.transitionStatus).toHaveBeenCalledWith('bc-1', 'paused', 'sending');
+
+    deps.broadcasts.findById.mockResolvedValue(broadcastRow({ status: 'sending' }) as never);
+    await expect(service.resume('bc-1')).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it('cancels sending, paused and scheduled campaigns and skips pending recipients', async () => {
+    for (const status of ['sending', 'paused', 'scheduled']) {
+      deps.broadcasts.findById.mockResolvedValue(broadcastRow({ status }) as never);
+      await service.cancel('bc-1');
+      expect(deps.broadcasts.transitionStatus).toHaveBeenLastCalledWith('bc-1', status, 'cancelled');
+    }
+    expect(deps.broadcasts.cancelPendingRecipients).toHaveBeenCalledTimes(3);
+  });
+
+  it('refuses to cancel a finished campaign', async () => {
+    deps.broadcasts.findById.mockResolvedValue(broadcastRow({ status: 'sent' }) as never);
+    await expect(service.cancel('bc-1')).rejects.toBeInstanceOf(ConflictError);
+    expect(deps.broadcasts.cancelPendingRecipients).not.toHaveBeenCalled();
+  });
+
+  it('stops a running batch within a few sends once paused', async () => {
+    const rows = Array.from({ length: 10 }, (_, i) => ({ id: `r-${i}`, contactId: `c-${i}`, contact: { id: `c-${i}`, phone: `91990000${i}`, name: 'A' } }));
+    deps.broadcasts.claimPendingBatch.mockResolvedValueOnce(rows as never);
+    // findById: dispatch() -> dispatchBatch() read 'sending', then the in-loop check sees 'paused'.
+    deps.broadcasts.findById
+      .mockResolvedValueOnce(broadcastRow({ status: 'sending' }) as never)
+      .mockResolvedValue(broadcastRow({ status: 'paused' }) as never);
+    const result = await service.dispatch('bc-1', 50);
+    expect(deps.transport.sendTemplate).toHaveBeenCalledTimes(3);
+    expect(result).toMatchObject({ status: 'paused', hasMore: false, sent: 3 });
   });
 });

@@ -1,5 +1,7 @@
 "use client";
 
+import { PageSkeleton } from "@/components/ui/page-skeleton";
+import { BookingLinkCard } from '@/components/booking/booking-link-card';
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useParams } from "next/navigation";
@@ -227,20 +229,14 @@ export default function BookingsManagement() {
     return matchesSearch && matchesStatus;
   });
 
-  if (loading) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  if (loading) return <PageSkeleton variant="table" />;
 
   if (!businessId) {
     return (
       <div className="flex h-[50vh] flex-col items-center justify-center text-center">
-        <AlertCircle className="h-10 w-10 text-slate-500 mb-3" />
-        <h3 className="text-lg font-bold text-white">No Business Profile Found</h3>
-        <p className="text-sm text-slate-400 mt-1">Please complete the setup wizard first.</p>
+        <AlertCircle className="h-10 w-10 text-muted-foreground mb-3" />
+        <h3 className="text-lg font-bold text-foreground">No Business Profile Found</h3>
+        <p className="text-sm text-muted-foreground mt-1">Please complete the setup wizard first.</p>
         <Link href={`/${businessSegment}/setup`} className="mt-4">
           <Button>Setup Business</Button>
         </Link>
@@ -250,14 +246,15 @@ export default function BookingsManagement() {
 
   return (
     <div className="space-y-6">
+      <BookingLinkCard compact />
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
             <CalendarDays className="h-6 w-6 text-primary" />
             {term.bookingPluralLabel} Management
           </h1>
-          <p className="text-slate-400 text-sm mt-1">
+          <p className="text-muted-foreground text-sm mt-1">
             Manage upcoming scheduling and bookings for your business.
           </p>
         </div>
@@ -269,20 +266,20 @@ export default function BookingsManagement() {
       {/* Filters Row */}
       <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
         <div className="relative w-full sm:max-w-xs">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search bookings..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 h-9 border-slate-800 bg-slate-900 text-xs"
+            className="pl-9 h-9 border-border bg-card text-xs"
           />
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Filter className="h-4 w-4 text-slate-400 hidden sm:block" />
+          <Filter className="h-4 w-4 text-muted-foreground hidden sm:block" />
           <select
             value={statusFilter}
             onChange={(e: any) => setStatusFilter(e.target.value)}
-            className="h-9 rounded-md border border-slate-800 bg-slate-900 px-3 text-xs text-white focus:outline-none cursor-pointer"
+            className="h-9 rounded-md border border-border bg-card px-3 text-xs text-foreground focus:outline-none cursor-pointer"
           >
             <option value="all">All Statuses</option>
             <option value="pending">Pending</option>
@@ -294,18 +291,18 @@ export default function BookingsManagement() {
       </div>
 
       {/* Bookings List Card */}
-      <Card className="border-slate-800 bg-slate-900/60 backdrop-blur-md">
+      <Card className="border-border bg-muted/40 backdrop-blur-md">
         <CardContent className="p-6">
           {filteredBookings.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Calendar className="h-12 w-12 text-slate-700 mb-3" />
-              <p className="text-sm text-slate-400">No {term.bookingPluralLabel.toLowerCase()} found.</p>
+              <Calendar className="h-12 w-12 text-muted-foreground mb-3" />
+              <p className="text-sm text-muted-foreground">No {term.bookingPluralLabel.toLowerCase()} found.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-slate-800 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <tr className="border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     <th className="pb-3 font-medium">Customer</th>
                     <th className="pb-3 font-medium">Date & Time</th>
                     <th className="pb-3 font-medium">Notes</th>
@@ -313,19 +310,19 @@ export default function BookingsManagement() {
                     <th className="pb-3 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800 text-sm">
+                <tbody className="divide-y divide-border text-sm">
                   {filteredBookings.map((b) => (
-                    <tr key={b.id} className="hover:bg-slate-800/10 transition-colors">
+                    <tr key={b.id} className="hover:bg-accent transition-colors">
                       <td className="py-4">
-                        <div className="font-medium text-white">{b.contact_name}</div>
-                        <div className="text-xs text-slate-500">{b.contact_phone}</div>
+                        <div className="font-medium text-foreground">{b.contact_name}</div>
+                        <div className="text-xs text-muted-foreground">{b.contact_phone}</div>
                       </td>
-                      <td className="py-4 text-slate-300">
+                      <td className="py-4 text-foreground/90">
                         <div>{b.preferred_date}</div>
-                        <div className="text-xs text-slate-500">{b.preferred_time}</div>
+                        <div className="text-xs text-muted-foreground">{b.preferred_time}</div>
                       </td>
-                      <td className="py-4 text-slate-400 text-xs max-w-xs truncate">
-                        {b.notes || <span className="italic text-slate-600">None</span>}
+                      <td className="py-4 text-muted-foreground text-xs max-w-xs truncate">
+                        {b.notes || <span className="italic text-muted-foreground">None</span>}
                       </td>
                       <td className="py-4">
                         <Badge
@@ -357,7 +354,7 @@ export default function BookingsManagement() {
                             variant="ghost"
                             size="icon"
                             onClick={() => handleOpenEdit(b)}
-                            className="h-8 w-8 text-slate-400 hover:text-white"
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
                           >
                             <Edit2 className="h-4 w-4" />
                           </Button>
@@ -368,7 +365,7 @@ export default function BookingsManagement() {
                               setBookingToDelete(b.id);
                               setDeleteOpen(true);
                             }}
-                            className="h-8 w-8 text-slate-400 hover:text-red-400"
+                            className="h-8 w-8 text-muted-foreground hover:text-red-400"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -385,10 +382,10 @@ export default function BookingsManagement() {
 
       {/* Add / Edit Dialog */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="border-slate-800 bg-slate-900 text-white max-w-md">
+        <DialogContent className="border-border bg-card text-foreground max-w-md">
           <DialogHeader>
             <DialogTitle>{editingBooking ? "Edit Booking" : "New Booking"}</DialogTitle>
-            <DialogDescription className="text-slate-400 text-xs">
+            <DialogDescription className="text-muted-foreground text-xs">
               Fill in the scheduling details below.
             </DialogDescription>
           </DialogHeader>
@@ -398,7 +395,7 @@ export default function BookingsManagement() {
               <select
                 value={form.contact_id}
                 onChange={(e) => setForm({ ...form, contact_id: e.target.value })}
-                className="w-full h-9 rounded-md border border-slate-800 bg-slate-950 px-3 text-xs focus:outline-none"
+                className="w-full h-9 rounded-md border border-border bg-background px-3 text-xs focus:outline-none"
               >
                 <option value="">-- Create new client details below --</option>
                 {contacts.map((c) => (
@@ -418,7 +415,7 @@ export default function BookingsManagement() {
                     value={form.contact_name}
                     onChange={(e) => setForm({ ...form, contact_name: e.target.value })}
                     placeholder="John Doe"
-                    className="h-9 border-slate-800 bg-slate-950 text-xs"
+                    className="h-9 border-border bg-background text-xs"
                   />
                 </div>
                 <div className="space-y-1">
@@ -428,7 +425,7 @@ export default function BookingsManagement() {
                     value={form.contact_phone}
                     onChange={(e) => setForm({ ...form, contact_phone: e.target.value })}
                     placeholder="+1234567890"
-                    className="h-9 border-slate-800 bg-slate-950 text-xs"
+                    className="h-9 border-border bg-background text-xs"
                   />
                 </div>
               </div>
@@ -442,7 +439,7 @@ export default function BookingsManagement() {
                   type="date"
                   value={form.preferred_date}
                   onChange={(e) => setForm({ ...form, preferred_date: e.target.value })}
-                  className="h-9 border-slate-800 bg-slate-950 text-xs"
+                  className="h-9 border-border bg-background text-xs"
                 />
               </div>
               <div className="space-y-1">
@@ -452,7 +449,7 @@ export default function BookingsManagement() {
                   placeholder="e.g. 10:00 AM"
                   value={form.preferred_time}
                   onChange={(e) => setForm({ ...form, preferred_time: e.target.value })}
-                  className="h-9 border-slate-800 bg-slate-950 text-xs"
+                  className="h-9 border-border bg-background text-xs"
                 />
               </div>
             </div>
@@ -462,7 +459,7 @@ export default function BookingsManagement() {
               <select
                 value={form.status}
                 onChange={(e) => setForm({ ...form, status: e.target.value })}
-                className="w-full h-9 rounded-md border border-slate-800 bg-slate-950 px-3 text-xs focus:outline-none"
+                className="w-full h-9 rounded-md border border-border bg-background px-3 text-xs focus:outline-none"
               >
                 <option value="pending">Pending</option>
                 <option value="confirmed">Confirmed</option>
@@ -477,7 +474,7 @@ export default function BookingsManagement() {
                 value={form.notes}
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
                 placeholder="Details of the booking..."
-                className="w-full min-h-[80px] rounded-md border border-slate-800 bg-slate-950 p-3 text-xs focus:outline-none"
+                className="w-full min-h-[80px] rounded-md border border-border bg-background p-3 text-xs focus:outline-none"
               />
             </div>
 

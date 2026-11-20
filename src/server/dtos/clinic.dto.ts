@@ -6,6 +6,7 @@
  * is a Phase 2 concern; this file makes the existing one typed and safe.
  */
 
+import { exceptionsToRecord } from '@/lib/healthcare/exceptions';
 import { z } from 'zod';
 
 import { hexColorSchema, timeOfDaySchema } from '../validators/common.validator';
@@ -125,7 +126,7 @@ export function toDoctorDto(row: DoctorRow): DoctorDto {
     languagesSpoken: row.languagesSpoken ?? null,
     profilePhoto: row.profilePhoto ?? null,
     weeklySlots: toJsonObject(row.weeklySlots),
-    dateExceptions: toJsonObject(row.dateExceptions),
+    dateExceptions: exceptionsToRecord(row.dateExceptions),
   };
 }
 
@@ -300,7 +301,7 @@ export function toClinicDto(row: ClinicRow): ClinicDto {
     instagramUrl: row.instagramUrl ?? null,
     facebookUrl: row.facebookUrl ?? null,
     aiKnowledgeBase: row.aiKnowledgeBase ?? null,
-    dateExceptions: toJsonObject(row.dateExceptions),
+    dateExceptions: exceptionsToRecord(row.dateExceptions),
     createdAt: toIso(row.createdAt),
     updatedAt: toIso(row.updatedAt),
   };

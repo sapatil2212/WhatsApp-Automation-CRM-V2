@@ -589,18 +589,23 @@ html:not([data-mtheme="light"]) .status-select-cancelled {
   background-color: rgba(244, 63, 94, 0.08) !important;
   border-color: rgba(244, 63, 94, 0.2) !important;
 }
-[data-mtheme], [data-theme] {
-  transition: var(--m-transition);
-}
+/* Theme-switch transition. Kept in @layer base so Tailwind utilities such as
+   transition-*, duration-* and ease-* can override it. Unlayered, this rule beat
+   every utility and stopped transform transitions (hover lift/scale) from animating. */
+@layer base {
+  [data-mtheme], [data-theme] {
+    transition: var(--m-transition);
+  }
 
-[data-mtheme] *,
-[data-mtheme] *::before,
-[data-mtheme] *::after,
-[data-theme] *,
-[data-theme] *::before,
-[data-theme] *::after {
-  /* Avoid transitioning layout properties to prevent glitches */
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, text-shadow 0.3s ease;
+  [data-mtheme] *,
+  [data-mtheme] *::before,
+  [data-mtheme] *::after,
+  [data-theme] *,
+  [data-theme] *::before,
+  [data-theme] *::after {
+    /* Avoid transitioning layout properties to prevent glitches */
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, text-shadow 0.3s ease;
+  }
 }
 
 /* ── Dashboard light mode: slate-800/700 backgrounds ── */
@@ -791,3 +796,101 @@ html[data-mtheme="light"] input::placeholder,
 html[data-mtheme="light"] textarea::placeholder {
   color: #64748b !important;
 }
+
+/* ============================================================
+ * TEAM INBOX — WhatsApp Web palette
+ *
+ * Scoped to `.wa-inbox` so the rest of the dashboard keeps its own
+ * theme tokens. Dark is the default (matches the dashboard default);
+ * `html[data-mtheme="light"]` swaps to WhatsApp Web's light palette.
+ * ============================================================ */
+.wa-inbox {
+  --wa-panel: #111b21;
+  --wa-panel-header: #202c33;
+  --wa-panel-hover: #202c33;
+  --wa-panel-active: #2a3942;
+  --wa-chat-bg: #0b141a;
+  --wa-wallpaper-opacity: 0.06;
+  --wa-in: #202c33;
+  --wa-out: #005c4b;
+  --wa-text: #e9edef;
+  --wa-text-2: #8696a0;
+  --wa-text-out-meta: rgba(233, 237, 239, 0.6);
+  --wa-border: #222d34;
+  --wa-input: #2a3942;
+  --wa-chip: #202c33;
+  --wa-chip-active: #0a332c;
+  --wa-chip-active-text: #00a884;
+  --wa-date: #182229;
+  --wa-accent: #00a884;
+  --wa-accent-strong: #06cf9c;
+  --wa-badge: #00a884;
+  --wa-badge-text: #111b21;
+  --wa-tick-read: #53bdeb;
+  --wa-quote-in: rgba(255, 255, 255, 0.06);
+  --wa-quote-out: rgba(0, 0, 0, 0.18);
+  --wa-system: #182229;
+  --wa-note: #3b3418;
+  --wa-note-border: #6b5b1a;
+  --wa-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13);
+  color: var(--wa-text);
+}
+
+html[data-mtheme="light"] .wa-inbox {
+  --wa-panel: #ffffff;
+  --wa-panel-header: #f0f2f5;
+  --wa-panel-hover: #f5f6f6;
+  --wa-panel-active: #f0f2f5;
+  --wa-chat-bg: #efeae2;
+  --wa-wallpaper-opacity: 0.35;
+  --wa-in: #ffffff;
+  --wa-out: #d9fdd3;
+  --wa-text: #111b21;
+  --wa-text-2: #667781;
+  --wa-text-out-meta: #667781;
+  --wa-border: #e9edef;
+  --wa-input: #ffffff;
+  --wa-chip: #f0f2f5;
+  --wa-chip-active: #e7fce3;
+  --wa-chip-active-text: #008069;
+  --wa-date: #ffffff;
+  --wa-accent: #008069;
+  --wa-accent-strong: #00a884;
+  --wa-badge: #25d366;
+  --wa-badge-text: #ffffff;
+  --wa-tick-read: #53bdeb;
+  --wa-quote-in: rgba(0, 0, 0, 0.05);
+  --wa-quote-out: rgba(0, 0, 0, 0.06);
+  --wa-system: #ffffff;
+  --wa-note: #fff6d5;
+  --wa-note-border: #f0d77a;
+  --wa-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13);
+}
+
+.wa-wallpaper {
+  position: relative;
+  background-color: var(--wa-chat-bg);
+}
+.wa-wallpaper::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url('/inbox-doodle.svg');
+  background-repeat: repeat;
+  background-size: 240px 240px;
+  opacity: var(--wa-wallpaper-opacity);
+  pointer-events: none;
+}
+
+.wa-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(134, 150, 160, 0.35) transparent;
+}
+.wa-scroll::-webkit-scrollbar { width: 6px; }
+.wa-scroll::-webkit-scrollbar-thumb { background: rgba(134, 150, 160, 0.35); border-radius: 3px; }
+
+@keyframes wa-flash {
+  0%, 100% { background-color: transparent; }
+  30% { background-color: rgba(0, 168, 132, 0.18); }
+}
+.wa-flash { animation: wa-flash 1.4s ease-out; }

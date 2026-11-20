@@ -160,6 +160,27 @@ export class BroadcastRepository extends BaseRepository {
     return affected.count > 0;
   }
 
+  /**
+   * Stops a campaign for good: recipients not yet sent become `cancelled`
+   * and leave the campaign total, so the stats describe what was actually
+   * attempted. Rows are kept so the export shows who was skipped.
+   */
+  async cancelPendingRecipients(id: string): Promise<number> {
+    return this.db.$transaction(async (tx) => {
+      const affected = await tx.broadcastRecipient.updateMany({
+        where: { broadcastId: id, status: 'pending' },
+        data: { status: 'cancelled', errorMessage: 'Campaign cancelled before this message was sent.' },
+      });
+      if (affected.count > 0) {
+        await tx.broadcast.updateMany({
+          where: { id },
+          data: { totalRecipients: { decrement: affected.count } },
+        });
+      }
+      return affected.count;
+    });
+  }
+
   async delete(id: string): Promise<void> {
     this.requireAffected(await this.db.broadcast.deleteMany({ where: { id } }));
   }
@@ -223,11 +244,27 @@ export class BroadcastRepository extends BaseRepository {
       select: {
         id: true,
         contactId: true,
-        contact: { select: { id: true, phone: true, name: true } },
+        contact: { select: { id: true, phone: true, name: true, email: true, company: true } },
       },
       orderBy: { id: 'asc' },
       take: batchSize,
     });
+  }
+
+  /** contactId -> (customFieldId -> value), for per-contact personalization. */
+  async customValuesFor(contactIds: string[]): Promise<Map<string, Record<string, string | null>>> {
+    const index = new Map<string, Record<string, string | null>>();
+    if (contactIds.length === 0) return index;
+    const rows = await this.db.contactCustomValue.findMany({
+      where: { contactId: { in: contactIds } },
+      select: { contactId: true, customFieldId: true, value: true },
+    });
+    for (const row of rows) {
+      const bucket = index.get(row.contactId) ?? {};
+      bucket[row.customFieldId] = row.value;
+      index.set(row.contactId, bucket);
+    }
+    return index;
   }
 
   async countPending(broadcastId: string): Promise<number> {

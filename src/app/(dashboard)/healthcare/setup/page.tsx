@@ -21,11 +21,17 @@ import {
   FileText,
   AlertCircle,
   Loader2,
+  Layers,
 } from "lucide-react";
+import { DepartmentsManager } from "@/components/healthcare/departments-manager";
+import { DoctorsDirectory } from "@/components/healthcare/doctors-directory";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { AiSetupImport, type SetupSection } from "@/components/setup/ai-setup-import";
+import { BookingLinkCard } from "@/components/booking/booking-link-card";
+import type { ExtractedSetup } from "@/lib/ai/setup-extract";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -36,6 +42,7 @@ export default function ClinicSetupWizard() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [clinicId, setClinicId] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   // --- Step 1 State: Clinic Info ---
   const [clinicInfo, setClinicInfo] = useState({
@@ -93,11 +100,7 @@ export default function ClinicSetupWizard() {
       date_exceptions: [],
     },
   ]);
-  const [doctorSubTabs, setDoctorSubTabs] = useState<Record<number, "profile" | "slots" | "exceptions">>({});
-  const [activeSlotDays, setActiveSlotDays] = useState<Record<number, string>>({});
-  const [newDocExceptions, setNewDocExceptions] = useState<Record<number, { date: string; is_available: boolean; reason: string }>>({});
   const [newCustomSlots, setNewCustomSlots] = useState<Record<number, { start_time: string; end_time: string }>>({});
-  const [slotDurations, setSlotDurations] = useState<Record<number, number>>({});
 
   // Helper: slot generator function
   const generateTimeSlots = (startTime: string, endTime: string, durationMinutes: number) => {
@@ -242,7 +245,7 @@ export default function ClinicSetupWizard() {
     }
 
     loadClinicData();
-  }, []);
+  }, [reloadKey]);
 
   const handleClinicInfoChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setClinicInfo({ ...clinicInfo, [e.target.name]: e.target.value });
@@ -254,50 +257,8 @@ export default function ClinicSetupWizard() {
     setTimings(updated);
   };
 
-  // --- Doctors Handlers ---
-  const handleDoctorChange = (index: number, field: string, value: any) => {
-    const updated = [...doctors];
-    updated[index] = { ...updated[index], [field]: value };
-    setDoctors(updated);
-  };
-
-  const handleDoctorAvailableDays = (index: number, day: string, checked: boolean) => {
-    const updated = [...doctors];
-    let currentDays = updated[index].available_days || [];
-    if (checked) {
-      if (!currentDays.includes(day)) currentDays = [...currentDays, day];
-    } else {
-      currentDays = currentDays.filter((d: string) => d !== day);
-    }
-    updated[index].available_days = currentDays;
-    setDoctors(updated);
-  };
-
-  const addDoctor = () => {
-    setDoctors([
-      ...doctors,
-      {
-        doctor_name: "",
-        specialization: "",
-        qualification: "",
-        experience: "",
-        available_days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-        available_start_time: "09:00",
-        available_end_time: "17:00",
-        consultation_fee: 50,
-        languages_spoken: "English",
-        profile_photo: "",
-      },
-    ]);
-  };
-
-  const removeDoctor = (index: number) => {
-    if (doctors.length === 1) {
-      toast.warning("Must configure at least one doctor.");
-      return;
-    }
-    setDoctors(doctors.filter((_, i) => i !== index));
-  };
+  // Doctors are edited in <DoctorsDirectory /> (own API); `doctors` is kept
+  // only so the AI import can skip names that already exist.
 
   // --- Services Handlers ---
   const handleServiceChange = (index: number, field: string, value: any) => {
@@ -562,6 +523,94 @@ export default function ClinicSetupWizard() {
     setAiSettings({ ...aiSettings, [name]: value });
   };
 
+  // --- AI document import: merge approved sections and save them ---
+  const applyAiSetup = async (data: ExtractedSetup, sections: Set<SetupSection>) => {
+    const post = async (step: number, payload: Record<string, unknown>) => {
+      const res = await fetch('/api/healthcare/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ step, data: payload }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || `Saving step ${step} failed`);
+      return json;
+    };
+    const keep = (v: string | undefined, fallback: string) => (v && v.trim() ? v : fallback);
+    try {
+      let id = clinicId;
+      if (sections.has('profile') || sections.has('knowledge') || !id) {
+        const p = data.profile;
+        const info = {
+          ...clinicInfo,
+          clinic_name: keep(sections.has('profile') ? p.name : '', clinicInfo.clinic_name) || 'My Clinic',
+          clinic_type: keep(sections.has('profile') ? p.type : '', clinicInfo.clinic_type),
+          clinic_description: keep(sections.has('profile') ? p.description : '', clinicInfo.clinic_description),
+          phone: keep(sections.has('profile') ? p.phone : '', clinicInfo.phone),
+          whatsapp_number: keep(sections.has('profile') ? p.whatsapp_number : '', clinicInfo.whatsapp_number),
+          email: keep(sections.has('profile') ? p.email : '', clinicInfo.email),
+          website: keep(sections.has('profile') ? p.website : '', clinicInfo.website),
+          address: keep(sections.has('profile') ? p.address : '', clinicInfo.address),
+          city: keep(sections.has('profile') ? p.city : '', clinicInfo.city),
+          state: keep(sections.has('profile') ? p.state : '', clinicInfo.state),
+          pincode: keep(sections.has('profile') ? p.pincode : '', clinicInfo.pincode),
+          google_map_link: keep(sections.has('profile') ? p.google_map_link : '', clinicInfo.google_map_link),
+          instagram_url: keep(sections.has('profile') ? p.instagram_url : '', clinicInfo.instagram_url),
+          facebook_url: keep(sections.has('profile') ? p.facebook_url : '', clinicInfo.facebook_url),
+          ai_knowledge_base: sections.has('knowledge') && data.knowledge
+            ? [clinicInfo.ai_knowledge_base, data.knowledge].filter(Boolean).join('\n\n')
+            : clinicInfo.ai_knowledge_base,
+        };
+        const json = await post(1, info);
+        id = json.clinic_id ?? id;
+        if (id) setClinicId(id);
+      }
+      if (!id) throw new Error('Could not create the clinic profile.');
+
+      if (sections.has('timings') && data.timings.length) {
+        await post(2, { clinic_id: id, timings: data.timings, date_exceptions: clinicExceptions });
+      }
+      if (sections.has('people') && data.people.length) {
+        const existing = doctors.filter((d) => d.doctor_name?.trim());
+        const names = new Set(existing.map((d) => d.doctor_name.trim().toLowerCase()));
+        const added = data.people
+          .filter((p) => !names.has(p.name.toLowerCase()))
+          .map((p) => ({
+            doctor_name: p.name,
+            specialization: p.department || p.role || '',
+            qualification: p.qualification,
+            experience: p.experience,
+            available_days: p.available_days.length ? p.available_days : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+            available_start_time: p.available_start_time || '09:00',
+            available_end_time: p.available_end_time || '17:00',
+            consultation_fee: p.fee || 0,
+            languages_spoken: p.languages || 'English',
+            profile_photo: '',
+            weekly_slots: {},
+            date_exceptions: [],
+          }));
+        if (added.length) await post(3, { clinic_id: id, doctors: added });
+      }
+      if (sections.has('services') && data.services.length) {
+        const existing = services.filter((x) => x.service_name?.trim());
+        const names = new Set(existing.map((x) => x.service_name.trim().toLowerCase()));
+        const added = data.services
+          .filter((x) => !names.has(x.name.toLowerCase()))
+          .map((x) => ({ service_name: x.name, description: x.description, starting_price: x.price, duration: x.duration, is_active: true }));
+        if (added.length) await post(4, { clinic_id: id, services: [...existing, ...added] });
+      }
+      if (sections.has('faqs') && data.faqs.length) {
+        const existing = faqs.filter((f) => f.question?.trim() && f.answer?.trim());
+        const qs = new Set(existing.map((f) => f.question.trim().toLowerCase()));
+        const added = data.faqs.filter((f) => !qs.has(f.question.toLowerCase())).map((f) => ({ question: f.question, answer: f.answer, keywords: '' }));
+        if (added.length) await post(5, { clinic_id: id, faqs: [...existing, ...added] });
+      }
+      toast.success('Business details imported and saved. Review each step to fine-tune.');
+      setReloadKey((k) => k + 1);
+    } catch (err: any) {
+      toast.error(err?.message || 'Import failed');
+    }
+  };
+
   // --- Save / Step submission ---
   const handleSaveStep = async () => {
     setSaving(true);
@@ -569,11 +618,21 @@ export default function ClinicSetupWizard() {
       const successMessages: Record<number, string> = {
         1: 'Clinic Information saved successfully!',
         2: 'Working hours and holidays saved successfully!',
-        3: 'Doctors and schedules saved successfully!',
+        3: 'Doctors directory saved.',
+        7: 'Departments saved.',
         4: 'Services registered successfully!',
         5: 'FAQs saved successfully!',
         6: 'AI Healthcare Automation onboarding setup complete!',
       };
+
+      const nextStep = stepsList[currentPos + 1]?.num;
+      // Departments & doctors save live through their own APIs.
+      if (currentStep === 7 || currentStep === 3) {
+        if (!clinicId) { setSaving(false); return; }
+        toast.success(successMessages[currentStep]);
+        if (nextStep) setCurrentStep(nextStep);
+        return;
+      }
 
       let body: any = { step: currentStep };
 
@@ -587,9 +646,6 @@ export default function ClinicSetupWizard() {
       } else if (currentStep === 2) {
         if (!clinicId) { setSaving(false); return; }
         body.data = { clinic_id: clinicId, timings, date_exceptions: clinicExceptions };
-      } else if (currentStep === 3) {
-        if (!clinicId) { setSaving(false); return; }
-        body.data = { clinic_id: clinicId, doctors };
       } else if (currentStep === 4) {
         if (!clinicId) { setSaving(false); return; }
         body.data = { clinic_id: clinicId, services };
@@ -620,7 +676,7 @@ export default function ClinicSetupWizard() {
       }
 
       toast.success(successMessages[currentStep]);
-      if (currentStep < 6) setCurrentStep((s) => s + 1);
+      if (nextStep) setCurrentStep(nextStep);
     } catch (err: any) {
       toast.error(`Error saving setup: ${err.message}`);
       console.error(err);
@@ -631,39 +687,47 @@ export default function ClinicSetupWizard() {
 
   if (loading) {
     return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          <p className="text-sm text-slate-400">Loading wizard data...</p>
-        </div>
+      <div className="space-y-4">
+        <div className="h-9 w-72 animate-pulse rounded-lg bg-muted" />
+        <div className="h-20 animate-pulse rounded-2xl bg-muted/60" />
+        <div className="h-14 animate-pulse rounded-2xl bg-muted/60" />
+        <div className="h-96 animate-pulse rounded-2xl bg-muted/50" />
       </div>
     );
   }
 
+  // `num` is the save key the setup API understands (and 7 = departments,
+  // which saves through its own API); the array order is what users see.
   const stepsList = [
-    { num: 1, label: "Business Info", icon: Building2 },
-    { num: 2, label: "Hours", icon: Clock },
-    { num: 3, label: "Staff & AI Agents", icon: UserRound },
+    { num: 1, label: "Clinic Info", icon: Building2 },
+    { num: 7, label: "Departments", icon: Layers },
+    { num: 3, label: "Doctors", icon: UserRound },
+    { num: 2, label: "Clinic Hours", icon: Clock },
     { num: 4, label: "Services", icon: Stethoscope },
     { num: 5, label: "FAQs", icon: HelpCircle },
     { num: 6, label: "AI Settings", icon: Brain },
   ];
+  const currentPos = Math.max(0, stepsList.findIndex((x) => x.num === currentStep));
+  const currentMeta = stepsList[currentPos];
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Page Title */}
       <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-white">Business Onboarding Setup</h1>
-        <p className="text-slate-400 text-sm mt-1">
+        <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Business Onboarding Setup</h1>
+        <p className="text-muted-foreground text-sm mt-1">
           Configure business information once, and let the AI handle WhatsApp inquiries and bookings.
         </p>
       </div>
 
+      <AiSetupImport isHealthcare onApply={applyAiSetup} />
+      {clinicId && <BookingLinkCard />}
+
       {/* Wizard Steps Indicator */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-2 border-b border-slate-800 pb-4">
-        {stepsList.map((step) => {
+      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2 border-b border-border pb-4">
+        {stepsList.map((step, pos) => {
           const Icon = step.icon;
-          const isCompleted = step.num < currentStep;
+          const isCompleted = pos < currentPos;
           const isActive = step.num === currentStep;
           return (
             <div
@@ -676,8 +740,8 @@ export default function ClinicSetupWizard() {
                 isActive
                   ? "bg-primary/10 border-primary text-primary font-medium"
                   : isCompleted
-                  ? "bg-slate-900 border-emerald-500/30 text-emerald-400"
-                  : "bg-slate-900/40 border-slate-800 text-slate-500 hover:border-slate-700"
+                  ? "bg-card border-emerald-500/30 text-emerald-400"
+                  : "bg-muted/40 border-border text-muted-foreground hover:border-foreground/20"
               }`}
             >
               <div
@@ -686,10 +750,10 @@ export default function ClinicSetupWizard() {
                     ? "bg-primary text-primary-foreground"
                     : isCompleted
                     ? "bg-emerald-500/10 text-emerald-400"
-                    : "bg-slate-800 text-slate-500"
+                    : "bg-muted text-muted-foreground"
                 }`}
               >
-                {step.num}
+                {pos + 1}
               </div>
               <span className="text-xs tracking-wide">{step.label}</span>
             </div>
@@ -698,7 +762,7 @@ export default function ClinicSetupWizard() {
       </div>
 
       {/* Main Form Box */}
-      <Card className="border-slate-800 bg-slate-900/60 backdrop-blur-md">
+      <Card className="border-border bg-muted/40 backdrop-blur-md">
         <CardHeader>
           <div className="flex items-center gap-3">
             <div className="bg-primary/10 p-2.5 rounded-lg text-primary">
@@ -708,15 +772,17 @@ export default function ClinicSetupWizard() {
               {currentStep === 4 && <Stethoscope className="h-6 w-6" />}
               {currentStep === 5 && <HelpCircle className="h-6 w-6" />}
               {currentStep === 6 && <Brain className="h-6 w-6" />}
+              {currentStep === 7 && <Layers className="h-6 w-6" />}
             </div>
             <div>
-              <CardTitle className="text-white text-xl">
-                Step {currentStep} — {stepsList[currentStep - 1].label}
+              <CardTitle className="text-foreground text-xl">
+                Step {currentPos + 1} — {currentMeta.label}
               </CardTitle>
-              <CardDescription className="text-slate-400">
+              <CardDescription className="text-muted-foreground">
                 {currentStep === 1 && "Basic details regarding location, name, and contact details."}
-                {currentStep === 2 && "Weekly opening times, lunch breaks, and holidays."}
-                {currentStep === 3 && "Register staff and AI agents, available times, roles, and fees."}
+                {currentStep === 2 && "Clinic opening times and holidays / closure dates (doctor slots come from each doctor's schedule)."}
+                {currentStep === 3 && "Add doctors, assign departments, and set each doctor's weekly sessions, slot length and breaks."}
+                {currentStep === 7 && "Create the departments your clinic offers. Patients choose a department first when booking."}
                 {currentStep === 4 && "Define business services, starting prices, and standard durations."}
                 {currentStep === 5 && "Configure general FAQs to answer client WhatsApp questions instantly."}
                 {currentStep === 6 && "Instruct AI how to respond to clients, emergencies, or escalate conversations."}
@@ -724,185 +790,185 @@ export default function ClinicSetupWizard() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-6 pt-4 border-t border-slate-800">
+        <CardContent className="space-y-6 pt-4 border-t border-border">
           {/* STEP 1: Clinic Information */}
           {currentStep === 1 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="clinic_name" className="text-slate-300">Business Name *</Label>
+                <Label htmlFor="clinic_name" className="text-foreground/90">Business Name *</Label>
                 <Input
                   id="clinic_name"
                   name="clinic_name"
                   value={clinicInfo.clinic_name}
                   onChange={handleClinicInfoChange}
-                  className="bg-slate-950 border-slate-800 text-white"
+                  className="bg-background border-border text-foreground"
                   placeholder="E.g. ChatNexGen Support Agency"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="clinic_type" className="text-slate-300">Business Category / Industry</Label>
+                <Label htmlFor="clinic_type" className="text-foreground/90">Business Category / Industry</Label>
                 <Input
                   id="clinic_type"
                   name="clinic_type"
                   value={clinicInfo.clinic_type}
                   onChange={handleClinicInfoChange}
-                  className="bg-slate-950 border-slate-800 text-white"
+                  className="bg-background border-border text-foreground"
                   placeholder="E.g. Real Estate, Digital Marketing, Retail"
                 />
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="clinic_description" className="text-slate-300">Business Description</Label>
+                <Label htmlFor="clinic_description" className="text-foreground/90">Business Description</Label>
                 <Textarea
                   id="clinic_description"
                   name="clinic_description"
                   value={clinicInfo.clinic_description}
                   onChange={handleClinicInfoChange}
-                  className="bg-slate-950 border-slate-800 text-white min-h-[80px]"
+                  className="bg-background border-border text-foreground min-h-[80px]"
                   placeholder="A short snippet explaining the business focus for AI prompt building..."
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="phone" className="text-slate-300">Landline / Phone</Label>
+                <Label htmlFor="phone" className="text-foreground/90">Landline / Phone</Label>
                 <Input
                   id="phone"
                   name="phone"
                   value={clinicInfo.phone}
                   onChange={handleClinicInfoChange}
-                  className="bg-slate-950 border-slate-800 text-white"
+                  className="bg-background border-border text-foreground"
                   placeholder="+1 555-0199"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="whatsapp_number" className="text-slate-300">WhatsApp Public Number</Label>
+                <Label htmlFor="whatsapp_number" className="text-foreground/90">WhatsApp Public Number</Label>
                 <Input
                   id="whatsapp_number"
                   name="whatsapp_number"
                   value={clinicInfo.whatsapp_number}
                   onChange={handleClinicInfoChange}
-                  className="bg-slate-950 border-slate-800 text-white"
+                  className="bg-background border-border text-foreground"
                   placeholder="+1 555-0100"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-slate-300">Clinic Email</Label>
+                <Label htmlFor="email" className="text-foreground/90">Clinic Email</Label>
                 <Input
                   id="email"
                   name="email"
                   value={clinicInfo.email}
                   onChange={handleClinicInfoChange}
-                  className="bg-slate-950 border-slate-800 text-white"
+                  className="bg-background border-border text-foreground"
                   placeholder="info@clinic.com"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="website" className="text-slate-300">Website URL</Label>
+                <Label htmlFor="website" className="text-foreground/90">Website URL</Label>
                 <Input
                   id="website"
                   name="website"
                   value={clinicInfo.website}
                   onChange={handleClinicInfoChange}
-                  className="bg-slate-950 border-slate-800 text-white"
+                  className="bg-background border-border text-foreground"
                   placeholder="https://clinic.com"
                 />
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="address" className="text-slate-300">Street Address</Label>
+                <Label htmlFor="address" className="text-foreground/90">Street Address</Label>
                 <Input
                   id="address"
                   name="address"
                   value={clinicInfo.address}
                   onChange={handleClinicInfoChange}
-                  className="bg-slate-950 border-slate-800 text-white"
+                  className="bg-background border-border text-foreground"
                   placeholder="123 Health Ave, Suite 10"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="city" className="text-slate-300">City</Label>
+                <Label htmlFor="city" className="text-foreground/90">City</Label>
                 <Input
                   id="city"
                   name="city"
                   value={clinicInfo.city}
                   onChange={handleClinicInfoChange}
-                  className="bg-slate-950 border-slate-800 text-white"
+                  className="bg-background border-border text-foreground"
                   placeholder="New York"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="state" className="text-slate-300">State / Region</Label>
+                <Label htmlFor="state" className="text-foreground/90">State / Region</Label>
                 <Input
                   id="state"
                   name="state"
                   value={clinicInfo.state}
                   onChange={handleClinicInfoChange}
-                  className="bg-slate-950 border-slate-800 text-white"
+                  className="bg-background border-border text-foreground"
                   placeholder="NY"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="pincode" className="text-slate-300">Pincode / Postal Code</Label>
+                <Label htmlFor="pincode" className="text-foreground/90">Pincode / Postal Code</Label>
                 <Input
                   id="pincode"
                   name="pincode"
                   value={clinicInfo.pincode}
                   onChange={handleClinicInfoChange}
-                  className="bg-slate-950 border-slate-800 text-white"
+                  className="bg-background border-border text-foreground"
                   placeholder="10001"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="google_map_link" className="text-slate-300">Google Business / Maps Link (GMB)</Label>
+                <Label htmlFor="google_map_link" className="text-foreground/90">Google Business / Maps Link (GMB)</Label>
                 <Input
                   id="google_map_link"
                   name="google_map_link"
                   value={clinicInfo.google_map_link}
                   onChange={handleClinicInfoChange}
-                  className="bg-slate-950 border-slate-800 text-white"
+                  className="bg-background border-border text-foreground"
                   placeholder="https://g.page/... or https://goo.gl/maps/..."
                 />
               </div>
 
               {/* AI Training Sources */}
-              <div className="md:col-span-2 mt-2 pt-4 border-t border-slate-800/80">
+              <div className="md:col-span-2 mt-2 pt-4 border-t border-border">
                 <div className="flex items-center gap-2 mb-1">
                   <Sparkles className="h-4 w-4 text-emerald-400" />
-                  <h3 className="text-sm font-bold text-white tracking-wide">AI Training Sources</h3>
+                  <h3 className="text-sm font-bold text-foreground tracking-wide">AI Training Sources</h3>
                 </div>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-muted-foreground">
                   Add your public links so the AI can reference them and answer customers like an expert about your business.
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="instagram_url" className="text-slate-300">Instagram Profile</Label>
+                <Label htmlFor="instagram_url" className="text-foreground/90">Instagram Profile</Label>
                 <Input
                   id="instagram_url"
                   name="instagram_url"
                   value={clinicInfo.instagram_url}
                   onChange={handleClinicInfoChange}
-                  className="bg-slate-950 border-slate-800 text-white"
+                  className="bg-background border-border text-foreground"
                   placeholder="https://instagram.com/yourbusiness"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="facebook_url" className="text-slate-300">Facebook Page</Label>
+                <Label htmlFor="facebook_url" className="text-foreground/90">Facebook Page</Label>
                 <Input
                   id="facebook_url"
                   name="facebook_url"
                   value={clinicInfo.facebook_url}
                   onChange={handleClinicInfoChange}
-                  className="bg-slate-950 border-slate-800 text-white"
+                  className="bg-background border-border text-foreground"
                   placeholder="https://facebook.com/yourbusiness"
                 />
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="ai_knowledge_base" className="text-slate-300">
-                  Expert Knowledge for AI <span className="text-slate-500 font-normal">(optional)</span>
+                <Label htmlFor="ai_knowledge_base" className="text-foreground/90">
+                  Expert Knowledge for AI <span className="text-muted-foreground font-normal">(optional)</span>
                 </Label>
                 <Textarea
                   id="ai_knowledge_base"
                   name="ai_knowledge_base"
                   value={clinicInfo.ai_knowledge_base}
                   onChange={handleClinicInfoChange}
-                  className="bg-slate-950 border-slate-800 text-white min-h-[100px]"
+                  className="bg-background border-border text-foreground min-h-[100px]"
                   placeholder="Paste anything the AI should know to answer like an expert: specialties, unique selling points, policies, common customer concerns, awards, experience, etc."
                 />
               </div>
@@ -912,21 +978,21 @@ export default function ClinicSetupWizard() {
           {/* STEP 2: Working Hours */}
           {currentStep === 2 && (
             <div className="space-y-4">
-              <div className="grid grid-cols-12 gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider pb-2 border-b border-slate-800">
+              <div className="grid grid-cols-12 gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider pb-2 border-b border-border">
                 <div className="col-span-3">Day</div>
                 <div className="col-span-2">Open Status</div>
                 <div className="col-span-3">Business Hours</div>
                 <div className="col-span-4">Lunch Break</div>
               </div>
               {timings.map((time, idx) => (
-                <div key={time.day_name} className="grid grid-cols-12 gap-2 items-center py-2 border-b border-slate-800/40 last:border-0">
-                  <div className="col-span-3 text-sm font-medium text-white">{time.day_name}</div>
+                <div key={time.day_name} className="grid grid-cols-12 gap-2 items-center py-2 border-b border-border last:border-0">
+                  <div className="col-span-3 text-sm font-medium text-foreground">{time.day_name}</div>
                   <div className="col-span-2">
                     <Switch
                       checked={!time.is_closed}
                       onCheckedChange={(checked) => handleTimingChange(idx, "is_closed", !checked)}
                     />
-                    <span className="text-xs text-slate-500 ml-2">{time.is_closed ? "Closed" : "Open"}</span>
+                    <span className="text-xs text-muted-foreground ml-2">{time.is_closed ? "Closed" : "Open"}</span>
                   </div>
                   <div className="col-span-3 flex items-center gap-1.5">
                     <Input
@@ -934,15 +1000,15 @@ export default function ClinicSetupWizard() {
                       type="time"
                       value={time.opening_time || "09:00"}
                       onChange={(e) => handleTimingChange(idx, "opening_time", e.target.value)}
-                      className="bg-slate-950 border-slate-800 text-white text-xs px-2 h-8"
+                      className="bg-background border-border text-foreground text-xs px-2 h-8"
                     />
-                    <span className="text-slate-600">-</span>
+                    <span className="text-muted-foreground">-</span>
                     <Input
                       disabled={time.is_closed}
                       type="time"
                       value={time.closing_time || "18:00"}
                       onChange={(e) => handleTimingChange(idx, "closing_time", e.target.value)}
-                      className="bg-slate-950 border-slate-800 text-white text-xs px-2 h-8"
+                      className="bg-background border-border text-foreground text-xs px-2 h-8"
                     />
                   </div>
                   <div className="col-span-4 flex items-center gap-1.5">
@@ -951,45 +1017,45 @@ export default function ClinicSetupWizard() {
                       type="time"
                       value={time.lunch_break_start || "13:00"}
                       onChange={(e) => handleTimingChange(idx, "lunch_break_start", e.target.value)}
-                      className="bg-slate-950 border-slate-800 text-white text-xs px-2 h-8"
+                      className="bg-background border-border text-foreground text-xs px-2 h-8"
                     />
-                    <span className="text-slate-600">-</span>
+                    <span className="text-muted-foreground">-</span>
                     <Input
                       disabled={time.is_closed}
                       type="time"
                       value={time.lunch_break_end || "14:00"}
                       onChange={(e) => handleTimingChange(idx, "lunch_break_end", e.target.value)}
-                      className="bg-slate-950 border-slate-800 text-white text-xs px-2 h-8"
+                      className="bg-background border-border text-foreground text-xs px-2 h-8"
                     />
                   </div>
                 </div>
               ))}
 
               {/* Holidays & Date Exceptions Section */}
-              <div className="border-t border-slate-800/80 pt-6 mt-6 space-y-4">
+              <div className="border-t border-border pt-6 mt-6 space-y-4">
                 <div>
-                  <h3 className="text-white font-bold text-sm tracking-wider uppercase text-primary">Clinic Holidays & Schedule Exceptions</h3>
-                  <p className="text-slate-400 text-xs mt-1">Specify custom dates when the clinic is closed or has special working hours.</p>
+                  <h3 className="text-foreground font-bold text-sm tracking-wider uppercase text-primary">Clinic Holidays & Schedule Exceptions</h3>
+                  <p className="text-muted-foreground text-xs mt-1">Specify custom dates when the clinic is closed or has special working hours.</p>
                 </div>
                 
                 {/* Add exception form */}
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-3 p-4 bg-slate-950/40 border border-slate-800 rounded-xl items-end">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-3 p-4 bg-background border border-border rounded-xl items-end">
                   <div className="space-y-1">
-                    <Label className="text-xs text-slate-400">Date</Label>
+                    <Label className="text-xs text-muted-foreground">Date</Label>
                     <Input
                       type="date"
                       value={newClinicException.date}
                       onChange={(e) => setNewClinicException({ ...newClinicException, date: e.target.value })}
-                      className="bg-slate-950 border-slate-850 text-white text-xs h-9"
+                      className="bg-background border-slate-850 text-foreground text-xs h-9"
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs text-slate-400">Label / Holiday Name</Label>
+                    <Label className="text-xs text-muted-foreground">Label / Holiday Name</Label>
                     <Input
                       placeholder="e.g. Christmas, Staff Day"
                       value={newClinicException.reason}
                       onChange={(e) => setNewClinicException({ ...newClinicException, reason: e.target.value })}
-                      className="bg-slate-950 border-slate-850 text-white text-xs h-9"
+                      className="bg-background border-slate-850 text-foreground text-xs h-9"
                     />
                   </div>
                   <div className="space-y-1 pb-1">
@@ -998,28 +1064,28 @@ export default function ClinicSetupWizard() {
                         checked={newClinicException.is_closed}
                         onCheckedChange={(checked) => setNewClinicException({ ...newClinicException, is_closed: checked })}
                       />
-                      <span className="text-xs text-slate-300">Closed All Day</span>
+                      <span className="text-xs text-foreground/90">Closed All Day</span>
                     </div>
                   </div>
                   
                   {!newClinicException.is_closed && (
                     <>
                       <div className="space-y-1">
-                        <Label className="text-xs text-slate-400">Open Time</Label>
+                        <Label className="text-xs text-muted-foreground">Open Time</Label>
                         <Input
                           type="time"
                           value={newClinicException.opening_time}
                           onChange={(e) => setNewClinicException({ ...newClinicException, opening_time: e.target.value })}
-                          className="bg-slate-950 border-slate-850 text-white text-xs h-9"
+                          className="bg-background border-slate-850 text-foreground text-xs h-9"
                         />
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs text-slate-400">Close Time</Label>
+                        <Label className="text-xs text-muted-foreground">Close Time</Label>
                         <Input
                           type="time"
                           value={newClinicException.closing_time}
                           onChange={(e) => setNewClinicException({ ...newClinicException, closing_time: e.target.value })}
-                          className="bg-slate-950 border-slate-850 text-white text-xs h-9"
+                          className="bg-background border-slate-850 text-foreground text-xs h-9"
                         />
                       </div>
                     </>
@@ -1056,14 +1122,14 @@ export default function ClinicSetupWizard() {
                 {clinicExceptions.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {clinicExceptions.map((ex, exIdx) => (
-                      <div key={ex.date} className="flex justify-between items-center p-3 bg-slate-950/20 border border-slate-800 rounded-xl">
+                      <div key={ex.date} className="flex justify-between items-center p-3 bg-background border border-border rounded-xl">
                         <div className="space-y-1">
-                          <span className="text-xs font-bold text-white block">{new Date(ex.date).toLocaleDateString('en-US', { dateStyle: 'medium' })}</span>
+                          <span className="text-xs font-bold text-foreground block">{new Date(ex.date).toLocaleDateString('en-US', { dateStyle: 'medium' })}</span>
                           <div className="flex gap-2 items-center">
                             <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${ex.is_closed ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"}`}>
                               {ex.is_closed ? "Closed" : `Open: ${ex.opening_time} - ${ex.closing_time}`}
                             </span>
-                            {ex.reason && <span className="text-xs text-slate-500">({ex.reason})</span>}
+                            {ex.reason && <span className="text-xs text-muted-foreground">({ex.reason})</span>}
                           </div>
                         </div>
                         <Button
@@ -1071,7 +1137,7 @@ export default function ClinicSetupWizard() {
                           variant="ghost"
                           size="icon"
                           onClick={() => setClinicExceptions(clinicExceptions.filter((_, i) => i !== exIdx))}
-                          className="h-8 w-8 text-slate-500 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg animate-fade-in"
+                          className="h-8 w-8 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 rounded-lg animate-fade-in"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -1079,511 +1145,31 @@ export default function ClinicSetupWizard() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-slate-600 italic">No exceptions or holidays registered yet.</p>
+                  <p className="text-xs text-muted-foreground italic">No exceptions or holidays registered yet.</p>
                 )}
               </div>
             </div>
           )}
 
-          {/* STEP 3: Doctors List */}
-          {currentStep === 3 && (
-            <div className="space-y-6">
-              {doctors.map((doc, idx) => {
-                const subTab = doctorSubTabs[idx] || "profile";
-                const activeDay = activeSlotDays[idx] || doc.available_days?.[0] || "Monday";
-                const duration = slotDurations[idx] || 30;
-                const exceptionForm = newDocExceptions[idx] || { date: "", is_available: false, reason: "" };
+          {/* STEP 2 (UI): Departments */}
+          {currentStep === 7 && <DepartmentsManager />}
 
-                return (
-                  <div key={idx} className="relative bg-slate-950/40 p-5 rounded-xl border border-slate-800 space-y-4">
-                    <button
-                      type="button"
-                      onClick={() => removeDoctor(idx)}
-                      className="absolute top-4 right-4 text-slate-500 hover:text-rose-500 transition-colors"
-                    >
-                      <Trash2 className="h-5 w-5" />
-                    </button>
-                    <div className="flex items-center gap-3 border-b border-slate-800 pb-3">
-                      <div className="bg-primary/10 h-8 w-8 rounded-lg flex items-center justify-center font-bold text-primary text-xs">
-                        #{idx + 1}
-                      </div>
-                      <h3 className="text-white font-bold text-sm tracking-wider uppercase">
-                        {doc.doctor_name ? `Dr. ${doc.doctor_name}` : `Doctor #${idx + 1}`}
-                      </h3>
-                    </div>
-
-                    {/* Sub-tab navigation */}
-                    <div className="flex gap-4 border-b border-slate-800 pb-2 text-xs font-semibold">
-                      <button
-                        type="button"
-                        onClick={() => setDoctorSubTabs({ ...doctorSubTabs, [idx]: "profile" })}
-                        className={`pb-1.5 border-b-2 px-1 transition-colors ${
-                          subTab === "profile"
-                            ? "border-primary text-primary"
-                            : "border-transparent text-slate-500 hover:text-slate-300"
-                        }`}
-                      >
-                        Basic Profile
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDoctorSubTabs({ ...doctorSubTabs, [idx]: "slots" })}
-                        className={`pb-1.5 border-b-2 px-1 transition-colors ${
-                          subTab === "slots"
-                            ? "border-primary text-primary"
-                            : "border-transparent text-slate-500 hover:text-slate-300"
-                        }`}
-                      >
-                        Weekly Slots ({Object.values(doc.weekly_slots || {}).flat().length} slots)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDoctorSubTabs({ ...doctorSubTabs, [idx]: "exceptions" })}
-                        className={`pb-1.5 border-b-2 px-1 transition-colors ${
-                          subTab === "exceptions"
-                            ? "border-primary text-primary"
-                            : "border-transparent text-slate-500 hover:text-slate-300"
-                        }`}
-                      >
-                        Exceptions & Leaves ({doc.date_exceptions?.length || 0})
-                      </button>
-                    </div>
-
-                    {/* Sub-tab Content: Profile */}
-                    {subTab === "profile" && (
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-in">
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-slate-400">Doctor Name *</Label>
-                          <Input
-                            value={doc.doctor_name}
-                            onChange={(e) => handleDoctorChange(idx, "doctor_name", e.target.value)}
-                            className="bg-slate-950 border-slate-800 text-white"
-                            placeholder="Dr Patil"
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-slate-400">Specialization</Label>
-                          <Input
-                            value={doc.specialization}
-                            onChange={(e) => handleDoctorChange(idx, "specialization", e.target.value)}
-                            className="bg-slate-950 border-slate-800 text-white"
-                            placeholder="E.g. Dentist, Orthopedist"
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-slate-400">Qualification</Label>
-                          <Input
-                            value={doc.qualification}
-                            onChange={(e) => handleDoctorChange(idx, "qualification", e.target.value)}
-                            className="bg-slate-950 border-slate-800 text-white"
-                            placeholder="E.g. BDS, MDS"
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-slate-400">Experience</Label>
-                          <Input
-                            value={doc.experience}
-                            onChange={(e) => handleDoctorChange(idx, "experience", e.target.value)}
-                            className="bg-slate-950 border-slate-800 text-white"
-                            placeholder="E.g. 10 Years"
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-slate-400">Consultation Fee (₹)</Label>
-                          <Input
-                            type="number"
-                            value={doc.consultation_fee}
-                            onChange={(e) => handleDoctorChange(idx, "consultation_fee", parseFloat(e.target.value) || 0)}
-                            className="bg-slate-950 border-slate-800 text-white"
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-slate-400">Languages Spoken</Label>
-                          <Input
-                            value={doc.languages_spoken}
-                            onChange={(e) => handleDoctorChange(idx, "languages_spoken", e.target.value)}
-                            className="bg-slate-950 border-slate-800 text-white"
-                            placeholder="English, Spanish"
-                          />
-                        </div>
-                        <div className="md:col-span-3 space-y-1.5">
-                          <Label className="text-xs text-slate-400">Profile Photo URL</Label>
-                          <Input
-                            value={doc.profile_photo || ""}
-                            onChange={(e) => handleDoctorChange(idx, "profile_photo", e.target.value)}
-                            className="bg-slate-950 border-slate-800 text-white"
-                            placeholder="https://image-link.com/avatar.jpg"
-                          />
-                        </div>
-                        <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-slate-800/40 pt-4">
-                          <div className="space-y-1.5">
-                            <Label className="text-xs text-slate-400 block mb-1">Available Days</Label>
-                            <div className="flex flex-wrap gap-2">
-                              {DAYS_OF_WEEK.map((day) => {
-                                const isChecked = doc.available_days?.includes(day);
-                                return (
-                                  <label
-                                    key={day}
-                                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs cursor-pointer transition-colors ${
-                                      isChecked
-                                        ? "bg-primary/10 border-primary text-primary"
-                                        : "bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-700"
-                                    }`}
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={isChecked}
-                                      onChange={(e) => handleDoctorAvailableDays(idx, day, e.target.checked)}
-                                      className="hidden"
-                                    />
-                                    {day.substring(0, 3)}
-                                  </label>
-                                );
-                              })}
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="space-y-1.5">
-                              <Label className="text-xs text-slate-400">Shift Start</Label>
-                              <Input
-                                type="time"
-                                value={doc.available_start_time || "09:00"}
-                                onChange={(e) => handleDoctorChange(idx, "available_start_time", e.target.value)}
-                                className="bg-slate-950 border-slate-800 text-white text-xs h-9"
-                              />
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label className="text-xs text-slate-400">Shift End</Label>
-                              <Input
-                                type="time"
-                                value={doc.available_end_time || "17:00"}
-                                onChange={(e) => handleDoctorChange(idx, "available_end_time", e.target.value)}
-                                className="bg-slate-950 border-slate-800 text-white text-xs h-9"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Sub-tab Content: Slots */}
-                    {subTab === "slots" && (
-                      <div className="space-y-4 animate-fade-in">
-                        {/* Selected day switcher */}
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-slate-400 block">Select Day to Edit Slots</Label>
-                          <div className="flex flex-wrap gap-1.5">
-                            {doc.available_days && doc.available_days.length > 0 ? (
-                              doc.available_days.map((day: string) => (
-                                <button
-                                  key={day}
-                                  type="button"
-                                  onClick={() => setActiveSlotDays({ ...activeSlotDays, [idx]: day })}
-                                  className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all duration-200 ${
-                                    activeDay === day
-                                      ? "bg-primary/20 border-primary text-primary"
-                                      : "bg-slate-900 border-slate-850 text-slate-400 hover:border-slate-700"
-                                  }`}
-                                >
-                                  {day}
-                                </button>
-                              ))
-                            ) : (
-                              <p className="text-xs text-rose-400 italic">No available days configured. Select available days in Profile first.</p>
-                            )}
-                          </div>
-                        </div>
-
-                        {doc.available_days && doc.available_days.length > 0 && (
-                          <div className="border border-slate-800 rounded-xl p-4 bg-slate-950/20 space-y-4">
-                            {/* Slots Generator Form */}
-                            <div className="flex flex-wrap gap-3 items-end p-3 bg-slate-950/40 border border-slate-850 rounded-xl">
-                              <div className="space-y-1 w-32">
-                                <Label className="text-[10px] text-slate-500 uppercase font-semibold">Slot Duration</Label>
-                                <select
-                                  value={duration}
-                                  onChange={(e) => setSlotDurations({ ...slotDurations, [idx]: parseInt(e.target.value) || 30 })}
-                                  className="w-full bg-slate-950 border border-slate-800 rounded-lg text-xs h-8 text-white px-2 focus:border-primary focus:outline-none"
-                                >
-                                  <option value={15}>15 Mins</option>
-                                  <option value={20}>20 Mins</option>
-                                  <option value={30}>30 Mins</option>
-                                  <option value={45}>45 Mins</option>
-                                  <option value={60}>60 Mins</option>
-                                </select>
-                              </div>
-                              <Button
-                                type="button"
-                                onClick={() => {
-                                  if (!doc.available_start_time || !doc.available_end_time) {
-                                    toast.error("Please configure start/end times in Profile first.");
-                                    return;
-                                  }
-                                  const generated = generateTimeSlots(doc.available_start_time, doc.available_end_time, duration);
-                                  const updated = [...doctors];
-                                  const weekly = { ...(updated[idx].weekly_slots || {}) };
-                                  weekly[activeDay] = generated;
-                                  updated[idx].weekly_slots = weekly;
-                                  setDoctors(updated);
-                                  toast.success(`Generated ${generated.length} slots for ${activeDay}!`);
-                                }}
-                                className="bg-slate-900 hover:bg-slate-800 text-xs h-8 border border-slate-800 text-slate-300"
-                              >
-                                Auto-Generate Slots
-                              </Button>
-                              <Button
-                                type="button"
-                                onClick={() => {
-                                  if (!doc.available_start_time || !doc.available_end_time) {
-                                    toast.error("Please configure start/end times in Profile first.");
-                                    return;
-                                  }
-                                  if (!doc.available_days || doc.available_days.length === 0) {
-                                    toast.error("Please configure available days in Profile first.");
-                                    return;
-                                  }
-                                  const updated = [...doctors];
-                                  const weekly = { ...(updated[idx].weekly_slots || {}) };
-                                  let totalGenerated = 0;
-                                  
-                                  doc.available_days.forEach((day: string) => {
-                                    const generated = generateTimeSlots(doc.available_start_time, doc.available_end_time, duration);
-                                    weekly[day] = generated;
-                                    totalGenerated += generated.length;
-                                  });
-                                  
-                                  updated[idx].weekly_slots = weekly;
-                                  setDoctors(updated);
-                                  toast.success(`Generated ${totalGenerated} slots in bulk for all available days (${doc.available_days.join(', ')})!`);
-                                }}
-                                className="bg-primary/20 hover:bg-primary/30 text-xs h-8 border border-primary/30 text-primary ml-1"
-                              >
-                                Auto-Generate for ALL Available Days
-                              </Button>
-                              <Button
-                                type="button"
-                                onClick={() => {
-                                  const updated = [...doctors];
-                                  const weekly = { ...(updated[idx].weekly_slots || {}) };
-                                  const currentSlots = weekly[activeDay] || [];
-                                  weekly[activeDay] = [...currentSlots, { start_time: "09:00", end_time: "09:30", is_active: true }];
-                                  updated[idx].weekly_slots = weekly;
-                                  setDoctors(updated);
-                                }}
-                                className="bg-primary hover:bg-primary/95 text-xs h-8 text-primary-foreground ml-auto"
-                              >
-                                Add Custom Slot
-                              </Button>
-                            </div>
-
-                            {/* Slots List */}
-                            <div>
-                              <Label className="text-xs text-slate-400 block mb-2">Active Slots on {activeDay}</Label>
-                              {doc.weekly_slots?.[activeDay] && doc.weekly_slots[activeDay].length > 0 ? (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                                  {doc.weekly_slots[activeDay].map((slot: any, slotIdx: number) => (
-                                    <div key={slotIdx} className="flex gap-2 items-center bg-slate-950/50 border border-slate-850 p-2 rounded-lg">
-                                      <Input
-                                        type="time"
-                                        value={slot.start_time}
-                                        onChange={(e) => {
-                                          const updated = [...doctors];
-                                          const weekly = { ...updated[idx].weekly_slots };
-                                          const daySlots = [...weekly[activeDay]];
-                                          daySlots[slotIdx] = { ...daySlots[slotIdx], start_time: e.target.value };
-                                          weekly[activeDay] = daySlots;
-                                          updated[idx].weekly_slots = weekly;
-                                          setDoctors(updated);
-                                        }}
-                                        className="bg-slate-950 border-slate-850 text-white text-xs h-7 px-1.5 w-20"
-                                      />
-                                      <span className="text-slate-600 text-xs">-</span>
-                                      <Input
-                                        type="time"
-                                        value={slot.end_time}
-                                        onChange={(e) => {
-                                          const updated = [...doctors];
-                                          const weekly = { ...updated[idx].weekly_slots };
-                                          const daySlots = [...weekly[activeDay]];
-                                          daySlots[slotIdx] = { ...daySlots[slotIdx], end_time: e.target.value };
-                                          weekly[activeDay] = daySlots;
-                                          updated[idx].weekly_slots = weekly;
-                                          setDoctors(updated);
-                                        }}
-                                        className="bg-slate-950 border-slate-850 text-white text-xs h-7 px-1.5 w-20"
-                                      />
-                                      <Switch
-                                        checked={slot.is_active}
-                                        onCheckedChange={(checked) => {
-                                          const updated = [...doctors];
-                                          const weekly = { ...updated[idx].weekly_slots };
-                                          const daySlots = [...weekly[activeDay]];
-                                          daySlots[slotIdx] = { ...daySlots[slotIdx], is_active: checked };
-                                          weekly[activeDay] = daySlots;
-                                          updated[idx].weekly_slots = weekly;
-                                          setDoctors(updated);
-                                        }}
-                                      />
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => {
-                                          const updated = [...doctors];
-                                          const weekly = { ...updated[idx].weekly_slots };
-                                          weekly[activeDay] = weekly[activeDay].filter((_: any, i: number) => i !== slotIdx);
-                                          updated[idx].weekly_slots = weekly;
-                                          setDoctors(updated);
-                                        }}
-                                        className="h-7 w-7 text-slate-500 hover:text-rose-500 hover:bg-rose-500/10 rounded-md"
-                                      >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                      </Button>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <p className="text-xs text-slate-600 italic">No slots defined for this day. Click "Auto-Generate Slots" to begin.</p>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Sub-tab Content: Exceptions */}
-                    {subTab === "exceptions" && (
-                      <div className="space-y-4 animate-fade-in">
-                        {/* Add Exception Form */}
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 p-4 bg-slate-950/40 border border-slate-800 rounded-xl items-end">
-                          <div className="space-y-1">
-                            <Label className="text-xs text-slate-400">Exception Date</Label>
-                            <Input
-                              type="date"
-                              value={exceptionForm.date}
-                              onChange={(e) => {
-                                const updated = { ...newDocExceptions };
-                                updated[idx] = { ...(updated[idx] || { date: "", is_available: false, reason: "" }), date: e.target.value };
-                                setNewDocExceptions(updated);
-                              }}
-                              className="bg-slate-950 border-slate-850 text-white text-xs h-9"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs text-slate-400">Reason / Description</Label>
-                            <Input
-                              placeholder="e.g. Personal Leave, Conference"
-                              value={exceptionForm.reason}
-                              onChange={(e) => {
-                                const updated = { ...newDocExceptions };
-                                updated[idx] = { ...(updated[idx] || { date: "", is_available: false, reason: "" }), reason: e.target.value };
-                                setNewDocExceptions(updated);
-                              }}
-                              className="bg-slate-950 border-slate-850 text-white text-xs h-9"
-                            />
-                          </div>
-                          <div className="space-y-1 pb-1">
-                            <div className="flex items-center gap-2">
-                              <Switch
-                                checked={!exceptionForm.is_available}
-                                onCheckedChange={(checked) => {
-                                  const updated = { ...newDocExceptions };
-                                  updated[idx] = { ...(updated[idx] || { date: "", is_available: false, reason: "" }), is_available: !checked };
-                                  setNewDocExceptions(updated);
-                                }}
-                              />
-                              <span className="text-xs text-slate-300">{!exceptionForm.is_available ? "Doctor on Leave (Unavailable)" : "Doctor Available"}</span>
-                            </div>
-                          </div>
-                          <Button
-                            type="button"
-                            onClick={() => {
-                              if (!exceptionForm.date) {
-                                toast.error("Please select a date.");
-                                return;
-                              }
-                              const updated = [...doctors];
-                              const currentExs = updated[idx].date_exceptions || [];
-                              if (currentExs.some((e: any) => e.date === exceptionForm.date)) {
-                                toast.error("An exception already exists for this date.");
-                                return;
-                              }
-                              updated[idx].date_exceptions = [...currentExs, { ...exceptionForm }];
-                              setDoctors(updated);
-                              
-                              const updatedForms = { ...newDocExceptions };
-                              updatedForms[idx] = { date: "", is_available: false, reason: "" };
-                              setNewDocExceptions(updatedForms);
-                              toast.success("Doctor exception added!");
-                            }}
-                            className="bg-primary text-primary-foreground hover:bg-primary/95 text-xs h-9"
-                          >
-                            Add Exception
-                          </Button>
-                        </div>
-
-                        {/* List Exceptions */}
-                        <div>
-                          <Label className="text-xs text-slate-400 block mb-2">Registered Exceptions / Leaves</Label>
-                          {doc.date_exceptions && doc.date_exceptions.length > 0 ? (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              {doc.date_exceptions.map((ex: any, exIdx: number) => (
-                                <div key={exIdx} className="flex justify-between items-center p-3 bg-slate-950/20 border border-slate-800 rounded-xl">
-                                  <div className="space-y-1">
-                                    <span className="text-xs font-bold text-white block">
-                                      {new Date(ex.date).toLocaleDateString('en-US', { dateStyle: 'medium' })}
-                                    </span>
-                                    <div className="flex gap-2 items-center">
-                                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${!ex.is_available ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"}`}>
-                                        {!ex.is_available ? "Leave" : "Available"}
-                                      </span>
-                                      {ex.reason && <span className="text-xs text-slate-500">({ex.reason})</span>}
-                                    </div>
-                                  </div>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => {
-                                      const updated = [...doctors];
-                                      updated[idx].date_exceptions = updated[idx].date_exceptions.filter((_: any, i: number) => i !== exIdx);
-                                      setDoctors(updated);
-                                    }}
-                                    className="h-8 w-8 text-slate-500 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-xs text-slate-600 italic">No leaves or overrides configured for this doctor.</p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              <Button onClick={addDoctor} type="button" variant="outline" className="border-dashed border-slate-800 text-slate-400 hover:text-white w-full">
-                <Plus className="h-4 w-4 mr-1" /> Add Doctor
-              </Button>
-            </div>
-          )}
+          {/* STEP 3 (UI): Doctors Directory — saved per doctor via /api/healthcare/doctors */}
+          {currentStep === 3 && <DoctorsDirectory key={reloadKey} />}
 
           {/* STEP 4: Services */}
           {currentStep === 4 && (
             <div className="space-y-6">
               {/* AI Bulk Importer Accordion/Card */}
-              <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-5 space-y-4">
+              <div className="rounded-xl border border-border bg-background p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <div className="bg-emerald-500/10 p-2 rounded-lg text-emerald-400 border border-emerald-500/20">
                       <Sparkles className="h-4 w-4" />
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-white tracking-wide">AI Bulk Services Importer</h4>
-                      <p className="text-xs text-slate-500">
+                      <h4 className="text-sm font-bold text-foreground tracking-wide">AI Bulk Services Importer</h4>
+                      <p className="text-xs text-muted-foreground">
                         Paste unstructured text (PDF/Word/Excel) or upload .txt/.csv to automatically populate services.
                       </p>
                     </div>
@@ -1592,7 +1178,7 @@ export default function ClinicSetupWizard() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="border-slate-800 text-xs text-slate-300 hover:bg-slate-900"
+                    className="border-border text-xs text-foreground/90 hover:bg-slate-900"
                     onClick={() => setShowImporter(!showImporter)}
                   >
                     {showImporter ? "Hide AI Importer" : "Use AI Importer"}
@@ -1600,10 +1186,10 @@ export default function ClinicSetupWizard() {
                 </div>
 
                 {showImporter && (
-                  <div className="space-y-4 pt-3 border-t border-slate-900/60 animate-fade-in">
+                  <div className="space-y-4 pt-3 border-t border-border animate-fade-in">
                     {/* Sample Downloads */}
-                    <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-950/60 p-3 rounded-lg border border-slate-900">
-                      <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <div className="flex flex-wrap items-center justify-between gap-3 bg-background p-3 rounded-lg border border-border">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <AlertCircle className="h-3.5 w-3.5 text-emerald-400" />
                         <span>Not sure what format to use? Guidance templates:</span>
                       </div>
@@ -1612,7 +1198,7 @@ export default function ClinicSetupWizard() {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="h-8 text-xs text-slate-300 hover:text-white hover:bg-slate-900 border border-slate-900 flex items-center gap-1.5"
+                          className="h-8 text-xs text-foreground/90 hover:text-foreground hover:bg-slate-900 border border-border flex items-center gap-1.5"
                           onClick={downloadSampleCSV}
                         >
                           <Download className="h-3 w-3" /> Download Sample CSV
@@ -1621,7 +1207,7 @@ export default function ClinicSetupWizard() {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="h-8 text-xs text-slate-300 hover:text-white hover:bg-slate-900 border border-slate-900 flex items-center gap-1.5"
+                          className="h-8 text-xs text-foreground/90 hover:text-foreground hover:bg-slate-900 border border-border flex items-center gap-1.5"
                           onClick={downloadSampleTXT}
                         >
                           <Download className="h-3 w-3" /> Download Sample TXT
@@ -1632,34 +1218,34 @@ export default function ClinicSetupWizard() {
                     {/* File Upload / Paste Split */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {/* Left side: Upload card */}
-                      <div className="md:col-span-1 border border-dashed border-slate-800 rounded-xl p-4 flex flex-col items-center justify-center bg-slate-950/20 hover:bg-slate-950/40 transition-colors relative group">
+                      <div className="md:col-span-1 border border-dashed border-border rounded-xl p-4 flex flex-col items-center justify-center bg-background hover:bg-slate-950/40 transition-colors relative group">
                         <input
                           type="file"
                           accept=".txt,.csv"
                           onChange={handleFileUpload}
                           className="absolute inset-0 opacity-0 cursor-pointer"
                         />
-                        <div className="bg-slate-900 p-3 rounded-full mb-3 text-slate-400 group-hover:text-primary transition-colors border border-slate-850">
+                        <div className="bg-card p-3 rounded-full mb-3 text-muted-foreground group-hover:text-primary transition-colors border border-slate-850">
                           <Upload className="h-5 w-5" />
                         </div>
-                        <span className="text-xs font-semibold text-slate-300">Upload Text or CSV</span>
-                        <span className="text-[10px] text-slate-500 mt-1">Drag & drop or click</span>
+                        <span className="text-xs font-semibold text-foreground/90">Upload Text or CSV</span>
+                        <span className="text-[10px] text-muted-foreground mt-1">Drag & drop or click</span>
                       </div>
 
                       {/* Right side: Pasting textarea */}
                       <div className="md:col-span-2 space-y-1.5">
-                        <Label className="text-xs text-slate-400">Paste Services Text below *</Label>
+                        <Label className="text-xs text-muted-foreground">Paste Services Text below *</Label>
                         <Textarea
                           value={bulkText}
                           onChange={(e) => setBulkText(e.target.value)}
                           placeholder="Paste menu catalog, pricing table, or plain description of services...&#10;Example:&#10;- Teeth whitening ₹150, 45 mins. Professional cosmetic bleaching&#10;- Routine Dental scaling at ₹80 taking 30 minutes"
-                          className="bg-slate-950 border-slate-850 text-white min-h-[110px] text-xs leading-relaxed"
+                          className="bg-background border-slate-850 text-foreground min-h-[110px] text-xs leading-relaxed"
                         />
                       </div>
                     </div>
 
                     {/* Analyze Action */}
-                    <div className="flex justify-end pt-2 border-t border-slate-900/60">
+                    <div className="flex justify-end pt-2 border-t border-border">
                       <Button
                         type="button"
                         disabled={importing}
@@ -1683,49 +1269,49 @@ export default function ClinicSetupWizard() {
                 )}
               </div>
               {services.map((svc, idx) => (
-                <div key={idx} className="relative bg-slate-950/40 p-5 rounded-xl border border-slate-800 space-y-4">
+                <div key={idx} className="relative bg-background p-5 rounded-xl border border-border space-y-4">
                   <button
                     type="button"
                     onClick={() => removeService(idx)}
-                    className="absolute top-4 right-4 text-slate-500 hover:text-rose-500 transition-colors"
+                    className="absolute top-4 right-4 text-muted-foreground hover:text-rose-500 transition-colors"
                   >
                     <Trash2 className="h-5 w-5" />
                   </button>
-                  <h3 className="text-white font-bold text-sm tracking-wider uppercase text-primary">Service #{idx + 1}</h3>
+                  <h3 className="text-foreground font-bold text-sm tracking-wider uppercase text-primary">Service #{idx + 1}</h3>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="md:col-span-2 space-y-1.5">
-                      <Label className="text-xs text-slate-400">Service Name *</Label>
+                      <Label className="text-xs text-muted-foreground">Service Name *</Label>
                       <Input
                         value={svc.service_name}
                         onChange={(e) => handleServiceChange(idx, "service_name", e.target.value)}
-                        className="bg-slate-950 border-slate-800 text-white"
+                        className="bg-background border-border text-foreground"
                         placeholder="E.g. Teeth Cleaning"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-slate-400">Starting Price (₹)</Label>
+                      <Label className="text-xs text-muted-foreground">Starting Price (₹)</Label>
                       <Input
                         type="number"
                         value={svc.starting_price}
                         onChange={(e) => handleServiceChange(idx, "starting_price", parseFloat(e.target.value) || 0)}
-                        className="bg-slate-950 border-slate-800 text-white"
+                        className="bg-background border-border text-foreground"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-slate-400">Duration (Minutes)</Label>
+                      <Label className="text-xs text-muted-foreground">Duration (Minutes)</Label>
                       <Input
                         type="number"
                         value={svc.duration}
                         onChange={(e) => handleServiceChange(idx, "duration", parseInt(e.target.value) || 30)}
-                        className="bg-slate-950 border-slate-800 text-white"
+                        className="bg-background border-border text-foreground"
                       />
                     </div>
                     <div className="md:col-span-3 space-y-1.5">
-                      <Label className="text-xs text-slate-400">Description</Label>
+                      <Label className="text-xs text-muted-foreground">Description</Label>
                       <Input
                         value={svc.description || ""}
                         onChange={(e) => handleServiceChange(idx, "description", e.target.value)}
-                        className="bg-slate-950 border-slate-800 text-white"
+                        className="bg-background border-border text-foreground"
                         placeholder="Brief summary..."
                       />
                     </div>
@@ -1734,12 +1320,12 @@ export default function ClinicSetupWizard() {
                         checked={svc.is_active}
                         onCheckedChange={(checked) => handleServiceChange(idx, "is_active", checked)}
                       />
-                      <span className="text-xs text-slate-300">Active</span>
+                      <span className="text-xs text-foreground/90">Active</span>
                     </div>
                   </div>
                 </div>
               ))}
-              <Button onClick={addService} type="button" variant="outline" className="border-dashed border-slate-800 text-slate-400 hover:text-white w-full">
+              <Button onClick={addService} type="button" variant="outline" className="border-dashed border-border text-muted-foreground hover:text-foreground w-full">
                 <Plus className="h-4 w-4 mr-1" /> Add Service
               </Button>
             </div>
@@ -1749,15 +1335,15 @@ export default function ClinicSetupWizard() {
           {currentStep === 5 && (
             <div className="space-y-6">
               {/* AI Bulk FAQs Importer */}
-              <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-5 space-y-4">
+              <div className="rounded-xl border border-border bg-background p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <div className="bg-emerald-500/10 p-2 rounded-lg text-emerald-400 border border-emerald-500/20">
                       <Sparkles className="h-4 w-4" />
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-white tracking-wide">AI Bulk FAQs Importer</h4>
-                      <p className="text-xs text-slate-500">
+                      <h4 className="text-sm font-bold text-foreground tracking-wide">AI Bulk FAQs Importer</h4>
+                      <p className="text-xs text-muted-foreground">
                         Paste unstructured text (PDF/Word/Excel) or upload .txt/.csv to automatically populate FAQs.
                       </p>
                     </div>
@@ -1766,7 +1352,7 @@ export default function ClinicSetupWizard() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="border-slate-800 text-xs text-slate-300 hover:bg-slate-900"
+                    className="border-border text-xs text-foreground/90 hover:bg-slate-900"
                     onClick={() => setShowFaqImporter(!showFaqImporter)}
                   >
                     {showFaqImporter ? "Hide AI Importer" : "Use AI Importer"}
@@ -1774,10 +1360,10 @@ export default function ClinicSetupWizard() {
                 </div>
 
                 {showFaqImporter && (
-                  <div className="space-y-4 pt-3 border-t border-slate-900/60 animate-fade-in">
+                  <div className="space-y-4 pt-3 border-t border-border animate-fade-in">
                     {/* Sample Downloads */}
-                    <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-950/60 p-3 rounded-lg border border-slate-900">
-                      <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <div className="flex flex-wrap items-center justify-between gap-3 bg-background p-3 rounded-lg border border-border">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <AlertCircle className="h-3.5 w-3.5 text-emerald-400" />
                         <span>Not sure what format to use? Guidance templates:</span>
                       </div>
@@ -1786,7 +1372,7 @@ export default function ClinicSetupWizard() {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="h-8 text-xs text-slate-300 hover:text-white hover:bg-slate-900 border border-slate-900 flex items-center gap-1.5"
+                          className="h-8 text-xs text-foreground/90 hover:text-foreground hover:bg-slate-900 border border-border flex items-center gap-1.5"
                           onClick={downloadSampleFAQCSV}
                         >
                           <Download className="h-3 w-3" /> Download Sample CSV
@@ -1795,7 +1381,7 @@ export default function ClinicSetupWizard() {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="h-8 text-xs text-slate-300 hover:text-white hover:bg-slate-900 border border-slate-900 flex items-center gap-1.5"
+                          className="h-8 text-xs text-foreground/90 hover:text-foreground hover:bg-slate-900 border border-border flex items-center gap-1.5"
                           onClick={downloadSampleFAQTXT}
                         >
                           <Download className="h-3 w-3" /> Download Sample TXT
@@ -1806,34 +1392,34 @@ export default function ClinicSetupWizard() {
                     {/* File Upload / Paste Split */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {/* Left side: Upload card */}
-                      <div className="md:col-span-1 border border-dashed border-slate-800 rounded-xl p-4 flex flex-col items-center justify-center bg-slate-950/20 hover:bg-slate-950/40 transition-colors relative group">
+                      <div className="md:col-span-1 border border-dashed border-border rounded-xl p-4 flex flex-col items-center justify-center bg-background hover:bg-slate-950/40 transition-colors relative group">
                         <input
                           type="file"
                           accept=".txt,.csv"
                           onChange={handleFaqFileUpload}
                           className="absolute inset-0 opacity-0 cursor-pointer"
                         />
-                        <div className="bg-slate-900 p-3 rounded-full mb-3 text-slate-400 group-hover:text-primary transition-colors border border-slate-850">
+                        <div className="bg-card p-3 rounded-full mb-3 text-muted-foreground group-hover:text-primary transition-colors border border-slate-850">
                           <Upload className="h-5 w-5" />
                         </div>
-                        <span className="text-xs font-semibold text-slate-300">Upload Text or CSV</span>
-                        <span className="text-[10px] text-slate-500 mt-1">Drag & drop or click</span>
+                        <span className="text-xs font-semibold text-foreground/90">Upload Text or CSV</span>
+                        <span className="text-[10px] text-muted-foreground mt-1">Drag & drop or click</span>
                       </div>
 
                       {/* Right side: Pasting textarea */}
                       <div className="md:col-span-2 space-y-1.5">
-                        <Label className="text-xs text-slate-400">Paste FAQs Text below *</Label>
+                        <Label className="text-xs text-muted-foreground">Paste FAQs Text below *</Label>
                         <Textarea
                           value={faqBulkText}
                           onChange={(e) => setFaqBulkText(e.target.value)}
                           placeholder="Paste lists of Q&As, website text, or documents...&#10;Example:&#10;Q: What are the timings?&#10;A: Open Mon-Sat 9AM-6PM.&#10;&#10;Q: Do you accept card?&#10;A: Yes, we accept all cards."
-                          className="bg-slate-950 border-slate-850 text-white min-h-[110px] text-xs leading-relaxed"
+                          className="bg-background border-slate-850 text-foreground min-h-[110px] text-xs leading-relaxed"
                         />
                       </div>
                     </div>
 
                     {/* Analyze Action */}
-                    <div className="flex justify-end pt-2 border-t border-slate-900/60">
+                    <div className="flex justify-end pt-2 border-t border-border">
                       <Button
                         type="button"
                         disabled={faqImporting}
@@ -1857,47 +1443,47 @@ export default function ClinicSetupWizard() {
                 )}
               </div>
               {faqs.map((faq, idx) => (
-                <div key={idx} className="relative bg-slate-950/40 p-5 rounded-xl border border-slate-800 space-y-4">
+                <div key={idx} className="relative bg-background p-5 rounded-xl border border-border space-y-4">
                   <button
                     type="button"
                     onClick={() => removeFaq(idx)}
-                    className="absolute top-4 right-4 text-slate-500 hover:text-rose-500 transition-colors"
+                    className="absolute top-4 right-4 text-muted-foreground hover:text-rose-500 transition-colors"
                   >
                     <Trash2 className="h-5 w-5" />
                   </button>
-                  <h3 className="text-white font-bold text-sm tracking-wider uppercase text-primary">FAQ #{idx + 1}</h3>
+                  <h3 className="text-foreground font-bold text-sm tracking-wider uppercase text-primary">FAQ #{idx + 1}</h3>
                   <div className="space-y-3">
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-slate-400 font-medium">Question *</Label>
+                      <Label className="text-xs text-muted-foreground font-medium">Question *</Label>
                       <Input
                         value={faq.question}
                         onChange={(e) => handleFaqChange(idx, "question", e.target.value)}
-                        className="bg-slate-950 border-slate-800 text-white"
+                        className="bg-background border-border text-foreground"
                         placeholder="E.g. Is Dr. Patil available today?"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-slate-400 font-medium">Answer *</Label>
+                      <Label className="text-xs text-muted-foreground font-medium">Answer *</Label>
                       <Textarea
                         value={faq.answer}
                         onChange={(e) => handleFaqChange(idx, "answer", e.target.value)}
-                        className="bg-slate-950 border-slate-800 text-white min-h-[60px]"
+                        className="bg-background border-border text-foreground min-h-[60px]"
                         placeholder="E.g. Please share preferred doctor name."
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-slate-400 font-medium">Trigger Keywords (Comma Separated)</Label>
+                      <Label className="text-xs text-muted-foreground font-medium">Trigger Keywords (Comma Separated)</Label>
                       <Input
                         value={faq.keywords || ""}
                         onChange={(e) => handleFaqChange(idx, "keywords", e.target.value)}
-                        className="bg-slate-950 border-slate-800 text-white"
+                        className="bg-background border-border text-foreground"
                         placeholder="E.g. doctor, schedule, available, timings"
                       />
                     </div>
                   </div>
                 </div>
               ))}
-              <Button onClick={addFaq} type="button" variant="outline" className="border-dashed border-slate-800 text-slate-400 hover:text-white w-full">
+              <Button onClick={addFaq} type="button" variant="outline" className="border-dashed border-border text-muted-foreground hover:text-foreground w-full">
                 <Plus className="h-4 w-4 mr-1" /> Add FAQ
               </Button>
             </div>
@@ -1906,10 +1492,10 @@ export default function ClinicSetupWizard() {
           {/* STEP 6: AI Settings */}
           {currentStep === 6 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="md:col-span-2 flex items-center justify-between p-4 bg-slate-950/40 rounded-xl border border-slate-800">
+              <div className="md:col-span-2 flex items-center justify-between p-4 bg-background rounded-xl border border-border">
                 <div className="space-y-0.5">
-                  <Label className="text-sm font-semibold text-white">Enable AI Automated Replies</Label>
-                  <p className="text-xs text-slate-500">Enable AI auto-response for incoming WhatsApp messages.</p>
+                  <Label className="text-sm font-semibold text-foreground">Enable AI Automated Replies</Label>
+                  <p className="text-xs text-muted-foreground">Enable AI auto-response for incoming WhatsApp messages.</p>
                 </div>
                 <Switch
                   checked={aiSettings.ai_enabled}
@@ -1918,72 +1504,72 @@ export default function ClinicSetupWizard() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="ai_tone" className="text-slate-300">AI Personality / Tone</Label>
+                <Label htmlFor="ai_tone" className="text-foreground/90">AI Personality / Tone</Label>
                 <Input
                   id="ai_tone"
                   value={aiSettings.ai_tone}
                   onChange={(e) => handleAISettingsChange("ai_tone", e.target.value)}
-                  className="bg-slate-950 border-slate-800 text-white"
+                  className="bg-background border-border text-foreground"
                   placeholder="E.g. polite and professional"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label className="text-slate-300">Supported Languages</Label>
+                <Label className="text-foreground/90">Supported Languages</Label>
                 <Input
                   value={aiSettings.supported_languages.join(", ")}
                   onChange={(e) => handleAISettingsChange("supported_languages", e.target.value.split(",").map(lang => lang.trim()).filter(Boolean))}
-                  className="bg-slate-950 border-slate-800 text-white"
+                  className="bg-background border-border text-foreground"
                   placeholder="E.g. English, Spanish"
                 />
               </div>
 
               <div className="md:col-span-2 space-y-2">
-                <Label htmlFor="greeting_message" className="text-slate-300">Greeting Message</Label>
+                <Label htmlFor="greeting_message" className="text-foreground/90">Greeting Message</Label>
                 <Textarea
                   id="greeting_message"
                   value={aiSettings.greeting_message}
                   onChange={(e) => handleAISettingsChange("greeting_message", e.target.value)}
-                  className="bg-slate-950 border-slate-800 text-white min-h-[70px]"
+                  className="bg-background border-border text-foreground min-h-[70px]"
                   placeholder="First automated greeting sent to new patients..."
                 />
               </div>
 
               <div className="md:col-span-2 space-y-2">
-                <Label htmlFor="after_hours_message" className="text-slate-300">After Hours / Closed Message</Label>
+                <Label htmlFor="after_hours_message" className="text-foreground/90">After Hours / Closed Message</Label>
                 <Textarea
                   id="after_hours_message"
                   value={aiSettings.after_hours_message}
                   onChange={(e) => handleAISettingsChange("after_hours_message", e.target.value)}
-                  className="bg-slate-950 border-slate-800 text-white min-h-[70px]"
+                  className="bg-background border-border text-foreground min-h-[70px]"
                   placeholder="Reply sent when patient queries during off hours..."
                 />
               </div>
 
               <div className="space-y-2">
-                <Label className="text-slate-300">Human Handover Keywords (Comma Separated)</Label>
+                <Label className="text-foreground/90">Human Handover Keywords (Comma Separated)</Label>
                 <Input
                   value={aiSettings.escalation_keywords}
                   onChange={(e) => handleAISettingsChange("escalation_keywords", e.target.value)}
-                  className="bg-slate-950 border-slate-800 text-white"
+                  className="bg-background border-border text-foreground"
                   placeholder="E.g. human, agent, operator"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label className="text-slate-300">Emergency Stop Keywords (Comma Separated)</Label>
+                <Label className="text-foreground/90">Emergency Stop Keywords (Comma Separated)</Label>
                 <Input
                   value={aiSettings.emergency_keywords}
                   onChange={(e) => handleAISettingsChange("emergency_keywords", e.target.value)}
-                  className="bg-slate-950 border-slate-800 text-white"
+                  className="bg-background border-border text-foreground"
                   placeholder="E.g. heart attack, bleeding, emergency"
                 />
               </div>
 
-              <div className="md:col-span-2 flex items-center justify-between p-4 bg-slate-950/40 rounded-xl border border-slate-800">
+              <div className="md:col-span-2 flex items-center justify-between p-4 bg-background rounded-xl border border-border">
                 <div className="space-y-0.5">
-                  <Label className="text-sm font-semibold text-white">Enable Human Handover Notification</Label>
-                  <p className="text-xs text-slate-500">Insert notes in CRM and notify human agents when AI detects fallback conditions.</p>
+                  <Label className="text-sm font-semibold text-foreground">Enable Human Handover Notification</Label>
+                  <p className="text-xs text-muted-foreground">Insert notes in CRM and notify human agents when AI detects fallback conditions.</p>
                 </div>
                 <Switch
                   checked={aiSettings.human_handover_enabled}
@@ -1995,12 +1581,12 @@ export default function ClinicSetupWizard() {
         </CardContent>
 
         {/* Action Buttons */}
-        <div className="flex justify-between items-center p-6 border-t border-slate-800 bg-slate-900/30">
+        <div className="flex justify-between items-center p-6 border-t border-border bg-muted/40">
           <Button
-            disabled={currentStep === 1 || saving}
-            onClick={() => setCurrentStep(currentStep - 1)}
+            disabled={currentPos === 0 || saving}
+            onClick={() => setCurrentStep(stepsList[currentPos - 1].num)}
             variant="outline"
-            className="border-slate-800 hover:bg-slate-800 text-white"
+            className="border-border hover:bg-accent text-foreground"
           >
             <ChevronLeft className="h-4 w-4 mr-1" /> Back
           </Button>
@@ -2011,9 +1597,13 @@ export default function ClinicSetupWizard() {
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
                 Saving...
               </span>
-            ) : currentStep === 6 ? (
+            ) : currentPos === stepsList.length - 1 ? (
               <span className="flex items-center gap-1.5">
                 <Save className="h-4 w-4" /> Complete Setup
+              </span>
+            ) : currentStep === 7 || currentStep === 3 ? (
+              <span className="flex items-center gap-1.5">
+                Next <ChevronRight className="h-4 w-4" />
               </span>
             ) : (
               <span className="flex items-center gap-1.5">

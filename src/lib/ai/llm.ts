@@ -21,10 +21,45 @@ export interface LLMResult {
 export interface CallOptions {
   maxTokens?: number;
   temperature?: number;
+  /**
+   * Routes Gemini requests by consequence and complexity.  Use `basic` for
+   * short greetings and acknowledgements, `standard` for normal assistance,
+   * and `critical` where an incorrect answer could cause a compliance,
+   * clinical, financial, or approval problem.
+   */
+  taskCriticality?: 'basic' | 'standard' | 'critical';
+  /** Do not send a task to another provider if Gemini is unavailable. */
+  geminiOnly?: boolean;
   provider?: 'gemini' | 'openai' | 'openrouter';
   apiKey?: string;
   model?: string;
   systemPrompt?: string;
+  /** Ask Gemini for a strict `application/json` response (no prose, no fences). */
+  jsonMode?: boolean;
+  /** Per-model request timeout. Defaults to 45s. */
+  timeoutMs?: number;
+  /**
+   * Files sent to Gemini alongside the prompt (images, PDFs). Gemini-only:
+   * other providers cannot read them, so attachments imply `geminiOnly`.
+   */
+  attachments?: Array<{ mimeType: string; data: string /* base64 */ }>;
+}
+
+/**
+ * Current Gemini models "think" before answering, and those thinking tokens
+ * are billed against `maxOutputTokens`. A 1.6k budget was routinely consumed
+ * by ~1.3k thinking tokens, leaving the JSON answer truncated. The headroom
+ * below is added on top of the caller's answer budget for Gemini only.
+ */
+const GEMINI_THINKING_HEADROOM = 6144;
+
+function geminiText(data: any): string {
+  const parts: any[] = data?.candidates?.[0]?.content?.parts ?? [];
+  return parts
+    .filter((part) => typeof part?.text === 'string' && !part.thought)
+    .map((part) => part.text)
+    .join('')
+    .trim();
 }
 
 function clean(v: string | undefined): string {
@@ -38,6 +73,51 @@ export function hasAnyLLMKey(): boolean {
       clean(process.env.OPENROUTER_API_KEY) ||
       clean(process.env.OPENAI_API_KEY),
   );
+}
+
+/** The platform-default provider is Gemini, configured only on the server. */
+export function hasGeminiKey(): boolean {
+  return Boolean(clean(process.env.GEMINI_API_KEY));
+}
+
+export type TaskCriticality = NonNullable<CallOptions['taskCriticality']>;
+
+/**
+ * A deliberately conservative classifier for end-user text.  Only a very
+ * short greeting/acknowledgement uses the economical tier. Everything else
+ * remains on the capable default unless it is clearly high-stakes.
+ */
+export function inferTaskCriticality(input: string): TaskCriticality {
+  const text = input.trim().toLowerCase();
+  if (
+    text.length <= 80 &&
+    /^(hi|hello|hey|good (morning|afternoon|evening)|thanks|thank you|ok|okay|got it|bye|goodbye)[!.?\s]*$/.test(text)
+  ) {
+    return 'basic';
+  }
+
+  if (/(compliance|policy|approval|legal|medical|health|payment|refund|security|emergency|meta|whatsapp template)/.test(text)) {
+    return 'critical';
+  }
+
+  return 'standard';
+}
+
+function geminiModelsFor(opts?: CallOptions): string[] {
+  if (opts?.model) return [opts.model];
+
+  switch (opts?.taskCriticality ?? 'standard') {
+    case 'basic':
+      // Fastest/lowest-cost response tier. The pinned 2.5 models are no
+      // longer served to new API keys (404), so only the -latest aliases
+      // are used here.
+      return ['gemini-flash-lite-latest', 'gemini-flash-latest'];
+    case 'critical':
+      // Policy and approval work benefits from the strongest reasoning tier.
+      return ['gemini-pro-latest', 'gemini-flash-latest'];
+    default:
+      return ['gemini-flash-latest', 'gemini-flash-lite-latest'];
+  }
 }
 
 export async function callLLM(
@@ -62,9 +142,7 @@ export async function callLLM(
 
   // 1. Direct Gemini (or if explicitly chosen)
   if (apiKey && (!opts?.provider || opts.provider === 'gemini')) {
-    const directModels = opts?.model
-      ? [opts.model]
-      : ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+    const directModels = geminiModelsFor(opts);
     for (const model of directModels) {
       if (success) break;
       try {
@@ -73,16 +151,33 @@ export async function callLLM(
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            signal: AbortSignal.timeout(opts?.timeoutMs ?? 45_000),
             body: JSON.stringify({
-              contents: [{ parts: [{ text: effectivePrompt }] }],
-              generationConfig: { temperature, maxOutputTokens: maxTokens },
+              contents: [{
+                parts: [
+                  ...(opts?.attachments ?? []).map((a) => ({ inlineData: { mimeType: a.mimeType, data: a.data } })),
+                  { text: effectivePrompt },
+                ],
+              }],
+              generationConfig: {
+                temperature,
+                maxOutputTokens: maxTokens + GEMINI_THINKING_HEADROOM,
+                ...(opts?.jsonMode ? { responseMimeType: "application/json" } : {}),
+              },
             }),
           },
         );
         if (res.ok) {
           const data = await res.json();
-          rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-          if (rawText) {
+          const finishReason = data?.candidates?.[0]?.finishReason;
+          const text = geminiText(data);
+          if (finishReason === "MAX_TOKENS") {
+            // A truncated answer is worse than none: it parses as garbage.
+            debugLogs.push(`Gemini ${model} -> truncated (MAX_TOKENS)`);
+          } else if (!text) {
+            debugLogs.push(`Gemini ${model} -> empty response (${finishReason ?? data?.promptFeedback?.blockReason ?? "unknown"})`);
+          } else {
+            rawText = text;
             success = true;
             tokensUsed = data?.usageMetadata?.totalTokenCount ?? Math.ceil((effectivePrompt.length + rawText.length) / 4);
           }
@@ -96,7 +191,7 @@ export async function callLLM(
   }
 
   // 2. OpenRouter
-  if (!success && (orKey || (opts?.provider === 'openrouter' && opts?.apiKey))) {
+  if (!success && !opts?.geminiOnly && !opts?.attachments?.length && (orKey || (opts?.provider === 'openrouter' && opts?.apiKey))) {
     const orModels = opts?.model
       ? [opts.model]
       : [
@@ -141,7 +236,7 @@ export async function callLLM(
   }
 
   // 3. OpenAI / OpenRouter via OPENAI_API_KEY
-  if (!success && (openAIKey || (opts?.provider === 'openai' && opts?.apiKey))) {
+  if (!success && !opts?.geminiOnly && !opts?.attachments?.length && (openAIKey || (opts?.provider === 'openai' && opts?.apiKey))) {
     const useKey = openAIKey || clean(opts?.apiKey);
     if (useKey) {
       try {

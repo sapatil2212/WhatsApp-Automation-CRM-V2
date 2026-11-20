@@ -20,10 +20,10 @@
 
 import { ConflictError } from '../kernel';
 
-export const RECIPIENT_STATUSES = ['pending', 'sent', 'delivered', 'read', 'replied', 'failed'] as const;
+export const RECIPIENT_STATUSES = ['pending', 'sent', 'delivered', 'read', 'replied', 'failed', 'cancelled'] as const;
 export type RecipientStatus = (typeof RECIPIENT_STATUSES)[number];
 
-export const BROADCAST_STATUSES = ['draft', 'scheduled', 'sending', 'sent', 'failed'] as const;
+export const BROADCAST_STATUSES = ['draft', 'scheduled', 'sending', 'paused', 'sent', 'failed', 'cancelled'] as const;
 export type BroadcastStatus = (typeof BROADCAST_STATUSES)[number];
 
 /** Ordered progress ladder. `failed` is deliberately absent — it branches. */
@@ -47,7 +47,8 @@ function ladderLevel(status: string): number {
  */
 export function isValidRecipientTransition(current: string, incoming: string): boolean {
   if (incoming === 'failed') return current === 'pending' || current === 'sent';
-  if (current === 'failed') return false;
+  // Failed and cancelled rows were never delivered; nothing can advance them.
+  if (current === 'failed' || current === 'cancelled') return false;
 
   const incomingLevel = ladderLevel(incoming);
   if (incomingLevel < 0) return false;
@@ -60,11 +61,14 @@ export function isValidRecipientTransition(current: string, incoming: string): b
 
 /** Which campaign statuses each status may move to. */
 const BROADCAST_TRANSITIONS: Record<BroadcastStatus, readonly BroadcastStatus[]> = {
-  draft: ['scheduled', 'sending', 'failed'],
-  scheduled: ['sending', 'draft', 'failed'],
-  sending: ['sent', 'failed'],
+  draft: ['scheduled', 'sending', 'failed', 'cancelled'],
+  scheduled: ['sending', 'draft', 'failed', 'cancelled'],
+  sending: ['sent', 'failed', 'paused', 'cancelled'],
+  // Resume goes back to sending; a paused campaign can also be stopped for good.
+  paused: ['sending', 'cancelled'],
   sent: [],
   failed: [],
+  cancelled: [],
 };
 
 export function canTransitionBroadcast(current: string, next: BroadcastStatus): boolean {
@@ -82,7 +86,7 @@ export function assertBroadcastTransition(current: string, next: BroadcastStatus
 
 /** A campaign in a terminal state can never be edited or re-sent. */
 export function isTerminalBroadcastStatus(status: string): boolean {
-  return status === 'sent' || status === 'failed';
+  return status === 'sent' || status === 'failed' || status === 'cancelled';
 }
 
 /** Only a draft or scheduled campaign may still be edited. */

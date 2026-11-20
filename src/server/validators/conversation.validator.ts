@@ -78,6 +78,11 @@ export const sendMessageBodySchema = z.discriminatedUnion('contentType', [
     templateLanguage: z.string().trim().max(20).optional(),
     /** Positional `{{1}}…{{n}}` substitutions. */
     templateParams: z.array(z.string().max(1024)).max(20).default([]),
+    /**
+     * Body with parameters substituted, as the agent saw it. Stored as the
+     * message text so the thread shows what the customer received.
+     */
+    renderedText: z.string().max(MAX_MESSAGE_LENGTH).optional(),
     replyToMessageId,
   }),
   z.object({
