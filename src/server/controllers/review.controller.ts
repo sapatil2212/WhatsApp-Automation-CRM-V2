@@ -60,12 +60,20 @@ const loose = z.any();
 const idParams = z.object({ id: z.string().uuid() });
 const rangeQuery = z.object({ days: z.coerce.number().int().min(1).max(365).default(30), businessId: z.string().uuid().optional() });
 
+/**
+ * Public origin for shareable links/QR codes. The domain the dashboard is actually opened on wins,
+ * so a deployment on a new domain needs no config. The env URL is only a fallback for when the
+ * request host is missing or internal (localhost, 0.0.0.0, a bare IP).
+ */
 function siteOrigin(request: Request): string {
   const env = (process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '');
-  if (env) return env;
   const url = new URL(request.url);
-  const proto = request.headers.get('x-forwarded-proto') ?? url.protocol.replace(':', '');
-  const host = request.headers.get('x-forwarded-host') ?? request.headers.get('host') ?? url.host;
+  const first = (v: string | null) => (v ?? '').split(',')[0].trim();
+  const host = first(request.headers.get('x-forwarded-host')) || first(request.headers.get('host')) || url.host;
+  const hostname = host.replace(/:\d+$/, '').toLowerCase();
+  const internal = !hostname || hostname === 'localhost' || hostname === '0.0.0.0' || hostname.endsWith('.local') || /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname) || hostname.startsWith('[');
+  if (internal && env) return env;
+  const proto = first(request.headers.get('x-forwarded-proto')) || url.protocol.replace(':', '');
   return `${proto}://${host}`;
 }
 
