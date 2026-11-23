@@ -3,26 +3,27 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
-import { BarChart3, Bot, Building2, ChevronDown, LayoutDashboard, Megaphone, QrCode, Settings, Star } from 'lucide-react';
+import { BarChart3, Building2, ChevronDown, LayoutDashboard, QrCode, Star } from 'lucide-react';
 
+import { isReviewTabActive, REVIEW_TABS } from '@/components/reviews/shared';
 import { cn } from '@/lib/utils';
 
-const ITEMS = [
-  { href: '/reviews', label: 'Overview', icon: LayoutDashboard },
-  { href: '/reviews/businesses', label: 'Businesses', icon: Building2 },
-  { href: '/reviews/campaigns', label: 'Review Campaigns', icon: Megaphone },
-  { href: '/reviews/qr-codes', label: 'QR Codes', icon: QrCode },
-  { href: '/reviews/jobs', label: 'Automation Jobs', icon: Bot },
-  { href: '/reviews/analytics', label: 'Analytics', icon: BarChart3 },
-  { href: '/reviews/settings', label: 'Settings', icon: Settings },
-];
+const ICONS = [LayoutDashboard, Building2, QrCode, BarChart3];
+const ITEMS = REVIEW_TABS.map((t, i) => ({ ...t, icon: ICONS[i] }));
 
 /** Sidebar group for the Google Review module. Self-contained so the sidebar only renders it. */
 export function ReviewsNavSection() {
   const pathname = usePathname();
   const inReviews = pathname === '/reviews' || pathname.startsWith('/reviews/');
   const [open, setOpen] = useState(inReviews);
-  const expanded = open || inReviews;
+  const [wasInReviews, setWasInReviews] = useState(inReviews);
+  // Opening the module from anywhere expands the group, but once there the
+  // user stays in control: the chevron must be able to collapse it again.
+  if (inReviews !== wasInReviews) {
+    setWasInReviews(inReviews);
+    if (inReviews) setOpen(true);
+  }
+  const expanded = open;
 
   return (
     <>
@@ -43,7 +44,7 @@ export function ReviewsNavSection() {
       {expanded && (
         <ul className="mt-0.5 flex flex-col gap-0.5 border-l border-sidebar-border/60 pl-2 ml-4">
           {ITEMS.map((item) => {
-            const active = item.href === '/reviews' ? pathname === '/reviews' : pathname.startsWith(item.href);
+            const active = isReviewTabActive(item, pathname);
             return (
               <li key={item.href}>
                 <Link

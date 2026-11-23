@@ -21,7 +21,7 @@ describe('template library', () => {
     expect(lib.map((t) => t.key)).toEqual([
       'appointment_confirmation',
       ...(healthcare ? ['appointment_token_confirmation'] : []),
-      'appointment_reminder', 'appointment_cancelled', 'appointment_rescheduled', 'appointment_completed',
+      'appointment_reminder', 'appointment_ready_now', 'appointment_reinstated', 'appointment_cancelled', 'appointment_rescheduled', 'appointment_missed', 'appointment_completed',
       ...(healthcare ? ['patient_prescription_delivery'] : []),
     ]);
     for (const t of lib) {
@@ -131,7 +131,9 @@ describe('token confirmation (healthcare)', () => {
   const byEvent = (rows: Record<string, unknown[]>) => async (_t: string, e: string) => (rows[e] ?? []) as never;
 
   it('is a healthcare-only template with token and booking ID', () => {
-    expect(tokenTpl.bodyText).toContain('Token number: {{3}}');
+    expect(tokenTpl.bodyText).toContain('Clinic queue no.: {{3}}');
+    // Meta treats the word "token" as an authentication signal.
+    expect(tokenTpl.bodyText.toLowerCase()).not.toContain('token');
     expect(tokenTpl.bodyText).toContain('Booking ID: {{4}}');
     expect(libraryFor('gym').some((t) => t.event === 'token_confirmation')).toBe(false);
   });

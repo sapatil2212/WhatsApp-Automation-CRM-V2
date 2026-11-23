@@ -2,9 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { BellRing, Clock, MessageCircleOff, Moon } from "lucide-react";
 
 import { Switch } from "@/components/ui/switch";
 import { api } from "@/lib/campaigns/api";
+
+const RULES = [
+  { icon: Clock, text: "A friendly nudge after 3, 10 and 21 hours of silence." },
+  { icon: Moon, text: "Only inside WhatsApp's 24-hour window, between 9 am and 9 pm." },
+  { icon: MessageCircleOff, text: 'Stops when the customer replies, books, or says "stop" / "not interested".' },
+];
 
 /** Automatic sales follow-ups for customers who stop replying. */
 export function FollowUpPanel() {
@@ -35,24 +42,25 @@ export function FollowUpPanel() {
   };
 
   return (
-    <section className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold text-foreground">Automatic follow-ups</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          When a customer stops replying, an AI sales assistant sends a friendly nudge after 3, 10 and 21 hours
-          of silence.
-        </p>
-      </div>
-      <div className="flex items-center justify-between gap-4 rounded-lg border bg-card p-4">
-        <div>
-          <div className="text-sm font-semibold text-foreground">Follow up with quiet customers</div>
-          <ul className="mt-1 list-disc pl-4 text-xs text-muted-foreground">
-            <li>Only inside WhatsApp&apos;s 24-hour window, between 9 am and 9 pm.</li>
-            <li>Stops when the customer replies, books, or says &quot;stop&quot; / &quot;not interested&quot;.</li>
-          </ul>
+    <section className="max-w-3xl rounded-xl border border-border/70 bg-card p-4">
+      <div className="flex items-start gap-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><BellRing className="size-4" /></span>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-semibold">Automatic follow-ups</h3>
+          <p className="text-xs text-muted-foreground">When a customer stops replying, the AI sales assistant follows up for you.</p>
         </div>
-        <Switch checked={enabled} disabled={loading || saving} onCheckedChange={toggle} aria-label="Automatic follow-ups" />
+        <div className="flex shrink-0 items-center gap-2">
+          <span className={`text-[12px] font-medium ${enabled ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>{loading ? "…" : enabled ? "On" : "Off"}</span>
+          <Switch checked={enabled} disabled={loading || saving} onCheckedChange={toggle} aria-label="Automatic follow-ups" />
+        </div>
       </div>
+      <ul className="mt-3 space-y-1.5 border-t border-border/70 pt-3">
+        {RULES.map((r) => (
+          <li key={r.text} className="flex items-start gap-2 text-[12px] text-muted-foreground">
+            <r.icon className="mt-0.5 size-3.5 shrink-0" /> {r.text}
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

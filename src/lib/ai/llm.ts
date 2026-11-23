@@ -42,7 +42,66 @@ export interface CallOptions {
    * Files sent to Gemini alongside the prompt (images, PDFs). Gemini-only:
    * other providers cannot read them, so attachments imply `geminiOnly`.
    */
-  attachments?: Array<{ mimeType: string; data: string /* base64 */ }>;
+  attachments?: Array<{ mimeType: string; data?: string /* base64, inline (up to ~18 MB) */; fileUri?: string /* from uploadGeminiFile, for larger files */ }>;
+}
+
+const GEMINI_API = 'https://generativelanguage.googleapis.com';
+/** Gemini rejects requests over ~20 MB, so bigger files go through the File API. */
+export const GEMINI_INLINE_MAX_BYTES = 18 * 1024 * 1024;
+
+function geminiKey(): string {
+  return clean(process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY_SECONDARY);
+}
+
+/**
+ * Upload a file (up to 2 GB) to the Gemini File API and wait until it is
+ * ready. Pass the returned `uri` as an attachment `fileUri`. Files expire on
+ * Google's side after 48 h; call `deleteGeminiFile` when done anyway.
+ */
+export async function uploadGeminiFile(bytes: Buffer, mimeType: string, displayName: string): Promise<{ uri: string; name: string }> {
+  const key = geminiKey();
+  if (!key) throw new Error('GEMINI_API_KEY is not configured.');
+  const start = await fetch(`${GEMINI_API}/upload/v1beta/files?key=${key}`, {
+    method: 'POST',
+    headers: {
+      'X-Goog-Upload-Protocol': 'resumable',
+      'X-Goog-Upload-Command': 'start',
+      'X-Goog-Upload-Header-Content-Length': String(bytes.length),
+      'X-Goog-Upload-Header-Content-Type': mimeType,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ file: { display_name: displayName.slice(0, 120) } }),
+    signal: AbortSignal.timeout(30_000),
+  });
+  const uploadUrl = start.headers.get('x-goog-upload-url');
+  if (!start.ok || !uploadUrl) throw new Error(`Gemini file upload could not start (${start.status}).`);
+
+  const done = await fetch(uploadUrl, {
+    method: 'POST',
+    headers: { 'Content-Length': String(bytes.length), 'X-Goog-Upload-Offset': '0', 'X-Goog-Upload-Command': 'upload, finalize' },
+    body: new Uint8Array(bytes),
+    signal: AbortSignal.timeout(180_000),
+  });
+  if (!done.ok) throw new Error(`Gemini file upload failed (${done.status}).`);
+  let file = ((await done.json()) as { file?: { name: string; uri: string; state?: string } }).file;
+  if (!file?.uri) throw new Error('Gemini file upload returned no file.');
+
+  // Large PDFs are processed asynchronously; wait until ACTIVE (max ~2 min).
+  for (let i = 0; file.state === 'PROCESSING' && i < 60; i++) {
+    await new Promise((r) => setTimeout(r, 2000));
+    const res = await fetch(`${GEMINI_API}/v1beta/${file.name}?key=${key}`, { signal: AbortSignal.timeout(15_000) });
+    if (res.ok) file = (await res.json()) as typeof file;
+  }
+  if (file.state === 'FAILED') throw new Error('Gemini could not process this file.');
+  if (file.state === 'PROCESSING') throw new Error('Gemini is still processing this file. Please try again in a minute.');
+  return { uri: file.uri, name: file.name };
+}
+
+/** Best-effort removal of an uploaded file (it would expire after 48 h anyway). */
+export async function deleteGeminiFile(name: string): Promise<void> {
+  const key = geminiKey();
+  if (!key || !name) return;
+  await fetch(`${GEMINI_API}/v1beta/${name}?key=${key}`, { method: 'DELETE', signal: AbortSignal.timeout(15_000) }).catch(() => undefined);
 }
 
 /**
@@ -155,7 +214,7 @@ export async function callLLM(
             body: JSON.stringify({
               contents: [{
                 parts: [
-                  ...(opts?.attachments ?? []).map((a) => ({ inlineData: { mimeType: a.mimeType, data: a.data } })),
+                  ...(opts?.attachments ?? []).map((a) => (a.fileUri ? { fileData: { mimeType: a.mimeType, fileUri: a.fileUri } } : { inlineData: { mimeType: a.mimeType, data: a.data } })),
                   { text: effectivePrompt },
                 ],
               }],

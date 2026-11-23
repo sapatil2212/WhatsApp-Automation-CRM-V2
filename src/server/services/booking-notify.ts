@@ -2,7 +2,7 @@
  * Booking side-effects shared by the public booking page, the WhatsApp AI
  * and the appointment lifecycle engine:
  *
- *  - token numbers (per doctor per day, in booking order)
+ *  - clinic queue numbers (slot position in the doctor's day)
  *  - WhatsApp messages to the customer, also logged in the inbox
  *  - Google Sheets push (Apps Script web-app URL from Integrations)
  *  - realtime notifications to the tenant's dashboard
@@ -34,27 +34,59 @@ export function doctorTitle(name?: string | null): string {
   return /^dr\.?\s/i.test(name) ? name : `Dr. ${name}`;
 }
 
-/** Sequential token for this doctor on this date (cancelled bookings excluded). */
+/**
+ * Clinic queue number: the slot's position in the doctor's schedule for that
+ * day, so the 14th of 14 slots is #14 whatever order patients booked in.
+ *
+ * Stored on `remindersSent.token` (kept as the storage key so existing rows,
+ * the dashboard and sheets keep working) together with the slot it was
+ * computed for, so a reschedule gets a new number. Falls back to booking
+ * order when the time is not on the doctor's grid (e.g. booked under an older
+ * schedule or added manually off-grid).
+ */
 export async function assignToken(appointmentId: string): Promise<number> {
   const appt = await systemDb.appointment.findUnique({
     where: { id: appointmentId },
-    select: { doctorId: true, clinicId: true, appointmentDate: true, createdAt: true, remindersSent: true },
+    select: {
+      doctorId: true,
+      clinicId: true,
+      appointmentDate: true,
+      appointmentTime: true,
+      createdAt: true,
+      remindersSent: true,
+      clinic: { select: { tenantId: true } },
+    },
   });
   if (!appt) return 0;
   const existing = (appt.remindersSent as Record<string, unknown> | null) ?? {};
-  if (typeof existing.token === 'number') return existing.token;
-  const token = await systemDb.appointment.count({
-    where: {
-      clinicId: appt.clinicId,
-      doctorId: appt.doctorId,
-      appointmentDate: appt.appointmentDate,
-      status: { not: 'cancelled' },
-      createdAt: { lte: appt.createdAt },
-    },
-  });
+  const date = appt.appointmentDate.toISOString().slice(0, 10);
+  const slotKey = `${date} ${appt.appointmentTime}`;
+  if (typeof existing.token === 'number' && existing.tokenSlot === slotKey) return existing.token;
+
+  let token: number | null = null;
+  if (appt.doctorId && appt.clinic?.tenantId) {
+    try {
+      const { AppointmentService } = await import('./appointment.service');
+      token = await AppointmentService.create(tenantDb(appt.clinic.tenantId)).slotNumber(appt.doctorId, date, appt.appointmentTime);
+    } catch (error) {
+      log.warn('queue number from schedule failed; using booking order', { appointmentId, err: error });
+    }
+  }
+  if (token === null) {
+    token = await systemDb.appointment.count({
+      where: {
+        clinicId: appt.clinicId,
+        doctorId: appt.doctorId,
+        appointmentDate: appt.appointmentDate,
+        status: { not: 'cancelled' },
+        createdAt: { lte: appt.createdAt },
+      },
+    });
+  }
+
   await systemDb.appointment.update({
     where: { id: appointmentId },
-    data: { remindersSent: { ...existing, token } },
+    data: { remindersSent: { ...existing, token, tokenSlot: slotKey } },
   });
   return token;
 }
@@ -155,7 +187,7 @@ export function appointmentConfirmationText(input: {
     `🩺 ${doctorTitle(input.doctorName)}${input.department ? ` · ${input.department}` : ''}`,
     `📅 ${pretty(input.date)}`,
     `⏰ ${prettyTime(input.time)}`,
-    `🎟️ Token No: *${input.token}*`,
+    `🎟️ Clinic Queue No: *${input.token}*`,
     input.address ? `📍 ${input.address}` : null,
     ``,
     `Ref: ${input.bookingRef}`,

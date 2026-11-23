@@ -186,14 +186,20 @@ describe('create', () => {
 });
 
 describe('update', () => {
-  it('refuses to edit a campaign that has started', async () => {
+  it('refuses to change the template of a campaign that has started', async () => {
     deps.broadcasts.findById.mockResolvedValueOnce(broadcastRow({ status: 'sending' }) as never);
-    await expect(service.update('bc-1', { name: 'x' })).rejects.toBeInstanceOf(ConflictError);
+    await expect(service.update('bc-1', { templateName: 'x' })).rejects.toBeInstanceOf(ConflictError);
   });
 
-  it('refuses to edit a sent campaign', async () => {
+  it('refuses to reschedule a sent campaign', async () => {
     deps.broadcasts.findById.mockResolvedValueOnce(broadcastRow({ status: 'sent' }) as never);
-    await expect(service.update('bc-1', { name: 'x' })).rejects.toBeInstanceOf(ConflictError);
+    await expect(service.update('bc-1', { scheduledAt: new Date() })).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it.each(['sent', 'failed', 'cancelled', 'paused', 'sending'])('still lets a %s campaign be renamed', async (status) => {
+    deps.broadcasts.findById.mockResolvedValue(broadcastRow({ status }) as never);
+    await service.update('bc-1', { name: 'Renamed' });
+    expect(deps.broadcasts.update).toHaveBeenCalledWith('bc-1', { name: 'Renamed' });
   });
 
   it('refuses an audience change, which would desync the frozen recipient set', async () => {
@@ -224,6 +230,18 @@ describe('delete', () => {
     deps.broadcasts.findById.mockResolvedValueOnce(broadcastRow({ status: 'sent' }) as never);
     await service.delete('bc-1');
     expect(deps.broadcasts.delete).toHaveBeenCalledWith('bc-1');
+  });
+});
+
+describe('deleteMany', () => {
+  it('deletes what it can and reports the one that is sending', async () => {
+    deps.broadcasts.findById
+      .mockResolvedValueOnce(broadcastRow({ id: 'a', status: 'sent' }) as never)
+      .mockResolvedValueOnce(broadcastRow({ id: 'b', status: 'sending' }) as never)
+      .mockResolvedValueOnce(broadcastRow({ id: 'c', status: 'cancelled' }) as never);
+    const res = await service.deleteMany(['a', 'b', 'c', 'a']);
+    expect(res.deleted).toEqual(['a', 'c']);
+    expect(res.blocked.map((b) => b.id)).toEqual(['b']);
   });
 });
 

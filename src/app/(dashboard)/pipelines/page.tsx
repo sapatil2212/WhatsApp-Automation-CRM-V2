@@ -54,7 +54,7 @@ export default function PipelinesPage() {
         return [];
       }
       const { pipelines } = await res.json();
-      return (pipelines ?? []).map((p: any) => ({
+      return (pipelines ?? []).map((p: Record<string, unknown>) => ({
         ...p,
         created_at: p.createdAt ?? p.created_at,
         user_id: p.userId ?? p.user_id,
@@ -71,7 +71,7 @@ export default function PipelinesPage() {
         const res = await fetch(`/api/pipelines/${pipelineId}/stages`);
         if (!res.ok) return [];
         const { stages } = await res.json();
-        return (stages ?? []).map((s: any) => ({
+        return (stages ?? []).map((s: Record<string, unknown>) => ({
           ...s,
           pipeline_id: s.pipelineId ?? s.pipeline_id,
           created_at: s.createdAt ?? s.created_at,
@@ -140,6 +140,8 @@ export default function PipelinesPage() {
         );
       } else {
         setSelectedPipelineId("");
+        setStages([]);
+        setDeals([]);
       }
       setLoading(false);
     })();
@@ -151,11 +153,7 @@ export default function PipelinesPage() {
   // ── Load stages + deals whenever selected pipeline changes ───────────────
 
   useEffect(() => {
-    if (!selectedPipelineId) {
-      setStages([]);
-      setDeals([]);
-      return;
-    }
+    if (!selectedPipelineId) return;
     let cancelled = false;
     (async () => {
       const [s, d] = await Promise.all([
@@ -176,8 +174,11 @@ export default function PipelinesPage() {
   const refreshPipelines = useCallback(async () => {
     const list = await loadPipelines();
     setPipelines(list);
-    if (list.length === 0) setSelectedPipelineId("");
-    else if (!list.some((p) => p.id === selectedPipelineId))
+    if (list.length === 0) {
+      setSelectedPipelineId("");
+      setStages([]);
+      setDeals([]);
+    } else if (!list.some((p) => p.id === selectedPipelineId))
       setSelectedPipelineId(list[0].id);
   }, [loadPipelines, selectedPipelineId]);
 
@@ -253,8 +254,8 @@ export default function PipelinesPage() {
           <div className="h-9 w-56 animate-pulse rounded-lg bg-muted" />
           <div className="h-9 w-40 animate-pulse rounded-lg bg-muted" />
         </div>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => <div key={i} className="h-20 animate-pulse rounded-2xl bg-muted/60" />)}
+        <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-6">
+          {[1, 2, 3, 4, 5, 6].map((i) => <div key={i} className="h-[72px] animate-pulse rounded-xl bg-muted/60" />)}
         </div>
         <div className="flex gap-3 overflow-hidden">
           {[1, 2, 3, 4, 5].map((i) => <div key={i} className="h-96 w-72 shrink-0 animate-pulse rounded-2xl bg-muted/50" />)}
@@ -268,10 +269,8 @@ export default function PipelinesPage() {
       {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Pipelines</p>
           <DropdownMenu>
-            <DropdownMenuTrigger className="mt-0.5 inline-flex items-center gap-2 rounded-lg px-1 text-2xl font-bold tracking-tight transition-colors hover:text-primary data-[popup-open]:text-primary">
-              <GitBranch className="size-5 text-primary" />
+            <DropdownMenuTrigger className="inline-flex items-center gap-2 rounded-lg text-2xl font-bold tracking-tight transition-colors hover:text-primary data-[popup-open]:text-primary">
               {selectedPipeline?.name ?? "Select pipeline"}
               <ChevronDown className="size-4 text-muted-foreground" />
             </DropdownMenuTrigger>
@@ -290,23 +289,24 @@ export default function PipelinesPage() {
               )}
             </DropdownMenuContent>
           </DropdownMenu>
+          <p className="mt-0.5 text-sm text-muted-foreground">Track every deal from first message to won.</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           {selectedPipeline && (
-            <Button variant="outline" onClick={() => setSettingsOpen(true)} className="gap-1.5"><Settings className="size-4" /> Stages</Button>
+            <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)} className="gap-1.5"><Settings className="size-3.5" /> Stages</Button>
           )}
-          <Button variant="outline" onClick={() => setNewPipelineOpen(true)} className="gap-1.5"><Sparkles className="size-4 text-primary" /> New pipeline</Button>
-          <Button onClick={() => handleAddDeal()} disabled={!selectedPipelineId || stages.length === 0} className="gap-1.5"><Plus className="size-4" /> Add deal</Button>
+          <Button variant="outline" size="sm" onClick={() => setNewPipelineOpen(true)} className="gap-1.5"><Sparkles className="size-3.5 text-primary" /> New pipeline</Button>
+          <Button size="sm" onClick={() => handleAddDeal()} disabled={!selectedPipelineId || stages.length === 0} className="gap-1.5"><Plus className="size-3.5" /> Add deal</Button>
         </div>
       </div>
 
       {pipelines.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card px-6 py-20 text-center">
-          <span className="flex size-12 items-center justify-center rounded-2xl bg-primary/10"><GitBranch className="size-6 text-primary" /></span>
-          <h3 className="mt-4 text-lg font-semibold">Track every deal from first message to won</h3>
-          <p className="mt-1 max-w-md text-sm text-muted-foreground">Pick a professional template or describe your process and AI designs the stages for you.</p>
-          <Button onClick={() => setNewPipelineOpen(true)} className="mt-5 gap-1.5"><Sparkles className="size-4" /> Create your first pipeline</Button>
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card px-6 py-14 text-center">
+          <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10"><GitBranch className="size-5 text-primary" /></span>
+          <h3 className="mt-3 text-sm font-semibold">Track every deal from first message to won</h3>
+          <p className="mt-1 max-w-md text-xs text-muted-foreground">Pick a professional template or describe your process and AI designs the stages for you.</p>
+          <Button size="sm" onClick={() => setNewPipelineOpen(true)} className="mt-4 gap-1.5"><Sparkles className="size-3.5" /> Create your first pipeline</Button>
         </div>
       ) : (
         <>
@@ -315,21 +315,21 @@ export default function PipelinesPage() {
           {/* Toolbar */}
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative min-w-[220px] flex-1 sm:max-w-xs">
-              <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search deals or contacts…" className="h-9 pl-8 pr-8" aria-label="Search deals" />
+              <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search deals or contacts…" className="h-8 pl-8 pr-8 text-[13px]" aria-label="Search deals" />
               {query && <button onClick={() => setQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label="Clear search"><X className="size-4" /></button>}
             </div>
-            <div className="flex rounded-lg border border-border bg-card p-0.5">
+            <div className="flex rounded-xl border border-border/70 bg-card p-1">
               {(["open", "won", "lost", "all"] as const).map((f) => (
-                <button key={f} onClick={() => setStatusFilter(f)} aria-pressed={statusFilter === f} className={`rounded-md px-3 py-1 text-xs font-medium capitalize transition-colors ${statusFilter === f ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"}`}>
+                <button key={f} onClick={() => setStatusFilter(f)} aria-pressed={statusFilter === f} className={`rounded-md px-2.5 py-1 text-[11px] font-medium capitalize transition-colors ${statusFilter === f ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"}`}>
                   {f}
                 </button>
               ))}
             </div>
-            <p className="text-xs text-muted-foreground">{visibleDeals.length} deal{visibleDeals.length === 1 ? "" : "s"}</p>
-            <div className="ml-auto flex rounded-lg border border-border bg-card p-0.5">
-              <button onClick={() => setView("board")} aria-pressed={view === "board"} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium ${view === "board" ? "bg-accent text-foreground" : "text-muted-foreground"}`}><Columns3 className="size-3.5" /> Board</button>
-              <button onClick={() => setView("list")} aria-pressed={view === "list"} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium ${view === "list" ? "bg-accent text-foreground" : "text-muted-foreground"}`}><List className="size-3.5" /> List</button>
+            <p className="text-[11px] text-muted-foreground">{visibleDeals.length} deal{visibleDeals.length === 1 ? "" : "s"}</p>
+            <div className="ml-auto flex rounded-xl border border-border/70 bg-card p-1">
+              <button onClick={() => setView("board")} aria-pressed={view === "board"} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium ${view === "board" ? "bg-accent text-foreground" : "text-muted-foreground"}`}><Columns3 className="size-3.5" /> Board</button>
+              <button onClick={() => setView("list")} aria-pressed={view === "list"} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium ${view === "list" ? "bg-accent text-foreground" : "text-muted-foreground"}`}><List className="size-3.5" /> List</button>
             </div>
           </div>
 
@@ -344,15 +344,15 @@ export default function PipelinesPage() {
           ) : (
             <div className="overflow-hidden rounded-2xl border border-border/70 bg-card">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px] text-sm">
-                  <thead className="border-b border-border bg-muted/50 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <table className="w-full min-w-[760px] text-[13px]">
+                  <thead className="border-b border-border bg-muted/50 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                     <tr>
-                      <th className="px-4 py-3">Deal</th>
-                      <th className="px-3 py-3">Contact</th>
-                      <th className="px-3 py-3">Stage</th>
-                      <th className="px-3 py-3 text-right">Value</th>
-                      <th className="px-3 py-3">Expected close</th>
-                      <th className="px-3 py-3">Status</th>
+                      <th className="px-4 py-2">Deal</th>
+                      <th className="px-3 py-2">Contact</th>
+                      <th className="px-3 py-2">Stage</th>
+                      <th className="px-3 py-2 text-right">Value</th>
+                      <th className="px-3 py-2">Expected close</th>
+                      <th className="px-3 py-2">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/70">
@@ -365,14 +365,14 @@ export default function PipelinesPage() {
                       const overdue = Boolean(d.expected_close_date && isOpen && new Date(d.expected_close_date).getTime() < now - 86_400_000);
                       return (
                         <tr key={d.id} onClick={() => handleEditDeal(d)} className="cursor-pointer transition-colors hover:bg-muted/50">
-                          <td className="px-4 py-3 font-medium">{d.title}</td>
-                          <td className="px-3 py-3 text-muted-foreground">{d.contact?.name || (d.contact?.phone ? `+${d.contact.phone}` : "—")}</td>
-                          <td className="px-3 py-3">
-                            <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-0.5 text-xs"><span className="size-2 rounded-full" style={{ backgroundColor: st?.color }} />{st?.name ?? "—"}</span>
+                          <td className="px-4 py-2 font-medium">{d.title}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{d.contact?.name || (d.contact?.phone ? `+${d.contact.phone}` : "—")}</td>
+                          <td className="px-3 py-2">
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-px text-[11px]"><span className="size-1.5 rounded-full" style={{ backgroundColor: st?.color }} />{st?.name ?? "—"}</span>
                           </td>
-                          <td className="px-3 py-3 text-right font-semibold tabular-nums">{formatMoney(d.value, d.currency)}</td>
+                          <td className="px-3 py-2 text-right font-semibold tabular-nums">{formatMoney(d.value, d.currency)}</td>
                           <td className={`px-3 py-3 text-xs ${overdue ? "font-medium text-red-600 dark:text-red-400" : "text-muted-foreground"}`}>{d.expected_close_date ? new Date(d.expected_close_date).toLocaleDateString() : "—"}{overdue ? " · overdue" : ""}</td>
-                          <td className="px-3 py-3 text-xs capitalize">{isOpen ? "open" : d.status}</td>
+                          <td className="px-3 py-2 text-[11px] capitalize">{isOpen ? "open" : d.status}</td>
                         </tr>
                       );
                     })}

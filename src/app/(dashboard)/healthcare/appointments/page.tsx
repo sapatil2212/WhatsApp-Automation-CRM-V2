@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
   Ban, Bell, CalendarCheck, CalendarClock, CalendarDays, CalendarX, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock, Eye, Globe,
-  LayoutDashboard, Link2, Loader2, Mail, MessageCircle, MoreHorizontal, Phone, Plus, RefreshCw, Search, Stethoscope, UserRound, UserX, X,
+  LayoutDashboard, Link2, Loader2, Mail, MessageCircle, Pencil, Phone, Plus, RefreshCw, Search, Stethoscope, Trash2, UserRound, UserX, X,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -142,7 +142,7 @@ function Modal({ open, title, onClose, children, footer, wide }: { open: boolean
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={title} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className={`flex max-h-[92dvh] w-full ${wide ? 'max-w-2xl' : 'max-w-lg'} flex-col overflow-hidden rounded-t-2xl bg-popover text-popover-foreground shadow-2xl ring-1 ring-foreground/10 sm:rounded-2xl`}>
         <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
-          <h2 className="text-base font-semibold">{title}</h2>
+          <h2 className="text-[15px] font-semibold">{title}</h2>
           <Button size="icon-sm" variant="ghost" aria-label="Close" onClick={onClose}><X className="size-4" /></Button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
@@ -152,7 +152,7 @@ function Modal({ open, title, onClose, children, footer, wide }: { open: boolean
   );
 }
 
-const selectCls = 'h-9 rounded-lg border border-input bg-background px-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring/40';
+const selectCls = 'h-8 rounded-lg border border-input bg-background px-2.5 text-[13px] text-foreground outline-none focus:ring-2 focus:ring-ring/40';
 
 /** Doctor + date + free slots, shared by "New appointment" and "Reschedule". */
 function SlotPicker({ doctors, doctorId, setDoctorId, date, setDate, time, setTime, today }: {
@@ -201,7 +201,7 @@ function SlotPicker({ doctors, doctorId, setDoctorId, date, setDate, time, setTi
           ) : (
             <div className="grid max-h-48 grid-cols-3 gap-2 overflow-y-auto sm:grid-cols-4">
               {slots.map((t) => (
-                <button key={t} type="button" onClick={() => setTime(t)} className={`rounded-lg border px-2 py-1.5 text-sm transition-colors ${time === t ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:border-primary/60'}`}>{fmtTime(t)}</button>
+                <button key={t} type="button" onClick={() => setTime(t)} className={`rounded-lg border px-2 py-1 text-[13px] transition-colors ${time === t ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:border-primary/60'}`}>{fmtTime(t)}</button>
               ))}
             </div>
           )}
@@ -234,12 +234,17 @@ export default function AppointmentsPage() {
   const [confirm, setConfirm] = useState<{ row: Row; status: Status } | null>(null);
   const [resched, setResched] = useState<Row | null>(null);
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<Row | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState<Row[] | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search.trim()), 300);
     return () => clearTimeout(t);
   }, [search]);
   useEffect(() => setPage(1), [tab, debounced, doctorId, onDate, pageSize]);
+  // A selection only makes sense for the rows currently on screen.
+  useEffect(() => setSelected(new Set()), [tab, debounced, doctorId, onDate, pageSize, page]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -317,6 +322,25 @@ export default function AppointmentsPage() {
   };
 
   const rows = board?.items ?? [];
+  const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.id));
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.id)));
+  const toggleOne = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const deleteRows = async (list: Row[]) => {
+    const res = await api<{ deleted: string[]; blocked: Array<{ id: string; reason: string }> }>('/api/healthcare/appointments/board/bulk-delete', { method: 'POST', json: { ids: list.map((r) => r.id) } });
+    const { deleted, blocked } = res.data;
+    if (deleted.length) toast.success(`${deleted.length} appointment${deleted.length === 1 ? '' : 's'} deleted.`);
+    if (blocked.length) toast.error(`${blocked.length} could not be deleted: ${blocked[0].reason}`);
+    if (detailId && deleted.includes(detailId)) setDetailId(null);
+    setSelected(new Set());
+    await load();
+  };
   const today = board?.today ?? new Date().toISOString().slice(0, 10);
   const total = board?.pagination.total ?? 0;
   const totalPages = board?.pagination.totalPages ?? 1;
@@ -334,84 +358,98 @@ export default function AppointmentsPage() {
   );
 
   const actionsFor = (r: Row) => (
-    <DropdownMenu>
-      <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" className="text-muted-foreground" aria-label="Appointment actions" disabled={busy === r.id} />}>
-        {busy === r.id ? <Loader2 className="size-4 animate-spin" /> : <MoreHorizontal className="size-4" />}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuItem onClick={() => setDetailId(r.id)}><Eye className="size-4" /> View details</DropdownMenuItem>
-        {r.status === 'scheduled' && (
-          <>
+    <div className="inline-flex items-center gap-0.5">
+      <Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-primary" title="View details" aria-label={`View ${r.patient.name || 'appointment'}`} onClick={() => setDetailId(r.id)}><Eye className="size-3.5" /></Button>
+      <Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-primary" title="Edit details" aria-label={`Edit ${r.patient.name || 'appointment'}`} onClick={() => setEditing(r)}><Pencil className="size-3.5" /></Button>
+      {r.status === 'scheduled' ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-primary" title="Status & reschedule" aria-label="Status and reschedule" disabled={busy === r.id} />}>
+            {busy === r.id ? <Loader2 className="size-3.5 animate-spin" /> : <CalendarClock className="size-3.5" />}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuItem onClick={() => setResched(r)}><CalendarClock className="size-4" /> Reschedule</DropdownMenuItem>
             {r.canMessage && <DropdownMenuItem onClick={() => act(r, { action: 'remind' }, 'Reminder sent.').catch(() => {})}><Bell className="size-4" /> Send reminder</DropdownMenuItem>}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => act(r, { action: 'status', status: 'completed' }, 'Marked as completed.').catch(() => {})}><CheckCircle2 className="size-4" /> Mark completed</DropdownMenuItem>
             <DropdownMenuItem onClick={() => setConfirm({ row: r, status: 'no_show' })}><UserX className="size-4" /> Mark no-show</DropdownMenuItem>
             <DropdownMenuItem variant="destructive" onClick={() => setConfirm({ row: r, status: 'cancelled' })}><Ban className="size-4" /> Cancel appointment</DropdownMenuItem>
-          </>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-
-  return (
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : (
+        <span className="size-7" aria-hidden />
+      )}
+      <Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive" title="Delete" aria-label={`Delete ${r.patient.name || 'appointment'}`} onClick={() => setDeleting([r])}><Trash2 className="size-3.5" /></Button>
+    </div>
+  );  return (
     <div className="space-y-5">
       {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><CalendarDays className="size-6 text-primary" /> Appointments</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Appointments</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">Bookings from WhatsApp, your booking link and the front desk — updated live.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => setShowLink((v) => !v)} className="gap-1.5"><Link2 className="size-4" /> Booking link</Button>
-          <Button variant="outline" size="icon" onClick={() => void load()} aria-label="Refresh"><RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} /></Button>
-          <Button onClick={() => setCreating(true)} className="gap-1.5"><Plus className="size-4" /> New appointment</Button>
+          <Button variant="outline" size="sm" onClick={() => setShowLink((v) => !v)} className="gap-1.5"><Link2 className="size-3.5" /> Booking link</Button>
+          <Button variant="outline" size="icon-sm" onClick={() => void load()} aria-label="Refresh" title="Refresh"><RefreshCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} /></Button>
+          <Button size="sm" onClick={() => setCreating(true)} className="gap-1.5"><Plus className="size-3.5" /> New appointment</Button>
         </div>
       </div>
 
       {showLink && <BookingLinkCard />}
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
         {stats.map((s) => (
-          <button key={s.label} type="button" onClick={s.onClick} className="rounded-2xl border border-border/70 bg-card p-4 text-left transition-colors hover:border-primary/40">
+          <button key={s.label} type="button" onClick={s.onClick} className="rounded-xl border border-border/70 bg-card px-3 py-2.5 text-left transition-colors hover:border-primary/40">
             <div className="flex items-center justify-between">
-              <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{s.label}</p>
-              <s.icon className="size-4 text-primary" />
+              <p className="truncate text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{s.label}</p>
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary"><s.icon className="size-3.5" /></span>
             </div>
-            <p className="mt-2 text-2xl font-bold tabular-nums">{s.value === undefined ? '—' : s.value.toLocaleString()}</p>
+            <p className="mt-1 text-xl font-bold leading-tight tabular-nums">{s.value === undefined ? '—' : s.value.toLocaleString()}</p>
           </button>
         ))}
       </div>
 
       {/* Tabs + toolbar */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex rounded-lg border border-border bg-muted/40 p-0.5" role="tablist">
+        <div className="flex rounded-xl border border-border/70 bg-card p-1" role="tablist">
           {TABS.map((t) => (
-            <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)} className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${tab === t.id ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
+            <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)} className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${tab === t.id ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent'}`}>
               {t.label}
             </button>
           ))}
         </div>
         <div className="relative min-w-[200px] flex-1 sm:max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search patient, phone, ID…" className="h-9 pl-8 pr-8" aria-label="Search appointments" />
+          <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search patient, phone, ID…" className="h-8 pl-8 pr-8 text-[13px]" aria-label="Search appointments" />
           {search && <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label="Clear search"><X className="size-4" /></button>}
         </div>
         <select aria-label="Filter by doctor" className={selectCls} value={doctorId} onChange={(e) => setDoctorId(e.target.value)}>
           <option value="">All doctors</option>
           {board?.doctors.map((d) => <option key={d.id} value={d.id}>{drName(d.name)}</option>)}
         </select>
-        <Input type="date" aria-label="Filter by date" value={onDate} onChange={(e) => setOnDate(e.target.value)} className="h-9 w-[150px]" />
-        {filtersActive && <Button variant="ghost" size="sm" onClick={() => { setSearch(''); setDoctorId(''); setOnDate(''); }} className="h-9 text-muted-foreground">Clear filters</Button>}
-        <p className="ml-auto text-xs text-muted-foreground">{total.toLocaleString()} {filtersActive ? 'matching' : 'appointments'}</p>
+        <Input type="date" aria-label="Filter by date" value={onDate} onChange={(e) => setOnDate(e.target.value)} className="h-8 w-[150px] text-[13px]" />
+        {filtersActive && <Button variant="ghost" size="sm" onClick={() => { setSearch(''); setDoctorId(''); setOnDate(''); }} className="text-muted-foreground">Clear filters</Button>}
+        <p className="ml-auto text-[11px] text-muted-foreground">{total.toLocaleString()} {filtersActive ? 'matching' : 'appointments'}</p>
       </div>
+
+      {/* Bulk actions */}
+      {selected.size > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-[13px]" role="status">
+          <span className="font-medium">{selected.size} selected</span>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setSelected(new Set())}>Clear</Button>
+            <Button variant="destructive" size="sm" className="gap-1.5" onClick={() => setDeleting(rows.filter((r) => selected.has(r.id)))}><Trash2 className="size-3.5" /> Delete selected</Button>
+          </div>
+        </div>
+      )}
 
       {/* Table */}
       <div className="overflow-hidden rounded-2xl border border-border/70 bg-card">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1020px] table-fixed text-sm">
+          <table className="w-full min-w-[1060px] table-fixed text-[13px]">
             <colgroup>
+              <col className="w-10" />
               <col className="w-[22%]" />
               <col className="w-[13%]" />
               <col className="w-[16%]" />
@@ -419,28 +457,29 @@ export default function AppointmentsPage() {
               <col className="w-[15%]" />
               <col className="w-[10%]" />
               <col className="w-[9%]" />
-              <col className="w-14" />
+              <col className="w-[132px]" />
             </colgroup>
-            <thead className="border-b border-border bg-muted/50 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <thead className="border-b border-border bg-muted/50 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
               <tr>
-                <th className="px-4 py-3">Patient</th>
-                <th className="px-3 py-3">Appointment</th>
-                <th className="px-3 py-3">Doctor</th>
-                <th className="px-3 py-3">Date &amp; time</th>
-                <th className="px-3 py-3">Complaint</th>
-                <th className="px-3 py-3">Source</th>
-                <th className="px-3 py-3">Status</th>
-                <th className="px-3 py-3"><span className="sr-only">Actions</span></th>
+                <th className="py-2 pl-4"><input type="checkbox" className="size-4 rx-check" aria-label="Select all appointments on this page" checked={allSelected} onChange={toggleAll} disabled={rows.length === 0} /></th>
+                <th className="px-4 py-2">Patient</th>
+                <th className="px-3 py-2">Appointment</th>
+                <th className="px-3 py-2">Doctor</th>
+                <th className="px-3 py-2">Date &amp; time</th>
+                <th className="px-3 py-2">Complaint</th>
+                <th className="px-3 py-2">Source</th>
+                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/70">
               {loading && rows.length === 0 ? (
                 Array.from({ length: 6 }).map((_, i) => (
-                  <tr key={i}><td colSpan={8} className="px-4 py-3"><div className="h-9 animate-pulse rounded-lg bg-muted/70" /></td></tr>
+                  <tr key={i}><td colSpan={9} className="px-4 py-3"><div className="h-9 animate-pulse rounded-lg bg-muted/70" /></td></tr>
                 ))
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-16 text-center">
+                  <td colSpan={9} className="px-4 py-16 text-center">
                     <CalendarDays className="mx-auto size-9 text-muted-foreground/60" />
                     <p className="mt-3 text-sm font-medium">{filtersActive ? 'No appointments match these filters' : tab === 'upcoming' ? 'No upcoming appointments' : 'Nothing here yet'}</p>
                     <p className="mt-1 text-xs text-muted-foreground">{filtersActive ? 'Try a different search, doctor or date.' : 'Share your booking link, or add an appointment for a walk-in patient.'}</p>
@@ -451,13 +490,16 @@ export default function AppointmentsPage() {
                 rows.map((r) => {
                   const rel = relDay(r.date, today);
                   return (
-                    <tr key={r.id} onClick={() => setDetailId(r.id)} className={`group cursor-pointer transition-colors hover:bg-muted/50 ${loading ? 'opacity-60' : ''}`}>
-                      <td className="px-4 py-3">
+                    <tr key={r.id} onClick={() => setDetailId(r.id)} className={`group cursor-pointer transition-colors hover:bg-muted/50 ${selected.has(r.id) ? 'bg-primary/5' : ''} ${loading ? 'opacity-60' : ''}`}>
+                      <td className="py-2 pl-4" onClick={(e) => e.stopPropagation()}>
+                        <input type="checkbox" className="size-4 rx-check" aria-label={`Select ${r.patient.name || 'appointment'}`} checked={selected.has(r.id)} onChange={() => toggleOne(r.id)} />
+                      </td>
+                      <td className="px-4 py-2">
                         <div className="flex min-w-0 items-center gap-3">
-                          <span className={`flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-foreground ${avatarColor(r.patient.contactId)}`}>{initials(r.patient.name)}</span>
+                          <span className={`flex size-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-foreground ${avatarColor(r.patient.contactId)}`}>{initials(r.patient.name)}</span>
                           <div className="min-w-0">
                             <p className="truncate font-medium">{r.patient.name || 'Unnamed patient'}</p>
-                            <p className="truncate text-xs text-muted-foreground">
+                            <p className="truncate text-[11px] text-muted-foreground">
                               {[r.patient.age && `${r.patient.age} yrs`, r.patient.gender && GENDER[r.patient.gender]].filter(Boolean).join(' · ') || ''}
                               {(r.patient.age || r.patient.gender) && r.patient.phone ? ' · ' : ''}
                               <span className="font-mono tabular-nums">{r.patient.phone ? fmtPhone(r.patient.phone) : ''}</span>
@@ -465,22 +507,22 @@ export default function AppointmentsPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-3">
-                        <p className="truncate font-mono text-xs">{r.ref}</p>
-                        {r.token !== null && <p className="text-xs text-muted-foreground">Token #{r.token}</p>}
+                      <td className="px-3 py-2">
+                        <p className="truncate font-mono text-[11px]">{r.ref}</p>
+                        {r.token !== null && <p className="text-[11px] text-muted-foreground">Queue #{r.token}</p>}
                       </td>
-                      <td className="px-3 py-3">
+                      <td className="px-3 py-2">
                         <p className="truncate">{drName(r.doctor?.name)}</p>
-                        <p className="truncate text-xs text-muted-foreground">{r.department || '—'}</p>
+                        <p className="truncate text-[11px] text-muted-foreground">{r.department || '—'}</p>
                       </td>
-                      <td className="px-3 py-3">
+                      <td className="px-3 py-2">
                         <p className="truncate">{rel ? <span className="font-medium text-primary">{rel}</span> : fmtDate(r.date, { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                        <p className="text-xs text-muted-foreground">{fmtTime(r.time)}{r.rescheduledFrom ? ' · moved' : ''}</p>
+                        <p className="text-[11px] text-muted-foreground">{fmtTime(r.time)}{r.rescheduledFrom ? ' · moved' : ''}</p>
                       </td>
-                      <td className="px-3 py-3"><p className="line-clamp-2 text-xs text-foreground/80">{r.complaint || <span className="text-muted-foreground">—</span>}</p></td>
-                      <td className="px-3 py-3"><SourceBadge source={r.source} consent={r.whatsappConsent} /></td>
-                      <td className="px-3 py-3"><StatusBadge status={r.status} /></td>
-                      <td className="px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>{actionsFor(r)}</td>
+                      <td className="px-3 py-2"><p className="line-clamp-2 text-[11px] text-foreground/80">{r.complaint || <span className="text-muted-foreground">—</span>}</p></td>
+                      <td className="px-3 py-2"><SourceBadge source={r.source} consent={r.whatsappConsent} /></td>
+                      <td className="px-3 py-2"><StatusBadge status={r.status} /></td>
+                      <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>{actionsFor(r)}</td>
                     </tr>
                   );
                 })
@@ -490,7 +532,7 @@ export default function AppointmentsPage() {
         </div>
 
         {/* Pagination */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/70 px-4 py-3 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/70 px-4 py-2 text-[11px] text-muted-foreground">
           <div className="flex items-center gap-2">
             <span>Rows per page</span>
             <select aria-label="Rows per page" className={`${selectCls} h-8`} value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
@@ -512,7 +554,7 @@ export default function AppointmentsPage() {
           <aside className="flex h-full w-full max-w-md flex-col bg-background shadow-2xl ring-1 ring-foreground/10" aria-label="Appointment details">
             <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
               <div className="min-w-0">
-                <p className="truncate text-base font-semibold">{detail?.patient.name || 'Appointment'}</p>
+                <p className="truncate text-[15px] font-semibold">{detail?.patient.name || 'Appointment'}</p>
                 <p className="font-mono text-xs text-muted-foreground">{detail?.ref}</p>
               </div>
               <Button size="icon-sm" variant="ghost" aria-label="Close" onClick={() => setDetailId(null)}><X className="size-4" /></Button>
@@ -520,16 +562,16 @@ export default function AppointmentsPage() {
             {!detail ? (
               <div className="space-y-3 p-5">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-16 animate-pulse rounded-xl bg-muted/60" />)}</div>
             ) : (
-              <div className="flex-1 space-y-5 overflow-y-auto p-5">
+              <div className="flex-1 space-y-3 overflow-y-auto p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge status={detail.status} />
                   <SourceBadge source={detail.source} consent={detail.whatsappConsent} />
-                  {detail.token !== null && <span className="rounded-full bg-muted px-2 py-0.5 text-[11px]">Token #{detail.token}</span>}
+                  {detail.token !== null && <span className="rounded-full bg-muted px-2 py-0.5 text-[11px]">Queue #{detail.token}</span>}
                 </div>
 
-                <section className="rounded-xl border border-border p-4">
+                <section className="rounded-xl border border-border/70 p-3.5">
                   <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Patient</h3>
-                  <dl className="grid grid-cols-[96px_1fr] gap-y-2 text-sm">
+                  <dl className="grid grid-cols-[96px_1fr] gap-y-1.5 text-[13px]">
                     <dt className="text-muted-foreground">Name</dt><dd className="font-medium">{detail.patient.name || '—'}</dd>
                     <dt className="text-muted-foreground">Age</dt><dd>{detail.patient.age ? `${detail.patient.age} yrs` : '—'}</dd>
                     <dt className="text-muted-foreground">Gender</dt><dd>{detail.patient.gender ? GENDER[detail.patient.gender] : '—'}</dd>
@@ -549,9 +591,9 @@ export default function AppointmentsPage() {
                   </dl>
                 </section>
 
-                <section className="rounded-xl border border-border p-4">
+                <section className="rounded-xl border border-border/70 p-3.5">
                   <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Appointment</h3>
-                  <dl className="grid grid-cols-[96px_1fr] gap-y-2 text-sm">
+                  <dl className="grid grid-cols-[96px_1fr] gap-y-1.5 text-[13px]">
                     <dt className="text-muted-foreground">Doctor</dt><dd className="font-medium">{drName(detail.doctor?.name)}</dd>
                     <dt className="text-muted-foreground">Department</dt><dd>{detail.department || '—'}</dd>
                     <dt className="text-muted-foreground">When</dt><dd>{fmtDate(detail.date)} · {fmtTime(detail.time)}</dd>
@@ -561,7 +603,7 @@ export default function AppointmentsPage() {
                   </dl>
                 </section>
 
-                <section className="rounded-xl border border-border p-4">
+                <section className="rounded-xl border border-border/70 p-3.5">
                   <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">WhatsApp messages</h3>
                   {detail.messages.length === 0 ? (
                     <p className="text-sm text-muted-foreground">{detail.canMessage ? 'None sent yet.' : 'The patient did not agree to WhatsApp updates.'}</p>
@@ -578,7 +620,7 @@ export default function AppointmentsPage() {
                 </section>
 
                 {(detail.intakes.length > 0 || detail.feedback.length > 0) && (
-                  <section className="rounded-xl border border-border p-4">
+                  <section className="rounded-xl border border-border/70 p-3.5">
                     <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Intake &amp; feedback</h3>
                     {detail.intakes.map((i) => (
                       <div key={i.id} className="mb-3 space-y-1 text-sm">
@@ -595,7 +637,7 @@ export default function AppointmentsPage() {
                   </section>
                 )}
 
-                <section className="rounded-xl border border-border p-4">
+                <section className="rounded-xl border border-border/70 p-3.5">
                   <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Other visits</h3>
                   {detail.history.length === 0 ? (
                     <p className="text-sm text-muted-foreground">First visit.</p>
@@ -612,6 +654,12 @@ export default function AppointmentsPage() {
                     </ul>
                   )}
                 </section>
+              </div>
+            )}
+            {detail && (
+              <div className="flex gap-2 border-t border-border bg-muted/40 px-4 pt-4">
+                <Button variant="outline" className="flex-1 gap-1.5" onClick={() => setEditing(detail)}><Pencil className="size-4" /> Edit</Button>
+                <Button variant="outline" className="flex-1 gap-1.5 text-destructive hover:text-destructive" onClick={() => setDeleting([detail])}><Trash2 className="size-4" /> Delete</Button>
               </div>
             )}
             {detail?.status === 'scheduled' && (
@@ -631,13 +679,13 @@ export default function AppointmentsPage() {
         isOpen={Boolean(confirm)}
         onOpenChange={(o) => !o && setConfirm(null)}
         title={confirm?.status === 'cancelled' ? 'Cancel this appointment?' : 'Mark as no-show?'}
-        description={
-          confirm
-            ? `${confirm.row.patient.name || 'Patient'} · ${drName(confirm.row.doctor?.name)} · ${fmtDate(confirm.row.date)} ${fmtTime(confirm.row.time)}. ${confirm.row.canMessage ? 'The patient will be told on WhatsApp.' : 'The patient has not agreed to WhatsApp messages, so they will not be notified.'}`
-            : ''
-        }
+        description={confirm?.status === 'cancelled' ? 'The slot is released so someone else can book it.' : 'The appointment is closed as missed.'}
+        details={confirm ? <ApptSummary row={confirm.row} /> : null}
+        notes={confirm ? [confirm.row.canMessage ? 'The patient will be told on WhatsApp.' : 'The patient has not agreed to WhatsApp messages, so they will not be notified.'] : []}
         confirmText={confirm?.status === 'cancelled' ? 'Cancel appointment' : 'Mark no-show'}
+        cancelText="Keep it"
         variant="destructive"
+        icon="warning"
         onConfirm={async () => {
           if (!confirm) return;
           await act(confirm.row, { action: 'status', status: confirm.status }, confirm.status === 'cancelled' ? 'Appointment cancelled.' : 'Marked as no-show.');
@@ -645,12 +693,65 @@ export default function AppointmentsPage() {
         }}
       />
 
+      <ConfirmationDialog
+        isOpen={Boolean(deleting)}
+        onOpenChange={(o) => !o && setDeleting(null)}
+        title={deleting && deleting.length > 1 ? `Delete ${deleting.length} appointments?` : 'Delete this appointment?'}
+        description={deleting && deleting.length > 1 ? 'They will be permanently removed.' : 'It will be permanently removed.'}
+        details={
+          deleting && deleting.length === 1 ? (
+            <ApptSummary row={deleting[0]} />
+          ) : deleting ? (
+            <ul className="max-h-32 space-y-1 overflow-y-auto">
+              {deleting.slice(0, 5).map((r) => (
+                <li key={r.id} className="flex items-center justify-between gap-3">
+                  <span className="truncate font-medium">{r.patient.name || 'Patient'}</span>
+                  <span className="shrink-0 text-[11px] text-muted-foreground">{fmtDate(r.date)} · {fmtTime(r.time)}</span>
+                </li>
+              ))}
+              {deleting.length > 5 && <li className="text-[11px] text-muted-foreground">and {deleting.length - 5} more</li>}
+            </ul>
+          ) : null
+        }
+        notes={[
+          'This cannot be undone.',
+          deleting && deleting.length > 1 ? 'Patients are not notified. To tell them, cancel instead.' : 'The patient is not notified. To tell them, cancel instead.',
+          deleting && deleting.length > 1 ? 'Appointments with a consultation record are skipped.' : 'Appointments with a consultation record cannot be deleted.',
+        ]}
+        confirmText={deleting && deleting.length > 1 ? `Delete ${deleting.length}` : 'Delete'}
+        variant="destructive"
+        onConfirm={async () => {
+          if (!deleting) return;
+          try {
+            await deleteRows(deleting);
+          } catch (e) {
+            toast.error((e as Error).message);
+            throw e;
+          }
+          setDeleting(null);
+        }}
+      />
+      {editing && <EditAppointmentModal row={editing} onClose={() => setEditing(null)} onDone={async () => { const id = editing.id; setEditing(null); await load(); if (detailId === id) await loadDetail(id); }} />}
       {resched && board && <RescheduleModal row={resched} doctors={board.doctors} today={today} onClose={() => setResched(null)} onDone={async () => { setResched(null); await load(); if (detailId) await loadDetail(detailId); }} />}
       {creating && board && <NewAppointmentModal doctors={board.doctors} today={today} onClose={() => setCreating(false)} onDone={async (id) => { setCreating(false); await load(); setDetailId(id); }} />}
     </div>
   );
 }
 
+/** Compact "who / when / with whom" block for confirm dialogs. */
+function ApptSummary({ row }: { row: Row }) {
+  return (
+    <div className="space-y-0.5">
+      <div className="flex items-center justify-between gap-3">
+        <span className="truncate font-semibold">{row.patient.name || 'Patient'}</span>
+        <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{row.ref}</span>
+      </div>
+      <p className="text-[12px] text-muted-foreground">
+        {fmtDate(row.date)} · {fmtTime(row.time)} · {drName(row.doctor?.name)}
+      </p>
+    </div>
+  );
+}
 function RescheduleModal({ row, doctors, today, onClose, onDone }: { row: Row; doctors: Board['doctors']; today: string; onClose: () => void; onDone: () => void }) {
   const [doctorId, setDoctorId] = useState(row.doctor?.id ?? '');
   const [date, setDate] = useState(row.date >= today ? row.date : today);
@@ -684,7 +785,7 @@ function RescheduleModal({ row, doctors, today, onClose, onDone }: { row: Row; d
       <p className="mb-4 rounded-lg bg-muted/60 p-3 text-sm">Currently <strong>{fmtDate(row.date)} · {fmtTime(row.time)}</strong> with {drName(row.doctor?.name)}.</p>
       <SlotPicker doctors={doctors} doctorId={doctorId} setDoctorId={setDoctorId} date={date} setDate={setDate} time={time} setTime={setTime} today={today} />
       <label className={`mt-4 flex items-center gap-2 text-sm ${row.canMessage ? '' : 'text-muted-foreground'}`}>
-        <input type="checkbox" className="size-4 accent-[var(--primary)]" checked={notify} disabled={!row.canMessage} onChange={(e) => setNotify(e.target.checked)} />
+        <input type="checkbox" className="size-4 rx-check" checked={notify} disabled={!row.canMessage} onChange={(e) => setNotify(e.target.checked)} />
         Tell the patient on WhatsApp{!row.canMessage && ' (no consent)'}
       </label>
     </Modal>
@@ -755,9 +856,62 @@ function NewAppointmentModal({ doctors, today, onClose, onDone }: { doctors: Boa
           <div className="mt-3 space-y-1.5"><Label>Chief complaint</Label><Textarea rows={2} value={f.complaint} onChange={set('complaint')} maxLength={1000} placeholder="e.g. Fever for 2 days" /></div>
         </div>
         <label className={`flex items-start gap-2 text-sm ${hasPhone ? '' : 'text-muted-foreground'}`}>
-          <input type="checkbox" className="mt-0.5 size-4 accent-[var(--primary)]" checked={consent && hasPhone} disabled={!hasPhone} onChange={(e) => setConsent(e.target.checked)} />
+          <input type="checkbox" className="mt-0.5 size-4 rx-check" checked={consent && hasPhone} disabled={!hasPhone} onChange={(e) => setConsent(e.target.checked)} />
           <span>Patient agreed to receive appointment confirmations and reminders on WhatsApp<span className="block text-xs text-muted-foreground"><Clock className="mr-1 inline size-3" />Sends the confirmation now and reminders before the visit.</span></span>
         </label>
+      </div>
+    </Modal>
+  );
+}
+
+function EditAppointmentModal({ row, onClose, onDone }: { row: Row; onClose: () => void; onDone: () => void }) {
+  const [f, setF] = useState({ name: row.patient.name ?? '', email: row.patient.email ?? '', age: row.patient.age ?? '', gender: row.patient.gender ?? '', complaint: row.complaint ?? '' });
+  const [saving, setSaving] = useState(false);
+  const save = async () => {
+    if (f.name.trim().length < 2) return toast.error("Enter the patient's name.");
+    setSaving(true);
+    try {
+      await api(`/api/healthcare/appointments/board/${row.id}`, {
+        method: 'PATCH',
+        json: { action: 'edit', name: f.name.trim(), email: f.email.trim(), age: f.age || undefined, gender: f.gender || null, complaint: f.complaint.trim() },
+      });
+      toast.success('Appointment updated.');
+      onDone();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
+  return (
+    <Modal
+      open
+      title={`Edit ${row.ref}`}
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button disabled={saving} onClick={save} className="gap-1.5">{saving ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />} Save changes</Button>
+        </>
+      }
+    >
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5 sm:col-span-2"><Label>Full name *</Label><Input value={f.name} onChange={set('name')} maxLength={120} /></div>
+        <div className="space-y-1.5"><Label>Email</Label><Input value={f.email} onChange={set('email')} type="email" /></div>
+        <div className="space-y-1.5"><Label>Age</Label><Input value={f.age} onChange={(e) => setF({ ...f, age: e.target.value.replace(/\D/g, '').slice(0, 3) })} inputMode="numeric" /></div>
+        <div className="space-y-1.5">
+          <Label>Gender</Label>
+          <select className={`${selectCls} w-full`} value={f.gender} onChange={set('gender')}>
+            <option value="">—</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
+            <option value="prefer_not_to_say">Prefer not to say</option>
+          </select>
+        </div>
+        <div className="space-y-1.5 sm:col-span-2"><Label>Chief complaint</Label><Textarea rows={3} value={f.complaint} onChange={set('complaint')} maxLength={1000} /></div>
+        <p className="text-xs text-muted-foreground sm:col-span-2">To change the doctor, date or time use Reschedule, so slots are checked and the patient is told.</p>
       </div>
     </Modal>
   );

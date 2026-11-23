@@ -1,11 +1,13 @@
 'use client';
 
 import { Suspense, useState } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { Copy, Download, Loader2, Plus, Printer, Share2, Trash2 } from 'lucide-react';
+import { Copy, Download, Loader2, Megaphone, Plus, Printer, Share2, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { BusinessPicker, Card, copyText, Empty, ErrorPanel, Field, Modal, PageHead, Pill, selectCls, Skeleton, SmallInput, useApi, type ReviewCampaign, type ReviewQr } from '@/components/reviews/shared';
 import { api } from '@/lib/campaigns/api';
 import { QR_PLACEMENTS } from '@/lib/reviews/constants';
@@ -39,7 +41,7 @@ function QrForm({ onClose, onSaved, defaults }: { onClose: () => void; onSaved: 
   };
 
   return (
-    <Modal title="Generate QR code" subtitle="Each QR code has its own secure link, so scans are tracked per placement." onClose={onClose} busy={busy}>
+    <Modal title="New QR code" subtitle="Each QR code has its own secure link, so scans are tracked per placement." onClose={onClose} busy={busy}>
       <div className="space-y-3">
         <Field label="Business *"><BusinessPicker value={businessId} onChange={(id) => { setBusinessId(id); setCampaignId(''); }} allowAll={false} className="w-full" /></Field>
         <Field label="Campaign (optional)">
@@ -58,13 +60,13 @@ function QrForm({ onClose, onSaved, defaults }: { onClose: () => void; onSaved: 
           <Field label="QR color"><input type="color" value={fgColor} onChange={(e) => setFg(e.target.value)} className="h-8 w-full cursor-pointer rounded-md border border-input bg-background" /></Field>
           <Field label="Background"><input type="color" value={bgColor} onChange={(e) => setBg(e.target.value)} className="h-8 w-full cursor-pointer rounded-md border border-input bg-background" /></Field>
         </div>
-        <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={includeLogo} onChange={(e) => setLogo(e.target.checked)} className="size-4 accent-[var(--primary)]" /> Put the business logo in the centre (SVG and poster)</label>
+        <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" checked={includeLogo} onChange={(e) => setLogo(e.target.checked)} className="size-4 rx-check" /> Put the business logo in the centre (SVG and poster)</label>
         <p className="text-[10px] text-muted-foreground">Keep strong contrast between the two colors so every phone can scan it.</p>
       </div>
       {error && <p className="mt-3 rounded-md bg-destructive/10 px-2.5 py-1.5 text-xs text-destructive" role="alert">{error}</p>}
       <div className="mt-4 flex justify-end gap-2">
-        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={onClose} disabled={busy}>Cancel</Button>
-        <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={save} disabled={busy}>{busy && <Loader2 className="size-3.5 animate-spin" />} Generate</Button>
+        <Button variant="outline" size="sm" onClick={onClose} disabled={busy}>Cancel</Button>
+        <Button size="sm" className="gap-1.5" onClick={save} disabled={busy}>{busy && <Loader2 className="size-3.5 animate-spin" />} Create QR code</Button>
       </div>
     </Modal>
   );
@@ -91,10 +93,10 @@ function QrInner() {
   const [businessId, setBusinessId] = useState(params.get('businessId') ?? '');
   const [open, setOpen] = useState(Boolean(params.get('campaignId')));
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [toDelete, setToDelete] = useState<ReviewQr | null>(null);
   const { data, error, loading, reload } = useApi<ReviewQr[]>(`/api/reviews/qr${businessId ? `?businessId=${businessId}` : ''}`);
 
   const remove = async (q: ReviewQr) => {
-    if (!window.confirm(`Delete "${q.label}"? Printed copies of this QR code will stop working.`)) return;
     setBusyId(q.id);
     try {
       await api(`/api/reviews/qr/${q.id}`, { method: 'DELETE' });
@@ -113,10 +115,10 @@ function QrInner() {
 
   return (
     <div className="space-y-4">
-      <PageHead title="QR codes & links" subtitle="Every QR code gets a unique, secure review link. Print it, share it on WhatsApp or put it on invoices." actions={<Button size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setOpen(true)}><Plus className="size-3.5" /> Generate QR</Button>} />
+      <PageHead title="QR codes" subtitle="Each QR code has its own review link. Print it, share it on WhatsApp or add it to invoices." actions={<><Button size="sm" variant="outline" className="gap-1.5" render={<Link href="/reviews/campaigns" />}><Megaphone className="size-3.5" /> Campaigns</Button><Button size="sm" className="gap-1.5" onClick={() => setOpen(true)}><Plus className="size-3.5" /> New QR code</Button></>} />
       <div className="flex flex-wrap items-center gap-2"><BusinessPicker value={businessId} onChange={setBusinessId} /></div>
       {error ? <ErrorPanel message={error} onRetry={reload} /> : loading && !data ? <Card><Skeleton /></Card> : !data?.length ? (
-        <Card><Empty title="No QR codes yet" body="Generate one for each place customers see you: the front desk, billing counter, invoice or your website." action={<Button size="sm" className="h-8 text-xs" onClick={() => setOpen(true)}>Generate QR</Button>} /></Card>
+        <Card><Empty title="No QR codes yet" body="Generate one for each place customers see you: the front desk, billing counter, invoice or your website." action={<Button size="sm" onClick={() => setOpen(true)}>New QR code</Button>} /></Card>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {data.map((q) => (
@@ -136,13 +138,24 @@ function QrInner() {
                   <Button size="sm" variant="outline" className="h-7 gap-1 px-2 text-[11px]" render={<a href={`/api/reviews/qr/${q.id}/image?format=svg&download=1`} />}><Download className="size-3" /> SVG</Button>
                   <Button size="icon-sm" variant="outline" className="size-7" title="Share on WhatsApp" aria-label="Share on WhatsApp" onClick={() => share(q)}><Share2 className="size-3.5" /></Button>
                   <Button size="icon-sm" variant="outline" className="size-7" title="Print poster" aria-label="Print poster" onClick={() => printPoster(q)}><Printer className="size-3.5" /></Button>
-                  <Button size="icon-sm" variant="ghost" className="size-7 text-destructive" title="Delete" aria-label="Delete" disabled={busyId === q.id} onClick={() => remove(q)}><Trash2 className="size-3.5" /></Button>
+                  <Button size="icon-sm" variant="ghost" className="size-7 text-destructive" title="Delete" aria-label="Delete" disabled={busyId === q.id} onClick={() => setToDelete(q)}><Trash2 className="size-3.5" /></Button>
                 </div>
               </div>
             </Card>
           ))}
         </div>
       )}
+      <ConfirmationDialog
+        isOpen={!!toDelete}
+        onOpenChange={(o) => { if (!o) setToDelete(null); }}
+        title="Delete this QR code?"
+        description="Its review link stops working straight away."
+        details={toDelete ? <span><span className="font-medium">{toDelete.label}</span> · {toDelete.business.name}</span> : undefined}
+        notes={['Printed copies of this QR code will show "not found".']}
+        confirmText="Delete QR code"
+        variant="destructive"
+        onConfirm={async () => { const q = toDelete; setToDelete(null); if (q) await remove(q); }}
+      />
       {open && <QrForm onClose={() => setOpen(false)} onSaved={reload} defaults={{ businessId, campaignId: params.get('campaignId') ?? '' }} />}
     </div>
   );

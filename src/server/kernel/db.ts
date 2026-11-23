@@ -114,8 +114,10 @@ async function assertParentsOwned(input: {
   parentModel: string;
   foreignKey: string;
   ids: string[];
+  /** Ids this tenant client created moments ago (possibly in an uncommitted transaction). */
+  knownOwned?: (parentModel: string, id: string) => boolean;
 }): Promise<void> {
-  const unique = [...new Set(input.ids)];
+  const unique = [...new Set(input.ids)].filter((id) => !input.knownOwned?.(input.parentModel, id));
   if (unique.length === 0) return;
 
   const delegate = (systemDb as unknown as Record<string, { count?: (args: unknown) => Promise<number> }>)[
@@ -166,6 +168,28 @@ function collectForeignKeys(data: unknown, foreignKey: string): string[] {
 function buildTenantClient(tenantId: string) {
   const resolveOwnedIds = makeOwnedIdResolver(tenantId);
 
+  // Rows this client inserted itself. The ownership check runs on systemDb,
+  // outside any interactive transaction, so it cannot see a parent created
+  // earlier in the *same* transaction (e.g. a Flow and its FlowNodes): the
+  // count came back 0 and every "create parent + children" write failed.
+  // An id returned by a create through this guard is owned by definition.
+  const created = new Map<string, number>();
+  const CREATED_TTL_MS = 120_000;
+  const remember = (model: string, row: unknown) => {
+    const id = asRecord(row).id;
+    if (typeof id !== 'string' || !id) return;
+    const now = Date.now();
+    if (created.size >= 1000) {
+      for (const [key, expires] of created) if (expires < now) created.delete(key);
+      if (created.size >= 1000) created.clear();
+    }
+    created.set(`${model}:${id}`, now + CREATED_TTL_MS);
+  };
+  const knownOwned = (model: string, id: string) => {
+    const expires = created.get(`${model}:${id}`);
+    return expires !== undefined && expires >= Date.now();
+  };
+
   return systemDb.$extends({
     name: `tenant-scope:${tenantId}`,
     query: {
@@ -205,9 +229,12 @@ function buildTenantClient(tenantId: string) {
                 parentModel: scope.parentModel,
                 foreignKey: scope.foreignKey,
                 ids: collectForeignKeys(mutableArgs.data, scope.foreignKey),
+                knownOwned,
               });
             }
-            return query(mutableArgs);
+            const row = await query(mutableArgs);
+            if (operation === 'create') remember(model, row);
+            return row;
           }
 
           // ── upsert: guard the lookup, scope the insert ────────────
@@ -227,6 +254,7 @@ function buildTenantClient(tenantId: string) {
                 parentModel: scope.parentModel,
                 foreignKey: scope.foreignKey,
                 ids: collectForeignKeys(mutableArgs.create, scope.foreignKey),
+                knownOwned,
               });
             }
             return query(mutableArgs);

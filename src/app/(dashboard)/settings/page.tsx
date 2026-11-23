@@ -2,8 +2,8 @@
 
 import { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Tag, User, Palette, Users, BellRing } from 'lucide-react';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { BellRing, Palette, Tag, User, Users } from 'lucide-react';
+
 import { TagManager } from '@/components/settings/tag-manager';
 import { ProfileForm } from '@/components/settings/profile-form';
 import { PasswordForm } from '@/components/settings/password-form';
@@ -11,28 +11,24 @@ import { SessionsCard } from '@/components/settings/sessions-card';
 import { AppearancePanel } from '@/components/settings/appearance-panel';
 import { TeamManager } from '@/components/settings/team-manager';
 import { FollowUpPanel } from '@/components/settings/follow-up-panel';
+import { cn } from '@/lib/utils';
 
-const TAB_VALUES = [
-  'profile',
-  'team',
-  'tags',
-  'followups',
-  'appearance',
+const TABS = [
+  { id: 'profile', label: 'Profile', icon: User },
+  { id: 'team', label: 'Team', icon: Users },
+  { id: 'tags', label: 'Tags', icon: Tag },
+  { id: 'followups', label: 'Follow-ups', icon: BellRing },
+  { id: 'appearance', label: 'Appearance', icon: Palette },
 ] as const;
-type TabValue = (typeof TAB_VALUES)[number];
+type TabValue = (typeof TABS)[number]['id'];
 
-function isTabValue(v: string | null): v is TabValue {
-  return !!v && (TAB_VALUES as readonly string[]).includes(v);
-}
+const isTabValue = (v: string | null): v is TabValue => TABS.some((t) => t.id === v);
 
 export default function SettingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // The URL is the single source of truth for the active tab — no
-  // local state, no sync effect. A previous revision duplicated this
-  // into `useState` + a sync effect, which tripped React 19's
-  // set-state-in-effect rule and was also redundant.
+  // The URL is the single source of truth for the active tab.
   const queryTab = searchParams.get('tab');
   const tab: TabValue = isTabValue(queryTab) ? queryTab : 'profile';
 
@@ -48,75 +44,40 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Settings</h1>
-        <p className="text-sm text-muted-foreground dark:text-slate-400 mt-1">
-          Manage your profile, team members, tags and workspace preferences. WhatsApp and Google Sheets live under Integrations.
-        </p>
+        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+        <p className="text-sm text-muted-foreground">Your profile, team, tags and workspace preferences. WhatsApp and Google Sheets are under Integrations.</p>
       </div>
 
-      <Tabs value={tab} onValueChange={(v) => onChange(v as TabValue)}>
-        <TabsList className="bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800/60 p-1 h-10 w-fit gap-1">
-          <TabsTrigger
-            value="profile"
-            className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-muted-foreground dark:text-slate-400 data-active:shadow-sm transition-all duration-200"
+      <div className="flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl border border-border/70 bg-card p-1" role="tablist" aria-label="Settings">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => onChange(t.id)}
+            className={cn('flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors', tab === t.id ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}
           >
-            <User className="size-4" />
-            Profile
-          </TabsTrigger>
-          <TabsTrigger
-            value="team"
-            className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-muted-foreground dark:text-slate-400 data-active:shadow-sm transition-all duration-200"
-          >
-            <Users className="size-4" />
-            Team
-          </TabsTrigger>
-          <TabsTrigger
-            value="tags"
-            className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-muted-foreground dark:text-slate-400 data-active:shadow-sm transition-all duration-200"
-          >
-            <Tag className="size-4" />
-            Tags
-          </TabsTrigger>
-          <TabsTrigger
-            value="followups"
-            className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-muted-foreground dark:text-slate-400 data-active:shadow-sm transition-all duration-200"
-          >
-            <BellRing className="size-4" />
-            Follow-ups
-          </TabsTrigger>
-          <TabsTrigger
-            value="appearance"
-            className="data-active:bg-white dark:data-active:bg-slate-800 data-active:text-primary text-muted-foreground dark:text-slate-400 data-active:shadow-sm transition-all duration-200"
-          >
-            <Palette className="size-4" />
-            Appearance
-          </TabsTrigger>
-        </TabsList>
+            <t.icon className="size-3.5" /> {t.label}
+          </button>
+        ))}
+      </div>
 
-        <TabsContent value="profile" className="space-y-6">
+      {tab === 'profile' && (
+        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
           <ProfileForm />
-          <PasswordForm />
-          <SessionsCard />
-        </TabsContent>
-
-        <TabsContent value="team">
-          <TeamManager />
-        </TabsContent>
-
-        <TabsContent value="tags">
-          <TagManager />
-        </TabsContent>
-
-        <TabsContent value="followups">
-          <FollowUpPanel />
-        </TabsContent>
-
-        <TabsContent value="appearance">
-          <AppearancePanel />
-        </TabsContent>
-      </Tabs>
+          <div className="space-y-4">
+            <PasswordForm />
+            <SessionsCard />
+          </div>
+        </div>
+      )}
+      {tab === 'team' && <TeamManager />}
+      {tab === 'tags' && <TagManager />}
+      {tab === 'followups' && <FollowUpPanel />}
+      {tab === 'appearance' && <AppearancePanel />}
     </div>
   );
 }

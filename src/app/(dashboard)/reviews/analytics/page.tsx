@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Eye, MousePointerClick, PenLine, QrCode, Sparkles, ThumbsUp } from 'lucide-react';
 
 import { Bars, BusinessPicker, Card, ErrorPanel, PageHead, selectCls, Skeleton, Stat, useApi } from '@/components/reviews/shared';
 import { REVIEW_LANGUAGES } from '@/lib/reviews/constants';
@@ -27,11 +28,11 @@ function PerfTable({ title, rows, nameLabel }: { title: string; rows: Perf[] | u
   const max = Math.max(1, ...(rows ?? []).map((r) => r.scans));
   return (
     <Card>
-      <p className="border-b border-border/70 px-4 py-2.5 text-[13px] font-semibold">{title}</p>
+      <p className="border-b border-border/70 px-4 py-2.5 text-sm font-semibold">{title}</p>
       {!rows ? <Skeleton rows={3} /> : !rows.length ? <p className="px-4 py-6 text-center text-xs text-muted-foreground">Nothing to compare yet.</p> : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[560px] text-xs">
-            <thead className="bg-muted/50 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"><tr><th className="py-2 pl-4 pr-3">{nameLabel}</th><th className="px-3 py-2">Scans</th><th className="px-3 py-2">Drafts</th><th className="px-3 py-2">Approved</th><th className="px-3 py-2">Google opens</th><th className="py-2 pl-3 pr-4">Approval rate</th></tr></thead>
+          <table className="w-full min-w-[560px] text-[13px]">
+            <thead className="bg-muted/40 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"><tr><th className="py-2 pl-4 pr-3">{nameLabel}</th><th className="px-3 py-2">Scans</th><th className="px-3 py-2">Drafts</th><th className="px-3 py-2">Approved</th><th className="px-3 py-2">Google opens</th><th className="py-2 pl-3 pr-4">Approval rate</th></tr></thead>
             <tbody className="divide-y divide-border/60">
               {[...rows].sort((a, b) => b.scans - a.scans).map((r) => (
                 <tr key={r.id}>
@@ -66,8 +67,8 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-4">
       <PageHead
-        title="Review analytics"
-        subtitle="Engagement on your review pages. Google page opens are not published reviews."
+        title="Analytics"
+        subtitle="How customers move from scanning a QR code to posting on Google."
         actions={
           <>
             <BusinessPicker value={businessId} onChange={setBusinessId} />
@@ -79,26 +80,20 @@ export default function AnalyticsPage() {
       />
       {ov.error && <ErrorPanel message={ov.error} onRetry={ov.reload} />}
       {!t ? !ov.error && <Card><Skeleton rows={2} /></Card> : (
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 lg:grid-cols-6">
-          <Stat label="QR scans" value={t.qrScans} />
-          <Stat label="Unique visitors" value={t.uniqueVisitors} />
-          <Stat label="AI requests" value={t.aiRequests} />
-          <Stat label="Drafts generated" value={t.draftsGenerated} />
-          <Stat label="Approved drafts" value={t.approvedDrafts} />
-          <Stat label="Copy actions" value={t.copyActions} />
-          <Stat label="Google page opens" value={t.googleOpens} hint="Not published reviews" />
-          <Stat label="Customer said done" value={t.customerReportedDone} hint="Self-reported" />
-          <Stat label="Automation jobs" value={t.automationJobs} />
-          <Stat label="Page prepared" value={t.prepSuccess} />
-          <Stat label="Prep failures" value={t.prepFailures} />
-          <Stat label="AI tokens" value={t.aiTokens.toLocaleString('en-IN')} />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <Stat label="QR scans" value={t.qrScans} icon={QrCode} />
+          <Stat label="Unique visitors" value={t.uniqueVisitors} icon={Eye} />
+          <Stat label="AI drafts" value={t.draftsGenerated} icon={PenLine} />
+          <Stat label="Approved" value={t.approvedDrafts} icon={Sparkles} />
+          <Stat label="Sent to Google" value={t.googleOpens} hint="Not the same as posted" icon={MousePointerClick} />
+          <Stat label="Said they posted" value={t.customerReportedDone} hint="Reported by the customer" icon={ThumbsUp} />
         </div>
       )}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
         <Card className="p-4">
           <div className="mb-3 flex items-center justify-between gap-2">
-            <p className="text-[13px] font-semibold">Activity</p>
+            <p className="text-sm font-semibold">Activity</p>
             <div className="flex rounded-md border border-border bg-muted/40 p-0.5">
               {(['daily', 'weekly', 'monthly'] as const).map((g) => <button key={g} type="button" onClick={() => setGrain(g)} className={`h-6 rounded px-2 text-[11px] font-medium capitalize ${grain === g ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}>{g}</button>)}
             </div>
@@ -107,7 +102,7 @@ export default function AnalyticsPage() {
         </Card>
         <div className="space-y-4">
           <Card className="p-4">
-            <p className="text-[13px] font-semibold">Customer journey funnel</p>
+            <p className="text-sm font-semibold">Customer journey</p>
             <div className="mt-2 space-y-1.5">
               {(ov.data?.funnel ?? []).map((s, _i, all) => (
                 <div key={s.key}>
@@ -118,7 +113,7 @@ export default function AnalyticsPage() {
             </div>
           </Card>
           <Card className="p-4">
-            <p className="text-[13px] font-semibold">Languages</p>
+            <p className="text-sm font-semibold">Review languages</p>
             {!ov.data?.languages.length ? <p className="mt-2 text-xs text-muted-foreground">No AI drafts yet.</p> : (
               <div className="mt-2 space-y-1.5">
                 {ov.data.languages.map((l) => (
@@ -130,9 +125,9 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      <PerfTable title="Campaign comparison" rows={camp.data?.campaigns} nameLabel="Campaign" />
-      <PerfTable title="QR code performance" rows={camp.data?.qrCodes} nameLabel="QR code" />
-      {!businessId && <PerfTable title="Business comparison" rows={biz.data?.businesses} nameLabel="Business" />}
+      {(camp.data?.campaigns.length ?? 0) > 0 && <PerfTable title="Campaigns" rows={camp.data?.campaigns} nameLabel="Campaign" />}
+      <PerfTable title="QR codes" rows={camp.data?.qrCodes} nameLabel="QR code" />
+      {!businessId && (biz.data?.businesses.length ?? 0) > 1 && <PerfTable title="Businesses" rows={biz.data?.businesses} nameLabel="Business" />}
       {ov.data?.note && <p className="text-[11px] text-muted-foreground">{ov.data.note}</p>}
     </div>
   );

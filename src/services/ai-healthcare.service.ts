@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { sendTextMessage } from '@/lib/whatsapp/meta-api'
 import {
@@ -8,11 +7,11 @@ import {
   getCachedAppointments,
   setCachedAppointments,
   invalidateAppointmentsCache,
-  type ClinicContext,
 } from '@/lib/healthcare/clinic-cache'
 import { tryFastPath } from '@/lib/healthcare/fast-path-responder'
 import { callLLM, parseJSONFromLLM } from '@/lib/ai/llm'
-import { tenantDb } from '@/server/kernel'
+import { AiUnavailableError } from '@/lib/ai/outcome'
+import { getLogger, systemDb, tenantDb } from '@/server/kernel'
 import { AppointmentService } from '@/server/services/appointment.service'
 import { appointmentConfirmationText, assignToken, bookingRef, notifyTenant, pretty, prettyTime, pushToGoogleSheet } from '@/server/services/booking-notify'
 import { availabilityQuerySchema, bookAppointmentBodySchema, rescheduleAppointmentBodySchema } from '@/server/validators/clinic.validator'
@@ -33,6 +32,8 @@ import {
   type FlowResult,
 } from '@/server/services/whatsapp-booking-flow'
 
+
+const log = getLogger('ai.healthcare')
 /** DB-backed lookups for the step-by-step WhatsApp booking flow. */
 export function bookingFlowData(tenantId: string, clinic: any, contactName: string | null, contactId?: string): FlowData {
   const db = tenantDb(tenantId)
@@ -116,14 +117,6 @@ function formatDocName(name: string): string {
   return name.toLowerCase().startsWith('dr') ? name : `Dr. ${name}`
 }
 
-function cleanDoctorName(name: string): string {
-  if (!name) return ''
-  return name
-    .toLowerCase()
-    .replace(/^dr\.?\s+/, '') // strip leading "dr." or "dr "
-    .replace(/^doctor\s+/, '') // strip leading "doctor "
-    .replace(/[^a-z0-9]/g, '') // remove all non-alphanumeric chars
-}
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -230,10 +223,6 @@ function extractBookingContext(
   return ctx
 }
 
-// ─── Gemini circuit breaker ────────────────────────────────────────────────
-const GEMINI_CIRCUIT_OPEN_MS = 60_000
-let geminiCircuitOpenUntil = 0        
-
 function getWeekdayName(dateStr: string): string {
   if (!dateStr) return ''
   const [y, m, d] = dateStr.split('-').map(Number)
@@ -301,12 +290,12 @@ export async function processHealthcareAIMessage(options: {
   const startTime = Date.now()
 
   // Resolve tenantId from the user profile
-  const profile = await prisma.profile.findUnique({
+  const profile = await systemDb.profile.findUnique({
     where: { userId }
   })
   
   if (!profile || !profile.tenantId) {
-    console.log('[AI Healthcare] No tenant profile registered for user ID:', userId)
+    log.info('declined: no tenant profile', { userId })
     return false
   }
   const tenantId = profile.tenantId
@@ -327,35 +316,35 @@ export async function processHealthcareAIMessage(options: {
     doctors = cached.doctors
     services = cached.services
     faqs = cached.faqs
-    console.log(`[AI Healthcare] Cache HIT for user ${userId} (saved ~200ms)`)
+    log.debug('clinic context cache hit', { userId })
   } else {
     // Cache miss — fetch from DB and populate cache
-    const clinicData = await prisma.clinic.findUnique({
+    const clinicData = await tenantDb(tenantId).clinic.findUnique({
       where: { userId }
     })
 
     if (!clinicData) {
-      console.log('[AI Healthcare] No clinic registered for this user ID:', userId)
+      log.info('declined: no clinic', { userId })
       return false
     }
     clinic = clinicData
 
-    const settingsData = await prisma.aISettings.findUnique({
+    const settingsData = await tenantDb(tenantId).aISettings.findUnique({
       where: { clinicId: clinic.id }
     })
 
     if (!settingsData || !settingsData.aiEnabled) {
-      console.log('[AI Healthcare] AI automation is disabled or not set up.')
+      log.info('declined: AI disabled', { clinicId: clinic.id })
       return false
     }
     aiSettings = settingsData
 
     // Fetch all static clinic context in parallel
     const [timingsData, doctorsData, servicesData, faqsData] = await Promise.all([
-      prisma.clinicTiming.findMany({ where: { clinicId: clinic.id } }),
-      prisma.doctor.findMany({ where: { clinicId: clinic.id } }),
-      prisma.clinicService.findMany({ where: { clinicId: clinic.id, isActive: true } }),
-      prisma.clinicFAQ.findMany({ where: { clinicId: clinic.id } }),
+      tenantDb(tenantId).clinicTiming.findMany({ where: { clinicId: clinic.id } }),
+      tenantDb(tenantId).doctor.findMany({ where: { clinicId: clinic.id } }),
+      tenantDb(tenantId).clinicService.findMany({ where: { clinicId: clinic.id, isActive: true } }),
+      tenantDb(tenantId).clinicFAQ.findMany({ where: { clinicId: clinic.id } }),
     ])
     timings = timingsData
     doctors = doctorsData
@@ -364,7 +353,7 @@ export async function processHealthcareAIMessage(options: {
 
     // Populate cache for subsequent messages
     setCachedClinicContext(userId, { clinic, aiSettings, timings, doctors, services, faqs })
-    console.log(`[AI Healthcare] Cache MISS — loaded & cached for user ${userId}`)
+    log.debug('clinic context cache miss; loaded', { userId })
   }
 
   // Dynamically replace "our clinic" in greeting_message with the actual clinic name
@@ -382,18 +371,17 @@ export async function processHealthcareAIMessage(options: {
   }
 
   // ─── Step 1.5: Human Handover Status Check ─────────────────────────────────
-  const convData = await prisma.conversation.findUnique({
+  const convData = await tenantDb(tenantId).conversation.findUnique({
     where: { id: conversationId },
     select: { status: true, bookingState: true, bookingStage: true }
   })
 
   // Load existing booking memory
   let currentBookingState = (convData?.bookingState as any) || {}
-  const currentBookingStage = convData?.bookingStage || 'collecting_details'
 
   if (convData?.status === 'open') {
     // Get the previous message in this conversation to calculate idle time
-    const prevMsgs = await prisma.message.findMany({
+    const prevMsgs = await tenantDb(tenantId).message.findMany({
       where: { conversationId },
       orderBy: { createdAt: 'desc' },
       take: 2
@@ -405,13 +393,13 @@ export async function processHealthcareAIMessage(options: {
     const SESSION_TIMEOUT_MS = 15 * 60 * 1000 // 15 minutes
 
     if (idleTimeMs > SESSION_TIMEOUT_MS) {
-      console.log(`[AI Healthcare] Conversation ${conversationId} was open but idle for ${Math.round(idleTimeMs / 1000 / 60)} minutes. Resetting status to 'closed' for a new session.`)
-      await prisma.conversation.update({
+      log.info('open conversation idle; returning it to the AI', { conversationId, idleMinutes: Math.round(idleTimeMs / 60000) })
+      await tenantDb(tenantId).conversation.update({
         where: { id: conversationId },
         data: { status: 'closed', updatedAt: new Date() }
       })
     } else {
-      const lastBotMsg = await prisma.message.findFirst({
+      const lastBotMsg = await tenantDb(tenantId).message.findFirst({
         where: { conversationId, senderType: 'bot' },
         orderBy: { createdAt: 'desc' }
       })
@@ -424,11 +412,11 @@ export async function processHealthcareAIMessage(options: {
       )
 
       if (isLastBotMsgHandover) {
-        console.log(`[AI Healthcare] Conversation ${conversationId} is open and last bot response was already a handover message. Silent bypass.`)
+        log.info('conversation owned by a human; handover already sent', { conversationId })
         return true
       }
 
-      console.log(`[AI Healthcare] Conversation ${conversationId} is open. Sending human-handover queuing message.`)
+      log.info('conversation owned by a human; sending handover notice', { conversationId })
       await sendReplyAndSave({
         tenantId,
         clinicId: clinic.id,
@@ -462,7 +450,7 @@ export async function processHealthcareAIMessage(options: {
     ?.some((kw: string) => matchesKeyword(userQuery, kw))
 
   if (isEmergency || isEscalation) {
-    console.log('[AI Healthcare] Emergency or escalation keyword matched.')
+    log.info('escalation keyword matched', { conversationId, emergency: !!isEmergency })
     await handleHumanEscalation({
       tenantId,
       clinic,
@@ -488,7 +476,7 @@ export async function processHealthcareAIMessage(options: {
     const wantsCancel = !wizardActive && isCancelRequest(messageText)
     const wantsReschedule = !wizardActive && !wantsCancel && isRescheduleRequest(messageText)
     if (wizardActive || wantsCancel || wantsReschedule || isBookingRequest(messageText)) {
-      const contact = await prisma.contact.findUnique({ where: { id: contactId }, select: { name: true } })
+      const contact = await tenantDb(tenantId).contact.findUnique({ where: { id: contactId }, select: { name: true } })
       const flow = bookingFlowData(tenantId, clinic, contact?.name ?? null, contactId)
       const result = wizardActive
         ? await advanceBookingFlow(currentBookingState, messageText, flow)
@@ -507,7 +495,7 @@ export async function processHealthcareAIMessage(options: {
   // ─── Step 3: Fast-path responder (SKIP AI for simple queries ~40% of traffic)
   const fastResult = tryFastPath(messageText, { clinic, aiSettings, timings, doctors, services, faqs, cachedAt: 0 }, !!isFirstInboundMessage)
   if (fastResult) {
-    console.log(`[AI Healthcare] Fast-path HIT: ${fastResult.intent} (${Date.now() - startTime}ms — no AI call)`)
+    log.info('fast-path reply', { intent: fastResult.intent, ms: Date.now() - startTime })
     await sendReplyAndSave({
       tenantId,
       clinicId: clinic.id,
@@ -533,19 +521,19 @@ export async function processHealthcareAIMessage(options: {
   let pastMessages: any[] = []
 
   if (upcomingAppointments !== null) {
-    pastMessages = await prisma.message.findMany({
+    pastMessages = await tenantDb(tenantId).message.findMany({
       where: { conversationId },
       orderBy: { createdAt: 'desc' },
       take: 12
     })
   } else {
     const [msgs, appts] = await Promise.all([
-      prisma.message.findMany({
+      tenantDb(tenantId).message.findMany({
         where: { conversationId },
         orderBy: { createdAt: 'desc' },
         take: 12
       }),
-      prisma.appointment.findMany({
+      tenantDb(tenantId).appointment.findMany({
         where: {
           clinicId: clinic.id,
           status: { not: 'cancelled' },
@@ -766,7 +754,7 @@ These details are already confirmed and saved in the conversation state. Do NOT 
     }
     if (blocks.length) freeSlotsContext = blocks.join('\n')
   } catch (err) {
-    console.warn('[AI Healthcare] availability engine unavailable, using fallback slot list', err)
+    log.warn('availability engine unavailable, using fallback slot list', { err })
   }
 
   const dateReferenceCalendar = next3Days
@@ -874,88 +862,6 @@ ${(aiSettings.supportedLanguages || ['English']).join(', ')}
 {"detected_intent":"greeting|appointment_booking|cancel_appointment|reschedule_appointment|doctor_info|timings|pricing|location|general_query|feedback|emergency|human_handoff","ai_response":"reply text","confidence_score":0.0-1.0,"is_escalation":false,"booking_details":{"patient_name":"","patient_age":"","reason_for_visit":"","department":"","doctor_name":"","date":"YYYY-MM-DD","time":"HH:MM"}}
 Ensure you populate the "booking_details" object of your JSON output with all details captured in memory or newly provided.`
 
-  const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) {
-    console.log('[AI Healthcare] GEMINI_API_KEY is not configured.')
-    return false
-  }
-
-  async function callGemini(modelName: string, signal?: AbortSignal) {
-    return await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal,
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ role: 'user', parts: [{ text: messageText }] }],
-          generationConfig: {
-            temperature: 0.2,
-            responseMimeType: 'application/json',
-            responseSchema: {
-              type: 'OBJECT',
-              properties: {
-                detected_intent: { type: 'STRING' },
-                ai_response: { type: 'STRING' },
-                confidence_score: { type: 'NUMBER' },
-                is_escalation: { type: 'BOOLEAN' },
-                booking_details: {
-                  type: 'OBJECT',
-                  properties: {
-                    patient_name: { type: 'STRING' },
-                    patient_age: { type: 'STRING' },
-                    reason_for_visit: { type: 'STRING' },
-                    doctor_name: { type: 'STRING' },
-                    date: { type: 'STRING' },
-                    time: { type: 'STRING' },
-                  },
-                },
-              },
-              required: ['detected_intent', 'ai_response', 'confidence_score', 'is_escalation'],
-            },
-          },
-        }),
-      }
-    )
-  }
-
-  async function callOpenAI(): Promise<string> {
-    const openaiKey = process.env.OPENAI_API_KEY
-    if (!openaiKey) throw new Error('OPENAI_API_KEY is not configured.')
-
-    const isOpenRouter = openaiKey.startsWith('sk-or-v1')
-    const url = isOpenRouter ? 'https://openrouter.ai/api/v1/chat/completions' : 'https://api.openai.com/v1/chat/completions'
-    const modelName = isOpenRouter ? 'openai/gpt-4o-mini' : 'gpt-4o-mini'
-
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${openaiKey}`,
-    }
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        model: modelName,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: messageText },
-        ],
-        temperature: 0.2,
-        response_format: { type: 'json_object' },
-      }),
-    })
-
-    if (!response.ok) {
-      const errText = await response.text()
-      throw new Error(`OpenAI/OpenRouter failed: ${response.status} ${errText}`)
-    }
-
-    const data = await response.json()
-    return data.choices?.[0]?.message?.content || ''
-  }
-
   let openAIResult: OpenAIResponse | null = null
 
   try {
@@ -969,8 +875,7 @@ Ensure you populate the "booking_details" object of your JSON output with all de
     )
     const parsed = llm.success ? parseJSONFromLLM<any>(llm.text) : null
     if (!parsed) {
-      console.error('[AI Healthcare] LLM unavailable or unparseable', llm.debugLogs)
-      return false
+      throw new AiUnavailableError('LLM unavailable or unparseable')
     }
     openAIResult = {
       detected_intent: parsed.detected_intent || 'fallback',
@@ -980,11 +885,11 @@ Ensure you populate the "booking_details" object of your JSON output with all de
       booking_details: parsed.booking_details || {}
     }
   } catch (error) {
-    console.error('[AI Healthcare] LLM call or parse failed:', error)
-    return false
+    // Nothing has been sent yet, so the router can safely retry and then fall back.
+    throw error instanceof AiUnavailableError ? error : new AiUnavailableError('LLM call or parse failed', error)
   }
 
-  if (!openAIResult) return false
+  if (!openAIResult) throw new AiUnavailableError('LLM returned no result')
 
   // Update structurally recorded memory context from AI response details
   const details = openAIResult.booking_details
@@ -998,7 +903,7 @@ Ensure you populate the "booking_details" object of your JSON output with all de
     if (details.time) currentBookingState.time = details.time
 
     // Save updated memory state to conversation
-    await prisma.conversation.update({
+    await tenantDb(tenantId).conversation.update({
       where: { id: conversationId },
       data: {
         bookingState: currentBookingState,
@@ -1039,7 +944,7 @@ Ensure you populate the "booking_details" object of your JSON output with all de
     ) {
       // Booking intent the keyword check missed (e.g. other languages):
       // switch to the guided step-by-step flow instead of a free-form ask.
-      const contact = await prisma.contact.findUnique({ where: { id: contactId }, select: { name: true } })
+      const contact = await tenantDb(tenantId).contact.findUnique({ where: { id: contactId }, select: { name: true } })
       const flow = bookingFlowData(tenantId, clinic, contact?.name ?? null, contactId)
       const started = await applyBookingFlowResult({ result: await startWizard(flow, messageText), flow, tenantId, clinic, doctors, timings, contactId, conversationId, senderPhone, messageText, contextMessageId, accessToken, phoneNumberId })
       if (started) return true
@@ -1080,7 +985,7 @@ Ensure you populate the "booking_details" object of your JSON output with all de
 
     if (bookingOutcome.success) {
       // Clear booking memory context on successful booking
-      await prisma.conversation.update({
+      await tenantDb(tenantId).conversation.update({
         where: { id: conversationId },
         data: {
           bookingState: Prisma.DbNull,
@@ -1126,28 +1031,6 @@ Ensure you populate the "booking_details" object of your JSON output with all de
   return true
 }
 
-async function saveToGoogleSheets(data: {
-  appointmentId: string
-  clinicName: string
-  patientName: string
-  patientAge: string
-  patientPhone: string
-  reasonForVisit: string
-  doctorName: string
-  specialization: string
-  date: string
-  time: string
-  bookedAt: string
-}): Promise<void> {
-  const webhookUrl = process.env.GOOGLE_SHEETS_WEBHOOK_URL
-  if (!webhookUrl) return
-
-  await fetch(webhookUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  })
-}
 
 function normaliseTime(raw: string): string | null {
   const t = String(raw || '').trim().toLowerCase().replace(/\s+/g, '')
@@ -1220,11 +1103,11 @@ async function handleSlotBooking(options: {
     const token = await assignToken(appt.id)
     // Patient started this WhatsApp chat, so WhatsApp updates are expected.
     const ref = await newAppointmentRef(date)
-    await prisma.appointmentDetail.create({
+    await tenantDb(tenantId).appointmentDetail.create({
       data: { appointmentId: appt.id, appointmentRef: ref, departmentId: details.department_id ?? null, patientPhone: senderPhone || null, whatsappConsent: true, consentAt: new Date(), source: 'whatsapp_ai' },
-    }).catch((e: unknown) => console.warn('[AI Healthcare] appointment detail not saved', e))
-    const current = await prisma.appointment.findUnique({ where: { id: appt.id }, select: { remindersSent: true } })
-    await prisma.appointment.update({
+    }).catch((e: unknown) => log.warn('appointment detail not saved', { err: e }))
+    const current = await tenantDb(tenantId).appointment.findUnique({ where: { id: appt.id }, select: { remindersSent: true } })
+    await tenantDb(tenantId).appointment.update({
       where: { id: appt.id },
       data: { remindersSent: { ...((current?.remindersSent as Record<string, unknown>) ?? {}), token, confirmation: new Date().toISOString(), source: 'whatsapp_ai' } },
     })
@@ -1302,7 +1185,7 @@ async function handleHumanEscalation(options: {
     customResponse,
   } = options
 
-  console.log(`[AI Healthcare] Escalating conversation ${conversationId} to human. Reason: ${reason}`)
+  log.info('escalating to human', { conversationId, reason })
 
   const transferMessage =
     customResponse ||
@@ -1311,7 +1194,7 @@ async function handleHumanEscalation(options: {
   const noteText = `[AI Healthcare Escalation]\nPatient requested human assistance or emergency detected.\n- Detected Intent: ${intent}\n- Reason: ${reason}\n- Patient Query: "${userMessage}"`
 
   // Insert Note
-  await prisma.contactNote.create({
+  await tenantDb(tenantId).contactNote.create({
     data: {
       tenantId,
       contactId,
@@ -1321,7 +1204,7 @@ async function handleHumanEscalation(options: {
   })
 
   // Mark conversation status as open
-  await prisma.conversation.update({
+  await tenantDb(tenantId).conversation.update({
     where: { id: conversationId },
     data: {
       status: 'open',
@@ -1365,7 +1248,7 @@ async function applyBookingFlowResult(o: {
 }): Promise<boolean> {
   let result = o.result
   const save = (state: unknown, stage: string) =>
-    prisma.conversation.update({
+    tenantDb(o.tenantId).conversation.update({
       where: { id: o.conversationId },
       data: { bookingState: state === null ? Prisma.DbNull : (state as Prisma.InputJsonValue), bookingStage: stage, updatedAt: new Date() },
     })
@@ -1396,10 +1279,10 @@ async function applyBookingFlowResult(o: {
     const st = result.state
     try {
       const service = AppointmentService.create(tenantDb(o.tenantId))
-      const before = await prisma.appointment.findUnique({ where: { id: st.targetId }, select: { appointmentDate: true, appointmentTime: true, remindersSent: true } })
+      const before = await tenantDb(o.tenantId).appointment.findUnique({ where: { id: st.targetId }, select: { appointmentDate: true, appointmentTime: true, remindersSent: true } })
       await service.reschedule(st.targetId!, rescheduleAppointmentBodySchema.parse({ appointmentDate: st.date, appointmentTime: st.time, doctorId: st.doctorId }))
       const log = (before?.remindersSent as Record<string, unknown>) ?? {}
-      await prisma.appointment.update({
+      await tenantDb(o.tenantId).appointment.update({
         where: { id: st.targetId },
         data: { remindersSent: { token: log.token, source: log.source, confirmation: log.confirmation, rescheduledFrom: before ? `${before.appointmentDate.toISOString().slice(0, 10)} ${before.appointmentTime}` : undefined } as any },
       })
@@ -1519,13 +1402,13 @@ async function sendReplyAndSave(options: {
     })
     sentMessageId = result.messageId
   } catch (error: any) {
-    console.error('[AI Healthcare] Failed to send WhatsApp message via Meta Cloud API:', error.message || error)
+    log.error('WhatsApp send failed', { conversationId, err: error })
   }
 
   // Parallel writes
   await Promise.all([
     // Insert Bot message to messages table
-    prisma.message.create({
+    tenantDb(tenantId).message.create({
       data: {
         conversationId,
         senderType: 'bot',
@@ -1536,7 +1419,7 @@ async function sendReplyAndSave(options: {
       }
     }),
     // Update Conversation last message stats
-    prisma.conversation.update({
+    tenantDb(tenantId).conversation.update({
       where: { id: conversationId },
       data: {
         lastMessageText: responseText,
@@ -1545,7 +1428,7 @@ async function sendReplyAndSave(options: {
       }
     }),
     // Insert into AI chat logs
-    prisma.aiChatLog.create({
+    tenantDb(tenantId).aiChatLog.create({
       data: {
         clinicId,
         patientId: contactId,
@@ -1556,6 +1439,6 @@ async function sendReplyAndSave(options: {
       }
     })
   ]).catch((err) => {
-    console.error('[AI Healthcare] DB write failed:', err)
+    log.error('reply bookkeeping write failed', { conversationId, err })
   })
 }

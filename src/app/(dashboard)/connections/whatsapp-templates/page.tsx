@@ -1,11 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import {
-  AlertTriangle, ArrowLeft, BellRing, CheckCircle2, Clock, Eye, FileText, Info, Loader2, MoreHorizontal, Pencil, Power, RefreshCw,
-  RotateCcw, Send, ShieldCheck, Trash2, X, XCircle,
+  AlertTriangle, BellRing, CheckCircle2, Clock, Eye, FileText, Info, Loader2, MoreHorizontal, Pencil, Power, RefreshCw,
+  RotateCcw, Send, Trash2, X, XCircle,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
+import { IntegrationsHeader } from '@/components/integrations/integrations-tabs';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { api } from '@/lib/campaigns/api';
 import { lintUtilityBody, VARIABLE_SOURCES, type TemplateVariable, type VariableSource } from '@/lib/whatsapp/appointment-template-library';
@@ -88,7 +89,7 @@ const SOURCE_LABEL: Record<VariableSource, string> = {
   appointment_time: 'Appointment time',
   service_name: 'Service / doctor',
   appointment_ref: 'Booking ID',
-  token_number: 'Token number',
+  token_number: 'Clinic queue no.',
   doctor_name: 'Doctor name',
 };
 const SUBMITTABLE = ['Draft', 'Rejected', 'Paused', 'Disabled'];
@@ -263,16 +264,19 @@ export default function WhatsappTemplatesPage() {
   };
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <Link href="/connections" className="mb-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><ArrowLeft className="size-3.5" /> Integrations</Link>
-          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><ShieldCheck className="size-6 text-primary" /> WhatsApp templates</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">Meta-approved utility templates for appointment confirmations, reminders and updates{data ? ` · ${data.verticalLabel}` : ''}.</p>
-        </div>
-        <Button variant="outline" onClick={sync} disabled={busy === 'sync' || !data?.whatsapp.connected} className="gap-1.5">
-          <RefreshCw className={`size-4 ${busy === 'sync' ? 'animate-spin' : ''}`} /> Sync with Meta
-        </Button>
+    <div className="space-y-4">
+      <Suspense fallback={<div className="h-[104px] animate-pulse rounded-xl bg-muted/50" />}>
+        <IntegrationsHeader
+          actions={
+            <Button size="sm" variant="outline" onClick={sync} disabled={busy === 'sync' || !data?.whatsapp.connected} className="gap-1.5">
+              <RefreshCw className={`size-3.5 ${busy === 'sync' ? 'animate-spin' : ''}`} /> Sync with Meta
+            </Button>
+          }
+        />
+      </Suspense>
+      <div>
+        <h2 className="text-base font-semibold">Appointment message templates</h2>
+        <p className="text-xs text-muted-foreground">Meta-approved utility templates for appointment confirmations, reminders and updates{data ? ` · ${data.verticalLabel}` : ''}.</p>
       </div>
 
       <div className="flex gap-3 rounded-2xl border border-sky-500/30 bg-sky-500/5 p-4 text-sm">
@@ -346,7 +350,7 @@ export default function WhatsappTemplatesPage() {
             <thead className="border-b border-border bg-muted/50 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="px-4 py-3">
-                  <input type="checkbox" className="size-4 cursor-pointer accent-[var(--primary)] align-middle" checked={allSelected} onChange={toggleAll} disabled={!items.length} aria-label="Select all templates" />
+                  <input type="checkbox" className="size-4 cursor-pointer rx-check align-middle" checked={allSelected} onChange={toggleAll} disabled={!items.length} aria-label="Select all templates" />
                 </th>
                 <th className="px-3 py-3">Template</th>
                 <th className="px-3 py-3">Business event</th>
@@ -366,7 +370,7 @@ export default function WhatsappTemplatesPage() {
                   return (
                     <tr key={t.id} onClick={() => setPreview(t)} className={`cursor-pointer transition-colors ${selected.has(t.id) ? 'bg-primary/5' : 'hover:bg-muted/50'}`}>
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                        <input type="checkbox" className="size-4 cursor-pointer accent-[var(--primary)] align-middle" checked={selected.has(t.id)} onChange={() => toggleOne(t.id)} aria-label={`Select ${t.name}`} />
+                        <input type="checkbox" className="size-4 cursor-pointer rx-check align-middle" checked={selected.has(t.id)} onChange={() => toggleOne(t.id)} aria-label={`Select ${t.name}`} />
                       </td>
                       <td className={`px-3 py-3 ${older ? 'opacity-60' : ''}`}>
                         <p className="truncate font-mono text-xs font-medium">{t.name}</p>

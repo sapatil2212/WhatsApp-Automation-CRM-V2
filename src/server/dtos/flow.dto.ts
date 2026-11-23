@@ -35,6 +35,10 @@ export const FLOW_NODE_TYPES = [
   'collect_input',
   'condition',
   'set_tag',
+  'send_media',
+  'send_template',
+  'delay',
+  'http_request',
   'handoff',
   'end',
 ] as const;

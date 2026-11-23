@@ -432,3 +432,52 @@ describe('keyword matching', () => {
     expect((await service.dispatch({ ...dispatch, context: { messageText: 'Hi there' } })).executed).toBe(1);
   });
 });
+
+describe('dispatch scopes (inbound routing)', () => {
+  function withAutomations(list: Array<{ id: string; triggerType?: string; triggerConfig?: unknown; steps: AutomationStepRow[] }>) {
+    const { deps, service } = engine([]);
+    deps.automations.listActiveForTrigger.mockImplementation(async () =>
+      list.map((a) => ({ triggerType: 'keyword_match', triggerConfig: { keywords: ['menu'], match_type: 'contains' }, ...a })) as never,
+    );
+    return { deps, service };
+  }
+  const reply = step({ stepType: 'send_message', stepConfig: { text: 'Hi' } });
+  const tag = step({ stepType: 'add_tag', stepConfig: { tag_id: TAG } });
+  const ctx = { triggerType: 'keyword_match' as const, contactId: 'contact-1', context: { messageText: 'menu' } };
+
+  it('side_effects runs only automations with no message step', async () => {
+    const { service } = withAutomations([
+      { id: 'tagger', steps: [tag] },
+      { id: 'replier', steps: [tag, reply] },
+    ]);
+    expect(await service.dispatch(ctx, { scope: 'side_effects' })).toEqual({ executed: 1, failed: 0 });
+  });
+
+  it('replies runs only automations with a message step', async () => {
+    const { deps, service } = withAutomations([
+      { id: 'tagger', steps: [tag] },
+      { id: 'replier', steps: [reply] },
+    ]);
+    expect((await service.dispatch(ctx, { scope: 'replies' })).executed).toBe(1);
+    expect(deps.outbound.sendText).toHaveBeenCalledTimes(1);
+  });
+
+  it('replies_opted_in needs send_even_if_ai_replied to be exactly true', async () => {
+    const { service } = withAutomations([
+      { id: 'off', steps: [reply] },
+      { id: 'on', triggerConfig: { keywords: ['menu'], send_even_if_ai_replied: true }, steps: [reply] },
+      { id: 'truthy', triggerConfig: { keywords: ['menu'], send_even_if_ai_replied: 'yes' }, steps: [reply] },
+    ]);
+    expect((await service.dispatch(ctx, { scope: 'replies_opted_in' })).executed).toBe(1);
+  });
+
+  it('exact_only / skip_exact split keyword automations by match type', async () => {
+    const list = [
+      { id: 'exact', triggerConfig: { keywords: ['menu'], match_type: 'exact' }, steps: [reply] },
+      { id: 'contains', triggerConfig: { keywords: ['menu'], match_type: 'contains' }, steps: [reply] },
+    ];
+    expect((await withAutomations(list).service.dispatch(ctx, { scope: 'replies', keyword: 'exact_only' })).executed).toBe(1);
+    expect((await withAutomations(list).service.dispatch(ctx, { scope: 'replies', keyword: 'skip_exact' })).executed).toBe(1);
+    expect((await withAutomations(list).service.dispatch(ctx)).executed).toBe(2);
+  });
+});

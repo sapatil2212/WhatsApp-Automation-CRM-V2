@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Bot, Workflow, Check, Loader2, Info } from "lucide-react";
+import { AlertTriangle, Bot, Workflow, Check, Loader2, Info } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -19,7 +19,7 @@ const MODES: {
     id: "ai_first",
     label: "AI first",
     description:
-      "The AI assistant answers automatically. A flow runs only if the AI can't handle the message.",
+      "The AI answers every message. Flows start only on an exact keyword or when the AI declines (AI switched off or not confident).",
     icon: Bot,
     accent: "text-violet-700 dark:text-violet-300",
   },
@@ -27,7 +27,7 @@ const MODES: {
     id: "flows_first",
     label: "Flows first",
     description:
-      "Your flows drive the conversation. The AI steps in only when no flow matches. Best for guided, multi-step journeys.",
+      "Any matching flow answers first. The AI replies only when no flow matches. Best for guided, multi-step journeys.",
     icon: Workflow,
     accent: "text-emerald-700 dark:text-emerald-300",
   },
@@ -35,7 +35,7 @@ const MODES: {
     id: "flows_only",
     label: "Flows only",
     description:
-      "Only your flows reply to customers. The AI assistant stays off.",
+      "Only flows and reply automations answer. The AI assistant never replies.",
     icon: Workflow,
     accent: "text-emerald-700 dark:text-emerald-300",
   },
@@ -43,7 +43,7 @@ const MODES: {
     id: "ai_only",
     label: "AI only",
     description:
-      "Only the AI assistant replies. Flows are paused for incoming messages.",
+      "Only the AI replies. New flows never start; a flow already in progress still finishes.",
     icon: Bot,
     accent: "text-violet-700 dark:text-violet-300",
   },
@@ -54,7 +54,7 @@ const MODES: {
  * WhatsApp messages are answered by the AI assistant, by Flows, or a
  * priority order between them. Persists via /api/flows/routing.
  */
-export function RoutingModeCard() {
+export function RoutingModeCard({ activeFlowCount = 0 }: { activeFlowCount?: number }) {
   const [mode, setMode] = useState<Mode | null>(null);
   const [saving, setSaving] = useState<Mode | null>(null);
   const [loading, setLoading] = useState(true);
@@ -165,11 +165,22 @@ export function RoutingModeCard() {
         })}
       </div>
 
-      <p className="mt-3 flex items-start gap-1.5 text-[11px] leading-relaxed text-muted-foreground">
-        <Info className="mt-0.5 h-3 w-3 shrink-0" />
-        A flow already in progress with a customer always continues, regardless
-        of this setting. If nothing handles a message, your automations still run.
-      </p>
+      {mode === "ai_first" && activeFlowCount > 0 && (
+        <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] leading-relaxed text-amber-800 dark:text-amber-300">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            You have {activeFlowCount} active flow{activeFlowCount === 1 ? "" : "s"}, but the AI answers first. Only
+            flows with an <strong>exact</strong> keyword trigger will start reliably. Switch to <strong>Flows first</strong> if
+            your flows should lead the conversation.
+          </span>
+        </div>
+      )}
+
+      <ul className="mt-3 space-y-1 text-[11px] leading-relaxed text-muted-foreground">
+        <li className="flex items-start gap-1.5"><Info className="mt-0.5 h-3 w-3 shrink-0" /> In every mode, a flow already in progress continues, and exact keyword flows and automations answer before the AI.</li>
+        <li className="flex items-start gap-1.5"><Info className="mt-0.5 h-3 w-3 shrink-0" /> Automations without message steps (tags, CRM, webhooks) always run. Message automations run only if nothing else answered, unless set to “Send even if AI replied”.</li>
+        <li className="flex items-start gap-1.5"><Info className="mt-0.5 h-3 w-3 shrink-0" /> If the AI fails, it retries once, then tells the customer the team will reply and opens the chat for your team.</li>
+      </ul>
     </section>
   );
 }

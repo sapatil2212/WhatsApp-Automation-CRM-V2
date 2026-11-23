@@ -23,6 +23,7 @@ import { TemplateService } from '../services/template.service';
 import { WhatsappTransport } from '../services/whatsapp-transport';
 import {
   broadcastParamsSchema,
+  bulkDeleteBroadcastsBodySchema,
   createBroadcastBodySchema,
   dispatchBroadcastBodySchema,
   listBroadcastsQuerySchema,
@@ -100,6 +101,18 @@ export const broadcastController = {
       const service = BroadcastService.create(db, ctx.userId, TemplateService.create(db, ctx.userId));
       await service.delete(params.id);
       return deleted('Broadcast deleted.');
+    },
+  }),
+
+  bulkDelete: createHandler({
+    operation: 'broadcasts.bulkDelete',
+    auth: 'tenant',
+    body: bulkDeleteBroadcastsBodySchema,
+    response: z.object({ deleted: z.array(z.string()), blocked: z.array(z.object({ id: z.string(), reason: z.string() })) }),
+    async handle({ body, ctx, db }) {
+      assertTenant(ctx);
+      const service = BroadcastService.create(db, ctx.userId, TemplateService.create(db, ctx.userId));
+      return service.deleteMany(body.ids);
     },
   }),
 

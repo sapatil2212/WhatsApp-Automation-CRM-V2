@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 
 import { Badge } from "@/components/ui/badge";
+import { unwrap } from "@/lib/flows/client";
 import { cn } from "@/lib/utils";
 
 /**
@@ -49,6 +50,48 @@ interface RunRow {
   reprompt_count: number;
   contact: { id: string; name: string | null; phone: string } | null;
 }
+
+/** API shapes (camelCase, standard envelope). */
+interface RunDto {
+  id: string;
+  status: RunRow["status"];
+  currentNodeKey: string | null;
+  startedAt: string;
+  lastAdvancedAt: string;
+  endedAt: string | null;
+  endReason: string | null;
+  vars: Record<string, unknown>;
+  repromptCount: number;
+  contact: { id: string; name: string | null; phone: string } | null;
+}
+interface EventDto {
+  id: string;
+  eventType: string;
+  nodeKey: string | null;
+  payload: Record<string, unknown>;
+  createdAt: string;
+}
+
+const runFromDto = (r: RunDto): RunRow => ({
+  id: r.id,
+  status: r.status,
+  current_node_key: r.currentNodeKey,
+  started_at: r.startedAt,
+  last_advanced_at: r.lastAdvancedAt,
+  ended_at: r.endedAt,
+  end_reason: r.endReason,
+  vars: r.vars ?? {},
+  reprompt_count: r.repromptCount ?? 0,
+  contact: r.contact,
+});
+
+const eventFromDto = (runId: string, e: EventDto): EventRow => ({
+  flow_run_id: runId,
+  event_type: e.eventType,
+  node_key: e.nodeKey,
+  payload: e.payload ?? {},
+  created_at: e.createdAt,
+});
 
 interface EventRow {
   flow_run_id: string;
@@ -100,7 +143,8 @@ export default function FlowRunsPage() {
 
   const [flow, setFlow] = useState<{ id: string; name: string } | null>(null);
   const [runs, setRuns] = useState<RunRow[]>([]);
-  const [events, setEvents] = useState<EventRow[]>([]);
+  // Events load when a run is expanded: null = not loaded, "loading", or the list.
+  const [events, setEvents] = useState<Record<string, EventRow[] | "loading" | "error">>({});
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [notFound, setNotFound] = useState(false);
@@ -110,21 +154,20 @@ export default function FlowRunsPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/flows/${params.id}/runs`);
-        if (res.status === 404) {
+        const [flowRes, runsRes] = await Promise.all([
+          fetch(`/api/flows/${params.id}`),
+          fetch(`/api/flows/${params.id}/runs?pageSize=50`),
+        ]);
+        if (flowRes.status === 404 || runsRes.status === 404) {
           if (!cancelled) setNotFound(true);
           return;
         }
-        if (!res.ok) throw new Error(`Failed: ${res.status}`);
-        const json = (await res.json()) as {
-          flow: { id: string; name: string };
-          runs: RunRow[];
-          events: EventRow[];
-        };
+        if (!flowRes.ok || !runsRes.ok) throw new Error(`Failed: ${flowRes.status}/${runsRes.status}`);
+        const flowDto = unwrap<{ id: string; name: string }>(await flowRes.json());
+        const runDtos = unwrap<RunDto[]>(await runsRes.json()) ?? [];
         if (!cancelled) {
-          setFlow(json.flow);
-          setRuns(json.runs ?? []);
-          setEvents(json.events ?? []);
+          setFlow({ id: flowDto.id, name: flowDto.name });
+          setRuns(runDtos.map(runFromDto));
         }
       } catch (err) {
         if (!cancelled) {
@@ -140,13 +183,31 @@ export default function FlowRunsPage() {
     };
   }, [params.id]);
 
+  async function loadEvents(runId: string) {
+    setEvents((prev) => ({ ...prev, [runId]: "loading" }));
+    try {
+      const res = await fetch(`/api/flows/${params.id}/runs/${runId}/events`);
+      if (!res.ok) throw new Error(`Failed: ${res.status}`);
+      const list = unwrap<EventDto[]>(await res.json()) ?? [];
+      // The API returns newest first; a timeline reads oldest first.
+      const ordered = [...list].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      setEvents((prev) => ({ ...prev, [runId]: ordered.map((e) => eventFromDto(runId, e)) }));
+    } catch (err) {
+      console.error(err);
+      setEvents((prev) => ({ ...prev, [runId]: "error" }));
+    }
+  }
+
   function toggle(runId: string) {
+    const opening = !expanded.has(runId);
     setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(runId)) next.delete(runId);
       else next.add(runId);
       return next;
     });
+    const current = events[runId];
+    if (opening && (current === undefined || current === "error")) void loadEvents(runId);
   }
 
   if (loading) return <PageSkeleton variant="table" />;
@@ -192,7 +253,7 @@ export default function FlowRunsPage() {
             <RunCard
               key={run.id}
               run={run}
-              events={events.filter((e) => e.flow_run_id === run.id)}
+              events={events[run.id]}
               expanded={expanded.has(run.id)}
               onToggle={() => toggle(run.id)}
             />
@@ -210,7 +271,7 @@ function RunCard({
   onToggle,
 }: {
   run: RunRow;
-  events: EventRow[];
+  events: EventRow[] | "loading" | "error" | undefined;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -272,7 +333,13 @@ function RunCard({
             </details>
           )}
           <div className="flex flex-col gap-1">
-            {events.length === 0 ? (
+            {events === undefined || events === "loading" ? (
+              <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" /> Loading the step log…
+              </p>
+            ) : events === "error" ? (
+              <p className="text-xs text-destructive">Couldn&apos;t load this run&apos;s log. Collapse and expand to retry.</p>
+            ) : events.length === 0 ? (
               <p className="text-xs text-muted-foreground">
                 No events recorded for this run.
               </p>
@@ -325,7 +392,7 @@ function EventLine({ ev }: { ev: EventRow }) {
 function summarizePayload(payload: Record<string, unknown>): string {
   // Show the keys that matter most to a human debugger; full JSON is
   // available via the "Captured vars" details panel for the run.
-  const keys = ["reply_id", "captured_key", "reason", "advancing_to"];
+  const keys = ["reply_id", "replyId", "captured_key", "capturedKey", "reason", "detail", "advancing_to", "advancingTo", "nodeType"];
   for (const k of keys) {
     if (k in payload && payload[k] !== null && payload[k] !== undefined) {
       return `${k}=${String(payload[k]).slice(0, 80)}`;

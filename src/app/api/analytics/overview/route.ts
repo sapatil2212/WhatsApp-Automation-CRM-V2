@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { createHandler, systemDb } from '@/server/kernel';
+import { CLINIC_TIME_ZONE } from '@/server/services/appointment.service';
 
 /**
  * Unified dashboard analytics for every business type.
@@ -9,8 +10,19 @@ import { createHandler, systemDb } from '@/server/kernel';
 
 const DAY = 86_400_000;
 
+/** Calendar day (YYYY-MM-DD) of an instant in the clinic's time zone, so late-evening messages land on the right day. */
 function dayKey(d: Date) {
-  return d.toISOString().slice(0, 10);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: CLINIC_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+}
+
+/** UTC offset of the clinic time zone at an instant, in ms. */
+function tzOffsetMs(d: Date) {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', { timeZone: CLINIC_TIME_ZONE, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      .formatToParts(d)
+      .map((x) => [x.type, x.value]),
+  );
+  return Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), Number(p.hour), Number(p.minute), Number(p.second)) - Math.floor(d.getTime() / 1000) * 1000;
 }
 
 export const GET = createHandler({
@@ -21,10 +33,11 @@ export const GET = createHandler({
   async handle({ ctx, query }) {
     const tenantId = ctx.tenantId;
     const now = new Date();
-    const since = new Date(now.getTime() - (query.days - 1) * DAY);
-    since.setUTCHours(0, 0, 0, 0);
+    // Range starts at local midnight (clinic time zone) `days - 1` days ago.
+    const today = new Date(dayKey(now) + 'T00:00:00Z'); // local "today" as a date-only value
+    const firstDay = new Date(today.getTime() - (query.days - 1) * DAY);
+    const since = new Date(firstDay.getTime() - tzOffsetMs(now));
     const prevSince = new Date(since.getTime() - query.days * DAY);
-    const today = new Date(dayKey(now) + 'T00:00:00Z');
 
     const [clinic, business] = await Promise.all([
       systemDb.clinic.findFirst({ where: { tenantId }, select: { id: true } }),
@@ -33,24 +46,21 @@ export const GET = createHandler({
 
     const [
       contactsTotal, contactsNew, contactsPrev, openConversations, unread,
-      messages, contactsSeries, broadcasts, deals, stages,
-      appts, apptsPrev, upcoming, enquiries, enquiriesPrev, aiLogsBiz, aiLogsClinic, recentConversations,
+      messages, msgTotals, contactsSeries, campaignAgg,
+      appts, apptsPrev, upcoming, upcomingCount, enquiries, enquiriesPrev, aiLogsBiz, aiLogsClinic, recentConversations,
     ] = await Promise.all([
       systemDb.contact.count({ where: { tenantId } }),
       systemDb.contact.count({ where: { tenantId, createdAt: { gte: since } } }),
       systemDb.contact.count({ where: { tenantId, createdAt: { gte: prevSince, lt: since } } }),
       systemDb.conversation.count({ where: { tenantId, status: 'open' } }),
       systemDb.conversation.aggregate({ where: { tenantId }, _sum: { unreadCount: true } }),
-      systemDb.message.findMany({ where: { conversation: { tenantId }, createdAt: { gte: since } }, select: { createdAt: true, senderType: true }, take: 50_000 }),
+      systemDb.message.findMany({ where: { conversation: { tenantId }, createdAt: { gte: since } }, select: { createdAt: true, senderType: true }, orderBy: { createdAt: 'desc' }, take: 50_000 }),
+      systemDb.message.groupBy({ by: ['senderType'], where: { conversation: { tenantId }, createdAt: { gte: since } }, _count: { _all: true } }),
       systemDb.contact.findMany({ where: { tenantId, createdAt: { gte: since } }, select: { createdAt: true }, take: 50_000 }),
-      systemDb.broadcast.findMany({
+      systemDb.broadcast.aggregate({
         where: { tenantId, createdAt: { gte: since } },
-        select: { id: true, name: true, status: true, totalRecipients: true, sentCount: true, deliveredCount: true, readCount: true, repliedCount: true, failedCount: true, createdAt: true },
-        orderBy: { createdAt: 'desc' },
-        take: 50,
+        _sum: { totalRecipients: true, deliveredCount: true, readCount: true, repliedCount: true, failedCount: true },
       }),
-      systemDb.deal.findMany({ where: { tenantId }, select: { value: true, status: true, stageId: true, updatedAt: true } }),
-      systemDb.pipelineStage.findMany({ where: { pipeline: { tenantId } }, select: { id: true, name: true, color: true, position: true, pipelineId: true }, orderBy: { position: 'asc' } }),
       clinic ? systemDb.appointment.findMany({ where: { clinicId: clinic.id, createdAt: { gte: since } }, select: { createdAt: true, status: true, appointmentDate: true, doctor: { select: { specialization: true } } } }) : [],
       clinic ? systemDb.appointment.count({ where: { clinicId: clinic.id, createdAt: { gte: prevSince, lt: since } } }) : 0,
       clinic
@@ -68,6 +78,11 @@ export const GET = createHandler({
               select: { id: true, contactName: true, preferredDate: true, preferredTime: true, enquiryType: true, notes: true },
             })
           : [],
+      clinic
+        ? systemDb.appointment.count({ where: { clinicId: clinic.id, status: 'scheduled', appointmentDate: { gte: today } } })
+        : business
+          ? systemDb.businessEnquiry.count({ where: { businessId: business.id, status: { in: ['pending', 'confirmed'] }, preferredDate: { gte: today } } })
+          : 0,
       business ? systemDb.businessEnquiry.findMany({ where: { businessId: business.id, createdAt: { gte: since } }, select: { createdAt: true, status: true, enquiryType: true } }) : [],
       business ? systemDb.businessEnquiry.count({ where: { businessId: business.id, createdAt: { gte: prevSince, lt: since } } }) : 0,
       business ? systemDb.businessAILog.findMany({ where: { businessId: business.id, createdAt: { gte: since } }, select: { detectedIntent: true }, take: 5000 }) : [],
@@ -81,14 +96,15 @@ export const GET = createHandler({
     ]);
 
     // ── daily series ───────────────────────────────────────────────
-    const days = Array.from({ length: query.days }, (_, i) => dayKey(new Date(since.getTime() + i * DAY)));
+    const days = Array.from({ length: query.days }, (_, i) => new Date(firstDay.getTime() + i * DAY).toISOString().slice(0, 10));
     const idx = new Map(days.map((d, i) => [d, i]));
     const zero = () => days.map(() => 0);
     const inbound = zero(), outbound = zero(), newContacts = zero(), bookings = zero();
+    const isInbound = (s: string) => s === 'customer' || s === 'contact';
     for (const m of messages) {
       const i = idx.get(dayKey(m.createdAt));
       if (i === undefined) continue;
-      if (m.senderType === 'customer' || m.senderType === 'contact') inbound[i] += 1;
+      if (isInbound(m.senderType)) inbound[i] += 1;
       else outbound[i] += 1;
     }
     for (const c of contactsSeries) { const i = idx.get(dayKey(c.createdAt)); if (i !== undefined) newContacts[i] += 1; }
@@ -112,34 +128,17 @@ export const GET = createHandler({
     ).slice(0, 8);
 
     // ── campaigns ─────────────────────────────────────────────────
-    const camp = broadcasts.reduce(
-      (acc, b) => {
-        acc.recipients += b.totalRecipients;
-        acc.delivered += b.deliveredCount + b.readCount + b.repliedCount;
-        acc.read += b.readCount + b.repliedCount;
-        acc.replied += b.repliedCount;
-        acc.failed += b.failedCount;
-        return acc;
-      },
-      { recipients: 0, delivered: 0, read: 0, replied: 0, failed: 0 },
-    );
+    const camp = {
+      recipients: campaignAgg._sum.totalRecipients ?? 0,
+      read: (campaignAgg._sum.readCount ?? 0) + (campaignAgg._sum.repliedCount ?? 0),
+      replied: campaignAgg._sum.repliedCount ?? 0,
+      delivered: (campaignAgg._sum.deliveredCount ?? 0) + (campaignAgg._sum.readCount ?? 0) + (campaignAgg._sum.repliedCount ?? 0),
+    };
     const pct = (n: number, d: number) => (d ? Math.round((n / d) * 1000) / 10 : 0);
 
-    // ── pipeline ──────────────────────────────────────────────────
-    const open = deals.filter((d) => d.status === 'active');
-    const won = deals.filter((d) => d.status === 'won' && d.updatedAt >= since);
-    const firstPipeline = stages[0]?.pipelineId;
-    const stageValues = stages
-      .filter((s) => s.pipelineId === firstPipeline)
-      .map((s) => ({
-        label: s.name,
-        color: s.color,
-        value: open.filter((d) => d.stageId === s.id).reduce((sum, d) => sum + Number(d.value ?? 0), 0),
-        count: open.filter((d) => d.stageId === s.id).length,
-      }));
-
-    const inboundTotal = inbound.reduce((a, b) => a + b, 0);
-    const outboundTotal = outbound.reduce((a, b) => a + b, 0);
+    // Exact totals come from the database; the daily series is built from at most the newest 50k rows.
+    const inboundTotal = msgTotals.filter((m) => isInbound(m.senderType)).reduce((a, m) => a + m._count._all, 0);
+    const outboundTotal = msgTotals.filter((m) => !isInbound(m.senderType)).reduce((a, m) => a + m._count._all, 0);
     const bookingsTotal = bookingRows.length;
     const bookingsPrev = Number(apptsPrev) + Number(enquiriesPrev);
     const trend = (cur: number, prev: number) => (prev ? Math.round(((cur - prev) / prev) * 100) : cur ? 100 : 0);
@@ -151,17 +150,14 @@ export const GET = createHandler({
         contacts: { total: contactsTotal, new: contactsNew, trend: trend(contactsNew, contactsPrev) },
         conversations: { open: openConversations, unread: unread._sum.unreadCount ?? 0 },
         messages: { inbound: inboundTotal, outbound: outboundTotal },
-        bookings: { total: bookingsTotal, trend: trend(bookingsTotal, bookingsPrev), upcoming: upcoming.length },
+        bookings: { total: bookingsTotal, trend: trend(bookingsTotal, bookingsPrev), upcoming: upcomingCount },
         campaigns: { sent: camp.recipients, deliveryRate: pct(camp.delivered, camp.recipients), readRate: pct(camp.read, camp.recipients), replyRate: pct(camp.replied, camp.recipients) },
-        pipeline: { openValue: open.reduce((s, d) => s + Number(d.value ?? 0), 0), openDeals: open.length, wonValue: won.reduce((s, d) => s + Number(d.value ?? 0), 0), wonDeals: won.length },
         aiReplies: aiLogsBiz.length + (aiLogsClinic as unknown[]).length,
       },
       series: { days, inbound, outbound, newContacts, bookings },
       bookingsByStatus: countBy(bookingRows, (b) => b.status),
       bookingsByGroup: countBy(bookingRows, (b) => b.group).slice(0, 6),
       intents,
-      stageValues,
-      campaigns: broadcasts.slice(0, 5).map((b) => ({ id: b.id, name: b.name, status: b.status, total: b.totalRecipients, readRate: pct(b.readCount + b.repliedCount, b.totalRecipients) })),
       upcoming: (upcoming as Array<Record<string, unknown>>).map((u) => ({
         id: u.id as string,
         name: (u.patientName ?? u.contactName ?? 'Customer') as string,

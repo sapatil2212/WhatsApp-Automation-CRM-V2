@@ -1,40 +1,19 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import Link from 'next/link';
 import { toast } from 'sonner';
-import {
-  Loader2,
-  Upload,
-  Trash2,
-  CircleAlert,
-  Shield,
-  CreditCard,
-  Calendar,
-  Building2,
-  Phone,
-  Mail,
-  User as UserIcon,
-  CheckCircle2,
-  XCircle,
-  Clock,
-} from 'lucide-react';
+import { Building2, Calendar, CheckCircle2, CircleAlert, Clock, Copy, CreditCard, Loader2, Save, Trash2, Upload, XCircle } from 'lucide-react';
 
 import { useAuth } from '@/hooks/use-auth';
+import { planById } from '@/lib/billing/plans';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Avatar,
   AvatarFallback,
   AvatarImage,
 } from '@/components/ui/avatar';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from '@/components/ui/card';
 
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 const ALLOWED_MIME = new Set([
@@ -258,339 +237,143 @@ export function ProfileForm() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="size-6 animate-spin text-primary" />
+      <div className="space-y-4">
+        <div className="h-72 animate-pulse rounded-xl bg-muted/60" />
+        <div className="h-40 animate-pulse rounded-xl bg-muted/60" />
       </div>
     );
   }
 
-  const joined = account?.createdAt
-    ? new Date(account.createdAt).toLocaleDateString(undefined, {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      })
-    : '—';
+  const fmt = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
+  const joined = account?.createdAt ? fmt(account.createdAt) : '—';
+  const subscriptionExpiry = account?.subscriptionExpiresAt ? fmt(account.subscriptionExpiresAt) : null;
+  const isSubscriptionActive = account?.subscriptionExpiresAt ? new Date(account.subscriptionExpiresAt) > new Date() : false;
 
-  const subscriptionExpiry = account?.subscriptionExpiresAt
-    ? new Date(account.subscriptionExpiresAt).toLocaleDateString(undefined, {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      })
-    : null;
+  const plan = planById(account?.selectedPlan);
 
-  const isSubscriptionActive = account?.subscriptionExpiresAt
-    ? new Date(account.subscriptionExpiresAt) > new Date()
-    : false;
+  const roleLabel = (r?: string | null) => (r === 'tenant_admin' ? 'Admin' : r === 'super_admin' ? 'Super admin' : r ? r.replace(/_/g, ' ') : 'User');
 
-  const planLabels: Record<string, string> = {
-    starter: '₹799 Starter',
-    professional: '₹1,499 Professional',
-    enterprise: '₹2,999 Enterprise',
-  };
+  const fieldCls = 'h-8 text-[13px] md:text-[13px]';
+  const labelCls = 'text-[11px] font-medium text-muted-foreground';
 
   return (
-    <div className="space-y-6">
-      {/* Profile Edit Card */}
-      <Card className="bg-muted/40 border-border">
-        <CardHeader>
-          <CardTitle className="text-foreground">Profile</CardTitle>
-          <CardDescription className="text-muted-foreground">
-            Your personal and business details. Update your information below.
-          </CardDescription>
-        </CardHeader>
+    <div className="space-y-4">
+      {/* Profile */}
+      <section className="rounded-xl border border-border/70 bg-card p-4">
+        <form onSubmit={onSubmit} className="space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold">Profile</h3>
+            <p className="text-xs text-muted-foreground">Your name, photo and business details.</p>
+          </div>
 
-        <CardContent>
-          <form onSubmit={onSubmit} className="space-y-6">
-            {/* Avatar row */}
-            <div className="flex flex-wrap items-center gap-5">
-              <Avatar size="lg" className="size-16">
-                {currentAvatar ? (
-                  <AvatarImage src={currentAvatar} alt={fullName || 'Avatar'} />
-                ) : null}
-                <AvatarFallback className="bg-primary/10 text-base text-primary">
-                  {initial}
-                </AvatarFallback>
-              </Avatar>
-
-              <div className="flex flex-wrap gap-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp,image/gif"
-                  className="hidden"
-                  onChange={onPickFile}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={saving}
-                >
-                  <Upload className="size-4" />
-                  {currentAvatar ? 'Change photo' : 'Upload photo'}
+          <div className="flex flex-wrap items-center gap-3">
+            <Avatar className="size-14">
+              {currentAvatar ? <AvatarImage src={currentAvatar} alt={fullName || 'Avatar'} /> : null}
+              <AvatarFallback className="bg-primary/10 text-base text-primary">{initial}</AvatarFallback>
+            </Avatar>
+            <div className="space-y-1">
+              <div className="flex flex-wrap gap-1.5">
+                <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={onPickFile} />
+                <Button type="button" size="sm" variant="outline" className="gap-1.5" onClick={() => fileInputRef.current?.click()} disabled={saving}>
+                  <Upload className="size-3.5" /> {currentAvatar ? 'Change photo' : 'Upload photo'}
                 </Button>
                 {currentAvatar && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={onRemoveAvatar}
-                    disabled={saving}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    <Trash2 className="size-4" />
-                    Remove
+                  <Button type="button" size="sm" variant="ghost" className="gap-1.5 text-muted-foreground hover:text-destructive" onClick={onRemoveAvatar} disabled={saving}>
+                    <Trash2 className="size-3.5" /> Remove
                   </Button>
                 )}
-                <p className="w-full text-xs text-muted-foreground">
-                  PNG, JPG, WebP, or GIF. Up to 2 MB.
-                </p>
               </div>
-            </div>
-
-            {/* Form fields - 2 columns */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="profile-full-name" className="text-foreground/90">
-                  <UserIcon className="inline size-3.5 mr-1" />
-                  Display Name
-                </Label>
-                <Input
-                  id="profile-full-name"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="John Doe"
-                  maxLength={120}
-                  disabled={saving}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="profile-email" className="text-foreground/90">
-                  <Mail className="inline size-3.5 mr-1" />
-                  Email
-                </Label>
-                <Input
-                  id="profile-email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={saving}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="profile-business-name" className="text-foreground/90">
-                  <Building2 className="inline size-3.5 mr-1" />
-                  Business Name
-                </Label>
-                <Input
-                  id="profile-business-name"
-                  value={businessName}
-                  onChange={(e) => setBusinessName(e.target.value)}
-                  placeholder="My Business"
-                  disabled={saving}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="profile-business-type" className="text-foreground/90">
-                  <Building2 className="inline size-3.5 mr-1" />
-                  Business Type
-                </Label>
-                <Input
-                  id="profile-business-type"
-                  value={businessType}
-                  onChange={(e) => setBusinessType(e.target.value)}
-                  placeholder="e.g. Healthcare, Retail"
-                  disabled={saving}
-                />
-              </div>
-
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="profile-phone" className="text-foreground/90">
-                  <Phone className="inline size-3.5 mr-1" />
-                  Phone Number
-                </Label>
-                <Input
-                  id="profile-phone"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder="+91 9876543210"
-                  disabled={saving}
-                />
-              </div>
-            </div>
-
-            {!profileData && (
-              <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                <CircleAlert className="size-4" />
-                Loading your profile…
-              </p>
-            )}
-
-            <div className="flex justify-end">
-              <Button type="submit" disabled={saving || !dirty || !profileData}>
-                {saving ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" />
-                    Saving…
-                  </>
-                ) : (
-                  'Save changes'
-                )}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-
-      {/* Account Details Card — Read-only info */}
-      <Card className="bg-muted/40 border-border">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-foreground">
-            <Shield className="size-4 text-primary" />
-            Account Details
-          </CardTitle>
-          <CardDescription className="text-muted-foreground">
-            Your account status, subscription, and system information.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {/* Role */}
-            <div className="rounded-lg border border-border bg-muted/40 p-3">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Role</p>
-              <p className="text-sm font-semibold text-foreground/90 capitalize">
-                {account?.role ?? 'user'}
-              </p>
-            </div>
-
-            {/* Verification Status */}
-            <div className="rounded-lg border border-border bg-muted/40 p-3">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Account Status</p>
-              <p className="flex items-center gap-1.5 text-sm font-semibold">
-                {account?.isVerified ? (
-                  <>
-                    <CheckCircle2 className="size-3.5 text-emerald-400" />
-                    <span className="text-emerald-400">Active</span>
-                  </>
-                ) : (
-                  <>
-                    <XCircle className="size-3.5 text-amber-400" />
-                    <span className="text-amber-400">Pending Approval</span>
-                  </>
-                )}
-              </p>
-            </div>
-
-            {/* Email Verified */}
-            <div className="rounded-lg border border-border bg-muted/40 p-3">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Email Verified</p>
-              <p className="flex items-center gap-1.5 text-sm font-semibold">
-                {account?.isEmailVerified ? (
-                  <>
-                    <CheckCircle2 className="size-3.5 text-emerald-400" />
-                    <span className="text-emerald-400">Verified</span>
-                  </>
-                ) : (
-                  <>
-                    <XCircle className="size-3.5 text-red-400" />
-                    <span className="text-red-400">Not Verified</span>
-                  </>
-                )}
-              </p>
-            </div>
-
-            {/* Selected Plan */}
-            <div className="rounded-lg border border-border bg-muted/40 p-3">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                <CreditCard className="inline size-3 mr-1" />
-                Plan
-              </p>
-              <p className="text-sm font-semibold text-foreground/90">
-                {account?.selectedPlan ? planLabels[account.selectedPlan] || account.selectedPlan : 'No Plan'}
-              </p>
-            </div>
-
-            {/* Subscription Expiry */}
-            <div className="rounded-lg border border-border bg-muted/40 p-3">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                <Clock className="inline size-3 mr-1" />
-                Subscription
-              </p>
-              <p className={`flex items-center gap-1.5 text-sm font-semibold ${isSubscriptionActive ? 'text-emerald-400' : 'text-red-400'}`}>
-                {subscriptionExpiry ? (
-                  <>
-                    {isSubscriptionActive ? (
-                      <CheckCircle2 className="size-3.5" />
-                    ) : (
-                      <XCircle className="size-3.5" />
-                    )}
-                    {isSubscriptionActive ? `Active until ${subscriptionExpiry}` : `Expired on ${subscriptionExpiry}`}
-                  </>
-                ) : (
-                  <span className="text-muted-foreground">Not subscribed</span>
-                )}
-              </p>
-            </div>
-
-            {/* Payment Proof */}
-            <div className="rounded-lg border border-border bg-muted/40 p-3">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Payment Proof</p>
-              <p className="flex items-center gap-1.5 text-sm font-semibold">
-                {account?.paymentProofAttached ? (
-                  <>
-                    <CheckCircle2 className="size-3.5 text-emerald-400" />
-                    <span className="text-emerald-400">Submitted</span>
-                  </>
-                ) : (
-                  <>
-                    <XCircle className="size-3.5 text-muted-foreground" />
-                    <span className="text-muted-foreground">Not Submitted</span>
-                  </>
-                )}
-              </p>
-            </div>
-
-            {/* Joined Date */}
-            <div className="rounded-lg border border-border bg-muted/40 p-3">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                <Calendar className="inline size-3 mr-1" />
-                Joined
-              </p>
-              <p className="text-sm font-semibold text-foreground/90">{joined}</p>
-            </div>
-
-            {/* Tenant Info */}
-            {tenant && (
-              <div className="rounded-lg border border-border bg-muted/40 p-3">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                  <Building2 className="inline size-3 mr-1" />
-                  Workspace
-                </p>
-                <p className="text-sm font-semibold text-foreground/90">
-                  {tenant.name || 'Default Workspace'}
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {tenant.isActive ? 'Active' : 'Inactive'} · Plan: {tenant.plan || 'None'}
-                </p>
-              </div>
-            )}
-
-            {/* User ID */}
-            <div className="rounded-lg border border-border bg-muted/40 p-3 sm:col-span-2 lg:col-span-3">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">User ID</p>
-              <p className="break-all font-mono text-xs text-muted-foreground">
-                {account?.id ?? '—'}
-              </p>
+              <p className="text-[11px] text-muted-foreground">PNG, JPG, WebP or GIF, up to 2 MB.</p>
             </div>
           </div>
-        </CardContent>
-      </Card>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block space-y-1" htmlFor="profile-full-name">
+              <span className={labelCls}>Display name <span className="text-destructive">*</span></span>
+              <Input id="profile-full-name" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="John Doe" maxLength={120} disabled={saving} required className={fieldCls} />
+            </label>
+            <label className="block space-y-1" htmlFor="profile-email">
+              <span className={labelCls}>Email <span className="text-destructive">*</span></span>
+              <Input id="profile-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={saving} required className={fieldCls} />
+            </label>
+            <label className="block space-y-1" htmlFor="profile-business-name">
+              <span className={labelCls}>Business name</span>
+              <Input id="profile-business-name" value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="My Business" disabled={saving} className={fieldCls} />
+            </label>
+            <label className="block space-y-1" htmlFor="profile-business-type">
+              <span className={labelCls}>Business type</span>
+              <Input id="profile-business-type" value={businessType} onChange={(e) => setBusinessType(e.target.value)} placeholder="e.g. Healthcare, Retail" disabled={saving} className={fieldCls} />
+            </label>
+            <label className="block space-y-1" htmlFor="profile-phone">
+              <span className={labelCls}>Phone number</span>
+              <Input id="profile-phone" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="+91 98765 43210" disabled={saving} className={fieldCls} />
+            </label>
+          </div>
+
+          {!profileData && (
+            <p className="flex items-center gap-2 text-xs text-muted-foreground"><CircleAlert className="size-3.5" /> Your profile could not be loaded. Refresh the page to try again.</p>
+          )}
+
+          <div className="flex items-center justify-end gap-2 border-t border-border/70 pt-3">
+            {dirty && <span className="mr-auto text-[11px] font-medium text-amber-600 dark:text-amber-400">Unsaved changes</span>}
+            <Button type="submit" size="sm" className="gap-1.5" disabled={saving || !dirty || !profileData}>
+              {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />} Save changes
+            </Button>
+          </div>
+        </form>
+      </section>
+
+      {/* Account */}
+      <section className="rounded-xl border border-border/70 bg-card p-4">
+        <h3 className="text-sm font-semibold">Account</h3>
+        <p className="mb-3 text-xs text-muted-foreground">Status, plan and workspace. See <Link href="/subscription" className="font-medium text-primary hover:underline">Subscription</Link> to renew or change your plan.</p>
+        <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+          <InfoTile label="Role" value={<span className="capitalize">{roleLabel(account?.role)}</span>} />
+          <InfoTile label="Account" value={account?.isVerified ? <Status ok>Active</Status> : <Status warn>Pending approval</Status>} />
+          <InfoTile label="Email" value={account?.isEmailVerified ? <Status ok>Verified</Status> : <Status bad>Not verified</Status>} />
+          <InfoTile label="Plan" icon={CreditCard} value={plan ? plan.name : account?.selectedPlan || 'No plan'} />
+          <InfoTile
+            label="Subscription"
+            icon={Clock}
+            value={subscriptionExpiry ? (isSubscriptionActive ? <Status ok>Until {subscriptionExpiry}</Status> : <Status bad>Expired {subscriptionExpiry}</Status>) : <span className="text-muted-foreground">Not subscribed</span>}
+          />
+          <InfoTile label="Payment proof" value={account?.paymentProofAttached ? <Status ok>Submitted</Status> : <span className="text-muted-foreground">Not submitted</span>} />
+          <InfoTile label="Joined" icon={Calendar} value={joined} />
+          {tenant && <InfoTile label="Workspace" icon={Building2} value={tenant.name || 'Default workspace'} sub={`${tenant.isActive ? 'Active' : 'Inactive'} · ${tenant.plan || 'No plan'}`} />}
+        </div>
+        <div className="mt-2.5 flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">User ID</span>
+          <code className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground">{account?.id ?? '—'}</code>
+          {account?.id && (
+            <button
+              type="button"
+              aria-label="Copy user ID"
+              title="Copy user ID"
+              className="text-muted-foreground hover:text-foreground"
+              onClick={async () => { try { await navigator.clipboard.writeText(account.id); toast.success('User ID copied'); } catch { toast.error('Could not copy'); } }}
+            >
+              <Copy className="size-3.5" />
+            </button>
+          )}
+        </div>
+      </section>
     </div>
   );
+}
+
+function InfoTile({ label, value, sub, icon: Icon }: { label: string; value: React.ReactNode; sub?: string; icon?: React.ElementType }) {
+  return (
+    <div className="rounded-lg border border-border/70 px-3 py-2">
+      <p className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{Icon && <Icon className="size-3" />} {label}</p>
+      <div className="mt-0.5 truncate text-[13px] font-semibold">{value}</div>
+      {sub && <p className="truncate text-[11px] text-muted-foreground">{sub}</p>}
+    </div>
+  );
+}
+
+/** Theme-safe status text (readable in light and dark mode). */
+function Status({ ok, warn, bad, children }: { ok?: boolean; warn?: boolean; bad?: boolean; children: React.ReactNode }) {
+  const cls = ok ? 'text-emerald-600 dark:text-emerald-400' : warn ? 'text-amber-600 dark:text-amber-400' : bad ? 'text-rose-600 dark:text-rose-400' : '';
+  const Icon = ok ? CheckCircle2 : XCircle;
+  return <span className={`inline-flex items-center gap-1 ${cls}`}><Icon className="size-3.5 shrink-0" /> {children}</span>;
 }

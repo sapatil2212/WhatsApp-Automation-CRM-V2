@@ -42,6 +42,7 @@ import type {
   KeywordMatchTriggerConfig,
 } from "@/types"
 import { cn } from "@/lib/utils"
+import { firstIssue, saveAutomation } from "@/lib/automations/client"
 
 // ------------------------------------------------------------
 // Types (builder-local — mirror the flattened rows we POST)
@@ -113,9 +114,6 @@ const TRIGGER_OPTIONS: { value: AutomationTriggerType; label: string; hint: stri
   },
   { value: "keyword_match", label: "Keyword Match", hint: "Message contains specific keyword(s)" },
   { value: "new_contact_created", label: "New Contact Created", hint: "When a contact is auto-created from an incoming message" },
-  { value: "conversation_assigned", label: "Conversation Assigned", hint: "When assigned to an agent" },
-  { value: "tag_added", label: "Tag Added", hint: "When a tag is added to a contact" },
-  { value: "time_based", label: "Time-Based", hint: "On a recurring schedule" },
 ]
 
 function cid(): string {
@@ -198,52 +196,32 @@ export function AutomationBuilder({ initial }: { initial: BuilderInitial }) {
   async function save() {
     setSaving(true)
     try {
-      const payload = {
-        name: state.name || "Untitled automation",
-        description: state.description || null,
-        trigger_type: state.trigger_type,
-        trigger_config: state.trigger_config,
-        is_active: state.is_active,
+      const saved = await saveAutomation(initial.id, {
+        name: state.name.trim() || "Untitled automation",
+        description: state.description.trim() || null,
+        triggerType: state.trigger_type,
+        triggerConfig: state.trigger_config,
+        isActive: state.is_active,
         steps: toApiSteps(state.steps),
-      }
-
-      const res = isEditing
-        ? await fetch(`/api/automations/${initial.id}`, {
-            method: "PATCH",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify(payload),
-          })
-        : await fetch(`/api/automations`, {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify(payload),
-          })
-
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        // If the server blocked activation with validation issues,
-        // surface the first concrete problem so the user can fix it
-        // without opening DevTools for the full array.
-        const firstIssue: { path?: string; message?: string } | undefined =
-          body?.issues?.[0]
-        if (firstIssue?.message) {
-          toast.error(firstIssue.message, {
-            description: firstIssue.path ? `at ${firstIssue.path}` : undefined,
-          })
-        } else {
-          toast.error(body?.error ?? "Save failed")
-        }
-        return
-      }
+      })
       toast.success(isEditing ? "Automation saved" : "Automation created")
-      if (!isEditing && body?.automation?.id) {
-        router.replace(`/automations/${body.automation.id}/edit`)
+      if (!isEditing) {
+        router.replace(`/automations/${saved.id}/edit`)
+      } else {
+        // The server may switch a broken automation off on save; mirror it.
+        setState((s) => ({ ...s, is_active: saved.isActive }))
       }
+    } catch (err) {
+      // If the server blocked activation, show the first concrete problem
+      // so it can be fixed without opening DevTools.
+      const issue = firstIssue(err)
+      toast.error(issue?.message ?? (err instanceof Error ? err.message : "Save failed"), {
+        description: issue?.path ? `at ${issue.path}` : undefined,
+      })
     } finally {
       setSaving(false)
     }
   }
-
   return (
     <div className="fixed inset-0 flex flex-col bg-background">
       {/* Top bar. At sub-sm widths the "Active" label is hidden and the
@@ -374,26 +352,24 @@ function TriggerCard({
                 onChange={onConfigChange}
               />
             )}
-            {type === "tag_added" && (
-              <Input
-                placeholder="Tag id"
-                value={(config.tag_id as string) ?? ""}
-                onChange={(e) =>
-                  onConfigChange({ ...config, tag_id: e.target.value })
-                }
-                className="bg-muted text-foreground"
-              />
+            {type === "keyword_match" && (config as { match_type?: string }).match_type === "exact" && (
+              <p className="text-[11px] text-muted-foreground">
+                Exact keywords run before the AI, so a customer typing the keyword always gets this automation.
+              </p>
             )}
-            {type === "time_based" && (
-              <Input
-                placeholder="Cron expression or HH:mm"
-                value={(config.schedule as string) ?? ""}
-                onChange={(e) =>
-                  onConfigChange({ ...config, schedule: e.target.value })
-                }
-                className="bg-muted text-foreground"
+            <label className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
+              <span>
+                <span className="block text-xs font-medium text-foreground">Send even if AI replied</span>
+                <span className="block text-[11px] text-muted-foreground">
+                  For automations that send messages. Off: it runs only when no flow or AI answered. Automations with no message step (tags, CRM, webhooks) always run.
+                </span>
+              </span>
+              <Switch
+                checked={config.send_even_if_ai_replied === true}
+                onCheckedChange={(v) => onConfigChange({ ...config, send_even_if_ai_replied: !!v })}
+                aria-label="Send even if AI replied"
               />
-            )}
+            </label>
           </div>
         )}
       </div>
@@ -1169,18 +1145,18 @@ export function toApiSteps(steps: BuilderStep[]): ApiStep[] {
  */
 export interface ServerStepNode {
   id: string
-  step_type: string
-  step_config: Record<string, unknown>
+  stepType: string
+  stepConfig: Record<string, unknown>
   branches: { yes: ServerStepNode[]; no: ServerStepNode[] }
 }
 
 export function fromServerSteps(nodes: ServerStepNode[]): BuilderStep[] {
   return nodes.map((n) => ({
     cid: cid(),
-    step_type: n.step_type as AutomationStepType,
-    step_config: n.step_config ?? {},
+    step_type: n.stepType as AutomationStepType,
+    step_config: n.stepConfig ?? {},
     branches:
-      n.step_type === "condition"
+      n.stepType === "condition"
         ? {
             yes: fromServerSteps(n.branches?.yes ?? []),
             no: fromServerSteps(n.branches?.no ?? []),

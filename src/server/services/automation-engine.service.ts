@@ -74,6 +74,47 @@ export interface AutomationContext {
   vars?: Record<string, unknown>;
 }
 
+/** Steps that put a message in front of the customer. Everything else is a side effect. */
+export const REPLY_STEP_TYPES: ReadonlySet<string> = new Set(['send_message', 'send_template']);
+
+/**
+ * Which automations a dispatch call may run, so the inbound router can keep
+ * side effects (tag, CRM, webhook) separate from customer-facing replies.
+ *
+ *  - all               everything (default; used by "Test run")
+ *  - side_effects      automations with no reply step. Always safe to run.
+ *  - replies           automations with a reply step.
+ *  - replies_opted_in  reply automations marked "send even if AI replied".
+ */
+export type AutomationScope = 'all' | 'side_effects' | 'replies' | 'replies_opted_in';
+
+/** `exact_only` / `skip_exact` split keyword automations into the pre-AI pass and the rest. */
+export type KeywordFilter = 'any' | 'exact_only' | 'skip_exact';
+
+export interface AutomationDispatchOptions {
+  scope?: AutomationScope;
+  keyword?: KeywordFilter;
+}
+
+export function hasReplySteps(steps: ReadonlyArray<{ stepType: string }>): boolean {
+  return steps.some((step) => REPLY_STEP_TYPES.has(step.stepType));
+}
+
+/** Per-automation switch, stored in `triggerConfig` (no schema change). Off unless explicitly true. */
+export function sendsEvenIfAiReplied(triggerConfig: unknown): boolean {
+  return (
+    typeof triggerConfig === 'object' &&
+    triggerConfig !== null &&
+    (triggerConfig as Record<string, unknown>).send_even_if_ai_replied === true
+  );
+}
+
+function isExactKeywordTrigger(automation: { triggerType: string; triggerConfig: unknown }): boolean {
+  if (automation.triggerType !== 'keyword_match') return false;
+  const parsed = keywordTriggerConfigSchema.safeParse(automation.triggerConfig ?? {});
+  return parsed.success && parsed.data.match_type === 'exact';
+}
+
 export interface AutomationDispatchInput {
   triggerType: AutomationTriggerType;
   contactId: string | null;
@@ -146,12 +187,23 @@ export class AutomationEngineService {
    * customer's automation is misconfigured; a non-2xx there makes Meta retry
    * the same inbound message and re-fire everything that did work.
    */
-  async dispatch(input: AutomationDispatchInput): Promise<{ executed: number; failed: number }> {
+  async dispatch(
+    input: AutomationDispatchInput,
+    options: AutomationDispatchOptions = {},
+  ): Promise<{ executed: number; failed: number }> {
+    const scope = options.scope ?? 'all';
+    const keyword = options.keyword ?? 'any';
     let executed = 0;
     let failed = 0;
 
     const automations = await this.deps.automations.listActiveForTrigger(input.triggerType);
     for (const automation of automations) {
+      const replies = hasReplySteps(automation.steps);
+      if (scope === 'side_effects' && replies) continue;
+      if (scope === 'replies' && !replies) continue;
+      if (scope === 'replies_opted_in' && !(replies && sendsEvenIfAiReplied(automation.triggerConfig))) continue;
+      if (keyword === 'exact_only' && !isExactKeywordTrigger(automation)) continue;
+      if (keyword === 'skip_exact' && isExactKeywordTrigger(automation)) continue;
       if (!this.triggerMatches(automation, input.context ?? {})) continue;
       try {
         await this.run({

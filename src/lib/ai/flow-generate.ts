@@ -59,7 +59,7 @@ NODE TYPES (config fields):
 - send_message   {"text", "next_node_key"}                 plain message
 - send_buttons   {"text", "header_text"?, "footer_text"?, "buttons":[{"reply_id","title","next_node_key"}]}   1–${L.maxButtons} buttons, title ≤ ${L.buttonTitleMaxLength} chars, waits for a tap
 - send_list      {"text", "button_label", "sections":[{"title","rows":[{"reply_id","title","description"?,"next_node_key"}]}]}   ≤ ${L.maxListRowsTotal} rows total, row title ≤ ${L.listRowTitleMaxLength} chars, description ≤ ${L.listRowDescriptionMaxLength}, button_label ≤ 20
-- collect_input  {"prompt_text", "var_key", "validation": "any"|"email"|"phone", "next_node_key"}   asks a question and stores the answer as {{var_key}}
+- collect_input  {"prompt_text", "var_key", "validation": "any"|"email"|"phone", "next_node_key"}   asks a question and stores the answer; reuse it later as {{vars.<var_key>}}
 - condition      {"subject": "var"|"tag", "subject_key", "operator": "equals"|"contains"|"present"|"absent", "value"?, "true_next", "false_next"}   for subject "tag", subject_key is the TAG NAME
 - set_tag        {"mode": "add"|"remove", "tag_name": "Lead - Hot", "next_node_key"}
 - handoff        {"note"}                                  hands the chat to a human agent (terminal)
@@ -68,7 +68,7 @@ NODE TYPES (config fields):
 RULES
 - Every next_node_key / true_next / false_next must reference an existing node_key. Every node must be reachable from start.
 - Use send_buttons for ≤ 3 choices, send_list for 4–10 choices. reply_id: snake_case, unique within the node.
-- Messages are WhatsApp-friendly: short, warm, *bold* allowed, emoji sparingly. Use {{var_key}} to reuse collected answers.
+- Messages are WhatsApp-friendly: short, warm, *bold* allowed, emoji sparingly. Reuse collected answers as {{vars.<var_key>}}, e.g. {{vars.name}}. Only reference a var_key that an earlier collect_input stores.
 - Prefer ending paths with a helpful message then "end", or "handoff" when a human must take over (complaints, custom quotes, "talk to agent").
 - Always include a way to reach a human agent from the main menu.
 - Keywords: lowercase, 2–6 relevant words.`;
@@ -206,6 +206,16 @@ export function normalizeDraft(raw: any): FlowDraft | null {
       case 'end':
         n.config = {};
         break;
+    }
+  }
+
+  // 2b. Variables: the model often writes `{{name}}`; store the canonical
+  // `{{vars.name}}` so the builder and engine agree. Numeric `{{1}}` is left alone.
+  const canonical = (s: string) => s.replace(/\{\{\s*(?!vars\.)([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g, '{{vars.$1}}');
+  for (const n of nodes) {
+    const c = n.config as Record<string, unknown>;
+    for (const field of ['text', 'prompt_text', 'note', 'caption']) {
+      if (typeof c[field] === 'string') c[field] = canonical(c[field] as string);
     }
   }
 

@@ -16,9 +16,21 @@
  * the newer wording as an edit, which starts a new approval.
  */
 
-export const LIBRARY_VERSION = 1;
+export const LIBRARY_VERSION = 2;
 
-export const TEMPLATE_EVENTS = ['confirmation', 'token_confirmation', 'reminder', 'cancelled', 'rescheduled', 'completed', 'prescription'] as const;
+/**
+ * Per-template wording version, so changing one template does not flag every
+ * other provisioned template as outdated. v2 of token_confirmation: "Token
+ * number" became "Clinic queue no.", since Meta treats "token" as an
+ * authentication (OTP) signal and can recategorise or reject the template.
+ */
+const EVENT_VERSION: Partial<Record<TemplateEvent, number>> = { token_confirmation: 2 };
+
+export function libraryVersionFor(event: string): number {
+  return EVENT_VERSION[event as TemplateEvent] ?? 1;
+}
+
+export const TEMPLATE_EVENTS = ['confirmation', 'token_confirmation', 'reminder', 'doctor_ready', 'reinstated', 'cancelled', 'rescheduled', 'no_show', 'completed', 'prescription'] as const;
 export type TemplateEvent = (typeof TEMPLATE_EVENTS)[number];
 
 export const VERTICALS = ['clinic', 'dental', 'hospital', 'gym', 'salon', 'hotel', 'other'] as const;
@@ -60,16 +72,22 @@ export const TEMPLATE_KEYS: Record<TemplateEvent, string> = {
   cancelled: 'appointment_cancelled',
   rescheduled: 'appointment_rescheduled',
   completed: 'appointment_completed',
+  doctor_ready: 'appointment_ready_now',
+  reinstated: 'appointment_reinstated',
+  no_show: 'appointment_missed',
 };
 
 export const EVENT_LABEL: Record<TemplateEvent, string> = {
   confirmation: 'Appointment created',
-  token_confirmation: 'Booked & confirmed (with token no.)',
+  token_confirmation: 'Booked & confirmed (with queue no.)',
   prescription: 'Prescription delivery (PDF)',
   reminder: 'Appointment reminder',
   cancelled: 'Appointment cancelled',
   rescheduled: 'Appointment rescheduled',
   completed: 'Appointment completed',
+  doctor_ready: 'Ready to see you now',
+  reinstated: 'Appointment reinstated',
+  no_show: 'Missed appointment (no-show)',
 };
 
 interface Terms {
@@ -102,7 +120,7 @@ function vars(t: Terms, which: VariableSource[]): TemplateVariable[] {
     appointment_time: { name: 'Time', fallback: 'the scheduled time', example: '10:30 AM' },
     service_name: { name: t.serviceLabel, fallback: t.visit, example: t.serviceExample },
     appointment_ref: { name: 'Booking ID', fallback: '-', example: 'APT-261125-K7Q2M' },
-    token_number: { name: 'Token number', fallback: '-', example: '12' },
+    token_number: { name: 'Clinic queue no.', fallback: '-', example: '12' },
     doctor_name: { name: 'Doctor name', fallback: 'your doctor', example: 'Dr. Mehta' },
   };
   return which.map((source, i) => ({ position: i + 1, source, ...meta[source] }));
@@ -112,7 +130,7 @@ function build(vertical: Vertical, event: TemplateEvent): LibraryTemplate {
   const t = TERMS[vertical];
   const V = cap(t.visit);
   const full: VariableSource[] = ['customer_name', 'business_name', 'appointment_date', 'appointment_time', 'service_name'];
-  const base = { key: TEMPLATE_KEYS[event], event, vertical, category: 'Utility' as const, language: 'en_US', footerText: null, version: LIBRARY_VERSION };
+  const base = { key: TEMPLATE_KEYS[event], event, vertical, category: 'Utility' as const, language: 'en_US', footerText: null, version: libraryVersionFor(event) };
   switch (event) {
     case 'confirmation':
       return {
@@ -154,22 +172,46 @@ function build(vertical: Vertical, event: TemplateEvent): LibraryTemplate {
         bodyText: `Hello {{1}},\n\nYour ${t.visit} at {{2}} on {{3}} has been marked as completed.\n\nThank you for choosing us.`,
         variables: vars(t, ['customer_name', 'business_name', 'appointment_date']),
       };
+    case 'doctor_ready':
+      return {
+        ...base,
+        title: `Ready to see you now`,
+        description: `Sent when staff start the ${t.visit} (queue status "In progress"), to call the customer in.`,
+        bodyText: `Hello {{1}},\n\nIt is your turn now at {{2}}.\n\n${t.serviceLabel}: {{3}}\nScheduled time: {{4}}\n\nPlease come to the reception. Reply to this message if you need any help.`,
+        variables: vars(t, ['customer_name', 'business_name', 'service_name', 'appointment_time']),
+      };
+    case 'reinstated':
+      return {
+        ...base,
+        title: `${V} reinstated`,
+        description: `Sent when a cancelled or missed ${t.visit} is put back on the schedule.`,
+        bodyText: `Hello {{1}},\n\nYour ${t.visit} at {{2}} has been reinstated.\n\n${V} details:\nDate: {{3}}\nTime: {{4}}\n${t.serviceLabel}: {{5}}\n\nReply to this message if you need to make any changes.`,
+        variables: vars(t, full),
+      };
+    case 'no_show':
+      return {
+        ...base,
+        title: `Missed ${t.visit}`,
+        description: `Sent when a ${t.visit} is marked as a no-show, so the customer can book again.`,
+        bodyText: `Hello {{1}},\n\nWe missed you at your ${t.visit} at {{2}} scheduled for {{3}} at {{4}}.\n\nReply to this message and we will help you book a new time.`,
+        variables: vars(t, ['customer_name', 'business_name', 'appointment_date', 'appointment_time']),
+      };
     case 'token_confirmation':
       return {
         ...base,
-        title: 'Booking confirmed with token',
-        description: 'Healthcare: sent when an appointment is booked, with the token number and booking ID for the reception desk.',
+        title: 'Booking confirmed with queue no.',
+        description: 'Healthcare: sent when an appointment is booked, with the clinic queue number and booking ID for the reception desk.',
         bodyText: `Hello {{1}},
 
 Your appointment at {{2}} has been booked and confirmed.
 
-Token number: {{3}}
+Clinic queue no.: {{3}}
 Booking ID: {{4}}
 Date: {{5}}
 Time: {{6}}
 ${t.serviceLabel}: {{7}}
 
-Please show your token number at the reception when you arrive. Reply to this message if you need to make any changes.`,
+Please show your queue number at the reception when you arrive. Reply to this message if you need to make any changes.`,
         variables: vars(t, ['customer_name', 'business_name', 'token_number', 'appointment_ref', 'appointment_date', 'appointment_time', 'service_name']),
       };
     case 'prescription':

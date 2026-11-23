@@ -25,7 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import { BubbleTail, Ticks } from "./parts";
+import { Ticks } from "./parts";
 import { messageTime, type InboxMessage, type Reaction } from "./types";
 
 export const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
@@ -48,7 +48,7 @@ function Media({ message }: { message: InboxMessage }) {
   const url = message.mediaUrl;
   if (!url || broken) {
     return (
-      <div className="flex items-center gap-2 rounded-md bg-[var(--wa-quote-in)] px-3 py-2 text-[13px] text-[var(--wa-text-2)]">
+      <div className="flex items-center gap-2 rounded-md bg-[var(--wa-quote-in)] px-3 py-2 text-[12px] text-[var(--wa-text-2)]">
         <ImageOff className="h-4 w-4" /> {message.contentType === "image" ? "Photo" : "Media"} unavailable
       </div>
     );
@@ -95,10 +95,10 @@ function Document({ message, out }: { message: InboxMessage; out: boolean }) {
         {ext.slice(0, 4)}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[14px]">{name}</p>
-        <p className="text-[12px] text-[var(--wa-text-2)]">{ext}</p>
+        <p className="truncate text-[12.5px]">{name}</p>
+        <p className="text-[11px] text-[var(--wa-text-2)]">{ext}</p>
       </div>
-      {message.mediaUrl ? <Download className="h-5 w-5 shrink-0 text-[var(--wa-text-2)]" /> : <FileText className="h-5 w-5" />}
+      {message.mediaUrl ? <Download className="h-4 w-4 shrink-0 text-[var(--wa-text-2)]" /> : <FileText className="h-4 w-4" />}
     </a>
   );
 }
@@ -113,7 +113,7 @@ function formatText(text: string): React.ReactNode[] {
   while ((m = re.exec(text))) {
     if (m.index > last) out.push(text.slice(last, m.index));
     const t = m[0];
-    if (t.startsWith("```")) out.push(<code key={k++} className="font-mono text-[13px]">{t.slice(3, -3)}</code>);
+    if (t.startsWith("```")) out.push(<code key={k++} className="font-mono text-[12px]">{t.slice(3, -3)}</code>);
     else if (t.startsWith("*")) out.push(<strong key={k++}>{t.slice(1, -1)}</strong>);
     else if (t.startsWith("_")) out.push(<em key={k++}>{t.slice(1, -1)}</em>);
     else if (t.startsWith("~")) out.push(<s key={k++}>{t.slice(1, -1)}</s>);
@@ -146,12 +146,12 @@ function Reactions({ reactions, currentUserId, onToggle }: { reactions: Reaction
           onClick={() => onToggle(emoji)}
           title={g.mine ? "Remove your reaction" : "React"}
           className={cn(
-            "flex h-6 items-center gap-0.5 rounded-full border border-[var(--wa-border)] bg-[var(--wa-panel-header)] px-1.5 text-[13px] shadow-sm",
+            "flex h-6 items-center gap-0.5 rounded-full border border-[var(--wa-border)] bg-[var(--wa-panel-header)] px-1.5 text-[12px] shadow-sm",
             g.mine && "border-[var(--wa-accent)]",
           )}
         >
           {emoji}
-          {g.count > 1 && <span className="text-[11px] text-[var(--wa-text-2)]">{g.count}</span>}
+          {g.count > 1 && <span className="text-[10px] text-[var(--wa-text-2)]">{g.count}</span>}
         </button>
       ))}
     </div>
@@ -186,13 +186,12 @@ export const Bubble = memo(function Bubble({
       <div className={cn("flex max-w-[85%] flex-col md:max-w-[65%]", out ? "items-end" : "items-start")}>
         <div
           className={cn(
-            "relative rounded-lg text-[14.2px] leading-[19px] shadow-[var(--wa-shadow)]",
+            "relative rounded-2xl text-[12.5px] leading-[17px] shadow-[var(--wa-shadow)]",
             out ? "bg-[var(--wa-out)]" : "bg-[var(--wa-in)]",
-            first && (out ? "rounded-tr-none" : "rounded-tl-none"),
+            first && (out ? "rounded-br-md" : "rounded-bl-md"),
             hasMediaFrame ? "p-[3px]" : "px-[9px] pb-[8px] pt-[6px]",
           )}
         >
-          {first && <BubbleTail side={out ? "out" : "in"} />}
 
           {/* Hover menu */}
           <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
@@ -245,7 +244,7 @@ export const Bubble = memo(function Bubble({
           {author && out && (
             <p
               className={cn(
-                "mb-0.5 flex items-center gap-1 text-[12.8px] font-medium",
+                "mb-0.5 flex items-center gap-1 text-[11.5px] font-medium",
                 m.senderType === "bot" ? "text-[#a78bfa]" : "text-[var(--wa-accent-strong)]",
                 hasMediaFrame && "px-1.5 pt-1",
               )}
@@ -270,29 +269,29 @@ export const Bubble = memo(function Bubble({
               <span className="min-w-0 px-2 py-1">
                 <span
                   className={cn(
-                    "block text-[12.8px] font-medium",
+                    "block text-[11.5px] font-medium",
                     m.replyTo.senderType === "customer" ? "text-[#53bdeb]" : "text-[var(--wa-accent-strong)]",
                   )}
                 >
                   {m.replyTo.senderType === "customer" ? contactName : "You"}
                 </span>
-                <span className="line-clamp-2 block text-[13px] text-[var(--wa-text-2)]">{m.replyTo.preview}</span>
+                <span className="line-clamp-2 block text-[12px] text-[var(--wa-text-2)]">{m.replyTo.preview}</span>
               </span>
             </button>
           )}
 
           {m.contentType === "template" && (
-            <span className="mb-1 inline-flex items-center gap-1 rounded bg-[var(--wa-quote-out)] px-1.5 py-0.5 text-[11px] text-[var(--wa-text-2)]">
+            <span className="mb-1 inline-flex items-center gap-1 rounded bg-[var(--wa-quote-out)] px-1.5 py-0.5 text-[10px] text-[var(--wa-text-2)]">
               <LayoutTemplate className="h-3 w-3" /> {m.templateName ?? "Template"}
             </span>
           )}
           {m.contentType === "interactive" && (
-            <span className="mb-0.5 flex items-center gap-1 text-[11px] uppercase tracking-wide text-[var(--wa-text-2)]">
+            <span className="mb-0.5 flex items-center gap-1 text-[10px] uppercase tracking-wide text-[var(--wa-text-2)]">
               <CornerDownLeft className="h-3 w-3" /> Button reply
             </span>
           )}
           {m.contentType === "location" && (
-            <span className="mb-0.5 flex items-center gap-1 text-[13px]">
+            <span className="mb-0.5 flex items-center gap-1 text-[12px]">
               <MapPin className="h-4 w-4 text-[var(--wa-accent-strong)]" /> Location
             </span>
           )}
@@ -313,7 +312,7 @@ export const Bubble = memo(function Bubble({
           {!text && !hasMediaFrame && ["document", "audio"].includes(m.contentType) && <div className="h-3.5" />}
           <span
             className={cn(
-              "absolute flex items-center gap-1 whitespace-nowrap text-[11px] leading-[15px]",
+              "absolute flex items-center gap-1 whitespace-nowrap text-[10px] leading-[14px]",
               hasMediaFrame && !text
                 ? "bottom-2 right-2 rounded-full bg-black/45 px-1.5 py-0.5 text-white"
                 : cn("bottom-[4px] right-[7px]", out ? "text-[var(--wa-text-out-meta)]" : "text-[var(--wa-text-2)]"),
@@ -324,7 +323,7 @@ export const Bubble = memo(function Bubble({
           </span>
         </div>
         {m.status === "failed" && out && (
-          <button type="button" onClick={() => onRetry?.(m)} className="mt-0.5 text-[11px] text-red-500 hover:underline">
+          <button type="button" onClick={() => onRetry?.(m)} className="mt-0.5 text-[10px] text-red-500 hover:underline">
             Not delivered{onRetry ? " · Tap to retry" : ""}
           </button>
         )}

@@ -7,7 +7,7 @@
  * the sections they want, and the normal setup save paths persist them.
  */
 
-import { callLLM, parseJSONFromLLM } from '@/lib/ai/llm';
+import { callLLM, deleteGeminiFile, GEMINI_INLINE_MAX_BYTES, parseJSONFromLLM, uploadGeminiFile } from '@/lib/ai/llm';
 import { extractTextFromDocument, MAX_DOCUMENT_SIZE_BYTES } from '@/lib/healthcare/document-parser';
 
 export const SETUP_MAX_BYTES = MAX_DOCUMENT_SIZE_BYTES; // 50 MB
@@ -129,20 +129,60 @@ Return ONLY JSON:
 }`;
 }
 
+/** Same extraction as a document, from details the owner typed or pasted. */
+export async function extractSetupFromText(input: { text: string; segment: string }): Promise<ExtractedSetup> {
+  const text = input.text.trim();
+  if (text.length < 20) throw new Error('Write a little more about the business (at least a sentence or two).');
+  const llm = await callLLM(`${prompt(input.segment, 'the text below, written by the business owner')}\n\nOWNER'S TEXT:\n${text.slice(0, MAX_TEXT)}`, {
+    geminiOnly: true,
+    jsonMode: true,
+    maxTokens: 12_000,
+    temperature: 0.1,
+    taskCriticality: 'standard' as const,
+    timeoutMs: 120_000,
+  });
+  const raw = llm.success ? parseJSONFromLLM<unknown>(llm.text) : null;
+  if (!raw) throw new Error('The AI could not read this text. Please try again.');
+  const out = normalize(raw, input.segment);
+  if (text.length > MAX_TEXT) out.notes.push('The text is very long; only the first part was analysed.');
+  return out;
+}
+
 export async function extractSetupFromFile(input: { buffer: Buffer; fileName: string; mimeType: string; segment: string }): Promise<ExtractedSetup> {
   const { buffer, fileName, mimeType, segment } = input;
   if (buffer.length > SETUP_MAX_BYTES) throw new Error('Files must be 50 MB or smaller.');
   const isImage = IMAGE.test(mimeType) || /\.(png|jpe?g|webp|heic)$/i.test(fileName);
 
+  const isPdf = /\.pdf$/i.test(fileName) || mimeType === 'application/pdf';
   let text = '';
-  if (!isImage) text = (await extractTextFromDocument(buffer, fileName, mimeType)).text;
-  const scanned = !isImage && /\.pdf$/i.test(fileName) && text.replace(/\s/g, '').length < 80;
+  if (!isImage) {
+    try {
+      text = (await extractTextFromDocument(buffer, fileName, mimeType)).text;
+    } catch (err) {
+      // A PDF the local parser can't read (engine/worker problem, odd encoding)
+      // is still readable by the AI directly; other formats have no fallback.
+      if (!isPdf) throw err;
+      text = '';
+    }
+  }
+  const scanned = !isImage && isPdf && text.replace(/\s/g, '').length < 80;
 
   const opts = { geminiOnly: true, jsonMode: true, maxTokens: 12_000, temperature: 0.1, taskCriticality: 'standard' as const, timeoutMs: 120_000 };
   let llm;
   if (isImage || scanned) {
-    if (buffer.length > 18 * 1024 * 1024) throw new Error('Scanned PDFs and images must be 18 MB or smaller for AI reading. Upload a text-based PDF or Word file instead.');
-    llm = await callLLM(prompt(segment, 'the attached document'), { ...opts, attachments: [{ mimeType: isImage ? mimeType || 'image/jpeg' : 'application/pdf', data: buffer.toString('base64') }] });
+    // The AI reads the file itself. Small files go inline; larger ones (up to
+    // the 50 MB upload limit) through the Gemini File API, deleted afterwards.
+    const mime = isImage ? mimeType || 'image/jpeg' : 'application/pdf';
+    if (buffer.length <= GEMINI_INLINE_MAX_BYTES) {
+      llm = await callLLM(prompt(segment, 'the attached document'), { ...opts, attachments: [{ mimeType: mime, data: buffer.toString('base64') }] });
+    } else {
+      const uploaded = await uploadGeminiFile(buffer, mime, fileName);
+      try {
+        llm = await callLLM(prompt(segment, 'the attached document'), { ...opts, timeoutMs: 180_000, attachments: [{ mimeType: mime, fileUri: uploaded.uri }] });
+      } finally {
+        void deleteGeminiFile(uploaded.name);
+      }
+    }
   } else {
     if (!text.trim()) throw new Error('No readable text was found in this file.');
     llm = await callLLM(`${prompt(segment, 'the document below')}\n\nDOCUMENT (${fileName}):\n${text.slice(0, MAX_TEXT)}`, opts);

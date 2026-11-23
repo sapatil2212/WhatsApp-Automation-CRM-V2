@@ -1,6 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import { ArrowRight, Bot, Check, ChevronDown, Landmark } from "lucide-react";
+import { PLANS } from "@/lib/billing/plans";
 import { InteractiveHero } from "@/components/marketing/interactive-hero";
 import { SpotlightCard } from "@/components/marketing/spotlight-card";
 import { MagneticButton } from "@/components/marketing/magnetic-button";
@@ -56,7 +57,7 @@ export default function HomePage() {
     },
     {
       q: "What are the subscription rates and Meta API fees?",
-      a: "Our self-managed Starter subscription begins at ₹799/month. Meta conversation-based fees (Utility, Authentication, Marketing, Service) are paid directly to Meta according to their official regional card rates; ChatNexGen passes through Meta API charges with 0% markup.",
+      a: "Self-Managed is ₹999/month per WhatsApp number (you run everything), Fully Managed is ₹1,999/month (our team runs it for you), and Custom plans are quoted for larger setups. Meta conversation-based fees (Utility, Authentication, Marketing, Service) are paid directly to Meta according to their official regional card rates; ChatNexGen passes through Meta API charges with 0% markup.",
     },
     {
       q: "How does the AI Assistant resolve queries?",
@@ -64,62 +65,18 @@ export default function HomePage() {
     },
   ];
 
-  const pricingCards = [
-    {
-      name: "Starter",
-      tag: "Self-Managed Setup",
-      price: "₹799",
-      period: "/month",
-      desc: "Full platform access for self-service automation, visual flow builders, and shared team inbox.",
-      features: [
-        "Official WhatsApp Business API",
-        "Visual Flow & Chatbot Builder",
-        "Shared Collaborative Inbox",
-        "27+ Native Integrations",
-        "0% Markup on Meta API fees",
-      ],
-      cta: "Get Started",
-      link: "/signup",
-      primary: false,
-    },
-    {
-      name: "Growth",
-      tag: "Done-With-You Setup",
-      price: "₹1,499",
-      period: " first month",
-      renewal: "₹799/month after",
-      desc: "Perfect for growing teams. We guide your configuration, verify accounts, and deploy core channels.",
-      features: [
-        "Everything in Starter plan",
-        "Meta Business Verification Assistance",
-        "WhatsApp Co-existence Configuration",
-        "Custom Integrations Wired In",
-        "Dedicated Account Setup Session",
-      ],
-      cta: "Get Started",
-      link: "/signup",
-      primary: true,
-    },
-    {
-      name: "Managed",
-      tag: "Done-For-You Strategy",
-      price: "₹2,999",
-      period: " pilot month",
-      renewal: "₹799/month after",
-      desc: "Fully managed operations. Our automation experts write templates, design bots, and report results.",
-      features: [
-        "Everything in Growth plan",
-        "2-3 Custom Automations built for you",
-        "Message Templates written & approved",
-        "Dedicated Account Manager",
-        "Monthly 1-on-1 Strategy Calls",
-      ],
-      cta: "Get Started",
-      link: "/signup",
-      primary: false,
-    },
-  ];
-
+  const pricingCards = PLANS.map((p) => ({
+    name: p.name,
+    tag: p.tagline,
+    price: p.price,
+    period: p.period,
+    renewal: p.selfServe ? "per WhatsApp number" : "Pricing tailored to your setup",
+    desc: p.description,
+    features: p.features,
+    cta: p.cta,
+    link: p.selfServe ? `/signup?plan=${p.id}` : "/book-demo",
+    primary: Boolean(p.popular),
+  }));
   return (
     <div className="w-full flex flex-col overflow-hidden">
       {/* FAQ Schema Injector */}
@@ -364,10 +321,10 @@ export default function HomePage() {
             <Landmark className="size-3.5" /> Pricing Options
           </div>
           <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-[var(--m-text-heading)]">
-            One platform. Flat rates.
+            Simple pricing.
           </h2>
           <p className="text-sm text-[var(--m-text-tertiary)]">
-            Active subscriptions are flat ₹2,999/month per WABA number. Select the initial setup tier that fits your team.
+            ₹999/month if you manage it, ₹1,999/month if we manage everything, or a custom plan. Prices per WhatsApp number, exclusive of GST.
           </p>
         </div>
 
@@ -405,7 +362,7 @@ export default function HomePage() {
 
                 <div className="space-y-4 pt-4">
                   <ul className="space-y-2 border-t border-[var(--m-border-primary)]/40 pt-4 text-xs text-[var(--m-text-tertiary)]">
-                    {plan.features.slice(0, 4).map((f, i) => (
+                    {plan.features.slice(0, 5).map((f, i) => (
                       <li key={i} className="flex items-center gap-2">
                         <Check className="size-3.5 text-emerald-400 shrink-0" />
                         <span>{f}</span>

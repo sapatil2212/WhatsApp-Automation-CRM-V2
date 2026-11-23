@@ -12,8 +12,9 @@
  * configurable TTL (default 5 minutes). Cache is automatically
  * invalidated when:
  *   - TTL expires
- *   - An explicit `invalidateClinicCache(userId)` call is made
- *     (called from settings/doctor/service update endpoints)
+ *   - Any write through `ClinicRepository` (doctors, timings, services,
+ *     FAQs, AI settings) or the clinic setup / routing endpoints, via
+ *     `invalidateClinicCacheByClinicId`
  *
  * Memory footprint: ~50KB per clinic (worst case with 20 doctors,
  * 50 services, 100 FAQs). Even 100 clinics = ~5MB — negligible.
@@ -88,12 +89,36 @@ export function setCachedAppointments(clinicId: string, appointments: any[]): vo
  * Call this from settings update endpoints.
  */
 export function invalidateClinicCache(userId: string): void {
-  clinicContextCache.delete(userId)
-  // Also clear appointments for any clinic belonging to this user
-  // (we key appointments by clinicId, so iterate)
+  // Read before deleting: the old order looked the entry up after removing
+  // it, so the appointments cache was never cleared here.
   const ctx = clinicContextCache.get(userId)
-  if (ctx?.clinic?.id) {
-    appointmentsCache.delete(ctx.clinic.id)
+  clinicContextCache.delete(userId)
+  if (ctx?.clinic?.id) appointmentsCache.delete(ctx.clinic.id)
+}
+
+/**
+ * Invalidate by clinic, whoever made the edit. The context is keyed by the
+ * clinic owner's userId (the WhatsApp account), so an edit by a staff member
+ * calling `invalidateClinicCacheForTenant(ctx.tenantId)` used to miss the entry and the
+ * AI kept answering from stale doctors/timings/settings for up to 5 minutes.
+ */
+export function invalidateClinicCacheByClinicId(clinicId: string): void {
+  for (const [key, ctx] of clinicContextCache) {
+    if (ctx.clinic?.id === clinicId) clinicContextCache.delete(key)
+  }
+  appointmentsCache.delete(clinicId)
+}
+
+/**
+ * Invalidate every cached clinic context for a tenant. Use from request
+ * handlers, where the editor may be a staff member rather than the owner.
+ */
+export function invalidateClinicCacheForTenant(tenantId: string): void {
+  for (const [key, ctx] of clinicContextCache) {
+    if (ctx.clinic?.tenantId === tenantId) {
+      clinicContextCache.delete(key)
+      if (ctx.clinic?.id) appointmentsCache.delete(ctx.clinic.id)
+    }
   }
 }
 

@@ -13,6 +13,8 @@
  * WhatsApp-initiated).
  */
 
+import { publicSiteUrl } from '../site-origin';
+import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
 
 import { triggerRealtimeEvent } from '@/lib/realtime';
@@ -64,7 +66,18 @@ export const boardActionSchema = z.discriminatedUnion('action', [
     notify: z.boolean().default(true),
   }),
   z.object({ action: z.literal('remind') }),
+  z.object({
+    action: z.literal('edit'),
+    name: z.string().trim().min(2, "Enter the patient's name.").max(120),
+    age: z.string().trim().regex(/^\d{0,3}$/, 'Age must be a number.').optional(),
+    gender: z.enum(['male', 'female', 'other', 'prefer_not_to_say']).nullable().optional(),
+    email: z.string().trim().email('Enter a valid email.').max(191).optional().or(z.literal('')),
+    complaint: z.string().trim().max(1000).optional(),
+    departmentId: z.string().uuid().nullable().optional(),
+  }),
 ]);
+
+export const boardBulkDeleteSchema = z.object({ ids: z.array(z.string().uuid()).min(1).max(200) });
 
 const include = {
   contact: { select: { id: true, name: true, phone: true, email: true } },
@@ -385,6 +398,16 @@ export async function actOnBoard(db: TenantDb, tenantId: string, id: string, bod
         `Hi ${after.patientName || after.contact?.name || 'there'}, your appointment at *${clinic.clinicName}* has been moved. 📅\n\n🩺 ${drName(after.doctor?.doctorName)}\n📅 ${pretty(body.date)} · ${prettyTime(body.time)}\n🆔 ${after.detail?.appointmentRef ?? bookingRef(id)}\n\nReply here if this time doesn't work for you.`,
       );
     }
+  } else if (body.action === 'edit') {
+    await db.appointment.updateMany({ where: { id }, data: { patientName: body.name, patientAge: body.age || null, reasonForVisit: body.complaint || null } });
+    if (!before.contact?.name) await db.contact.updateMany({ where: { id: before.contactId }, data: { name: body.name } });
+    const detailData = {
+      patientEmail: body.email || null,
+      ...(body.gender !== undefined ? { patientGender: body.gender } : {}),
+      ...(body.departmentId !== undefined ? { departmentId: body.departmentId } : {}),
+    };
+    if (before.detail) await db.appointmentDetail.updateMany({ where: { appointmentId: id }, data: detailData });
+    else await db.appointmentDetail.create({ data: { appointmentId: id, appointmentRef: bookingRef(id), patientPhone: before.contact?.phone ?? null, whatsappConsent: false, source: 'whatsapp', ...detailData } as never });
   } else {
     if (before.status !== 'scheduled') throw new ConflictError('Reminders can only be sent for scheduled appointments.');
     if (!canMessage(before)) throw new ConflictError("This patient hasn't agreed to WhatsApp messages or has no number.");
@@ -404,4 +427,177 @@ export async function actOnBoard(db: TenantDb, tenantId: string, id: string, bod
 
   appointmentsChanged(tenantId, { id, kind: body.action });
   return { row: toBoardRow(await loadRow(db, clinic.id, id)), messaged };
+}
+
+
+/** Appointments with a consultation hold medical records and are never deleted from the board. */
+export async function deleteFromBoard(db: TenantDb, tenantId: string, ids: string[]): Promise<{ deleted: string[]; blocked: Array<{ id: string; reason: string }> }> {
+  const clinic = await requireClinic(db);
+  const rows = await db.appointment.findMany({ where: { id: { in: ids }, clinicId: clinic.id }, select: { id: true, consultation: { select: { id: true } } } });
+  const found = new Set(rows.map((r) => r.id));
+  const blocked: Array<{ id: string; reason: string }> = ids.filter((i) => !found.has(i)).map((id) => ({ id, reason: 'Appointment not found.' }));
+  const deletable = rows.filter((r) => !r.consultation).map((r) => r.id);
+  for (const r of rows) if (r.consultation) blocked.push({ id: r.id, reason: 'It has a consultation record. Cancel it instead.' });
+  if (deletable.length) {
+    await db.appointment.deleteMany({ where: { id: { in: deletable }, clinicId: clinic.id } });
+    appointmentsChanged(tenantId, { kind: 'deleted' });
+  }
+  return { deleted: deletable, blocked };
+}
+
+// ── consultation queue: manual status ───────────────────────────────
+
+export const QUEUE_STATUSES = ['ready', 'in_progress', 'completed', 'no_show', 'cancelled'] as const;
+export const queueStatusSchema = z.object({
+  status: z.enum(QUEUE_STATUSES),
+  /** Tell the patient on WhatsApp (only if they consented). */
+  notify: z.boolean().default(true),
+});
+
+/**
+ * Changes a patient's status from the consultation queue, from any status
+ * except a completed consultation, and tells the patient on WhatsApp.
+ *
+ *  ready        on the schedule, waiting. From cancelled / no-show this
+ *               reinstates the same slot (refused if someone else took it).
+ *               Message: "your appointment is back on".
+ *  in_progress  starts (or resumes) the consultation. Message: doctor is ready.
+ *  completed    closes the visit; an open consultation is closed too (its draft
+ *               prescription is not issued). Message: thank-you + feedback ask.
+ *  no_show      marks it missed. Message: "we missed you" + rebooking link.
+ *  cancelled    cancels; an open consultation is cancelled. Message: cancellation.
+ *
+ * Every change sends its own message (keyed per change, so changing back and
+ * forth is never silently de-duplicated). Messages go through the notification
+ * engine (24h window → text, else the approved template) and only to patients
+ * who agreed to WhatsApp updates. The scheduled lifecycle engine is told the
+ * completed / no-show step was handled so it does not send a second copy.
+ */
+export async function setQueueStatus(
+  db: TenantDb,
+  ctx: { tenantId: string; userId: string; role: string },
+  id: string,
+  body: z.infer<typeof queueStatusSchema>,
+): Promise<{ status: (typeof QUEUE_STATUSES)[number]; messaged: boolean; notifiable: boolean }> {
+  const clinic = await requireClinic(db);
+  const before = await loadRow(db, clinic.id, id);
+  const consult = await db.consultation.findFirst({ where: { appointmentId: id }, select: { id: true, status: true, startedAt: true } });
+  const service = AppointmentService.create(db);
+  const notifiable = canMessage(before);
+  const date = dateOnly(before.appointmentDate);
+  const slot = `${date} ${before.appointmentTime}`;
+  const name = before.patientName || before.contact?.name || 'there';
+  const consultOpen = consult?.status === 'in_progress';
+  const consultDone = consult?.status === 'completed';
+  // One key per change, so ready → cancelled → ready sends every message.
+  const changeKey = (kind: string) => `${kind}@${slot}#${new Date().toISOString().slice(0, 16)}`;
+  const send = (event: NotifyEvent, kind: string, text: string) =>
+    body.notify && notifiable ? notifyPatient(ctx.tenantId, clinic.clinicName, before, event, changeKey(kind), text) : Promise.resolve(false);
+  let messaged = false;
+
+  if (consultDone && body.status !== 'completed') {
+    throw new ConflictError('This consultation is completed and is part of the medical record, so its status can no longer change.');
+  }
+
+  const closeConsultation = async (status: 'completed' | 'cancelled') => {
+    if (!consultOpen || !consult) return;
+    const now = new Date();
+    await db.consultation.updateMany({
+      where: { id: consult.id, status: 'in_progress' },
+      data: {
+        status,
+        completedAt: now,
+        completedBy: ctx.userId,
+        durationSec: Math.max(0, Math.round((now.getTime() - consult.startedAt.getTime()) / 1000)),
+      },
+    });
+  };
+  /** Back on the schedule; a cancelled draft consultation is kept for later. */
+  const reinstate = async () => {
+    if (before.status === 'scheduled') return false;
+    await service.reinstate(id);
+    // Completed / no-show markers from an earlier pass must not block a new one.
+    const fresh = await db.appointment.findFirst({ where: { id }, select: { remindersSent: true } });
+    const log = sentLog(fresh?.remindersSent);
+    delete log.no_show;
+    delete log.completed;
+    await db.appointment.updateMany({ where: { id }, data: { remindersSent: log as Prisma.InputJsonObject } });
+    return true;
+  };
+  /** Records the lifecycle step as handled here, so the scheduler sends no duplicate. */
+  const markLifecycle = async (step: 'completed' | 'no_show') => {
+    const fresh = await db.appointment.findFirst({ where: { id }, select: { remindersSent: true } });
+    await db.appointment.updateMany({
+      where: { id },
+      data: { remindersSent: { ...sentLog(fresh?.remindersSent), [step]: new Date().toISOString(), [`${step}_by`]: body.notify ? 'staff' : 'staff_silent' } },
+    });
+  };
+  const lifecycleText = async (step: 'completed' | 'no_show') => {
+    const { messageFor } = await import('./appointment-lifecycle');
+    const { bookingSlugFor } = await import('./booking-slug');
+    const site = publicSiteUrl();
+    const token = sentLog(before.remindersSent).token;
+    return messageFor(step, {
+      patient: before.patientName || before.contact?.name || '',
+      clinic: clinic.clinicName,
+      doctor: before.doctor?.doctorName ?? null,
+      date: before.appointmentDate,
+      time: before.appointmentTime,
+      token: typeof token === 'number' ? token : undefined,
+      link: site ? `${site}/book/${await bookingSlugFor(clinic.id)}` : '',
+    });
+  };
+  const ref = before.detail?.appointmentRef ?? bookingRef(id);
+  const backOnText = `Hi ${name}, your appointment at *${clinic.clinicName}* is back on. ✅\n\n🩺 ${drName(before.doctor?.doctorName) || 'Consultation'}\n📅 ${pretty(date)} · ${prettyTime(before.appointmentTime)}\n🆔 ${ref}\n\nReply here if you need to change it.`;
+
+  switch (body.status) {
+    case 'ready': {
+      if (consultOpen) throw new ConflictError('The consultation is in progress. Complete or cancel it instead.');
+      if (await reinstate()) messaged = await send('reinstated', 'reinstated', backOnText);
+      break;
+    }
+    case 'in_progress': {
+      const reinstated = await reinstate();
+      const { startConsultation } = await import('./consultation.service');
+      await startConsultation(db, ctx as never, id);
+      if (!consultOpen) {
+        messaged = await send(
+          'doctor_ready',
+          'called',
+          `Hi ${name}, ${drName(before.doctor?.doctorName) || 'the doctor'} is ready to see you now at *${clinic.clinicName}*. 🩺\n\nPlease proceed to the consultation room.${reinstated ? `\n🆔 ${ref}` : ''}`,
+        );
+      }
+      break;
+    }
+    case 'completed': {
+      if (before.status === 'completed') break;
+      await reinstate();
+      await closeConsultation('completed');
+      await service.setStatus(id, { status: 'completed' });
+      await markLifecycle('completed');
+      messaged = await send('completed', 'completed', await lifecycleText('completed'));
+      if (messaged) await db.appointment.updateMany({ where: { id }, data: { feedbackSent: true } });
+      break;
+    }
+    case 'no_show': {
+      if (consultOpen) throw new ConflictError('The patient is being seen, so this cannot be marked as a no-show.');
+      if (before.status === 'cancelled') await reinstate();
+      if (before.status !== 'no_show') await service.setStatus(id, { status: 'no_show' });
+      await markLifecycle('no_show');
+      messaged = await send('no_show', 'no_show', await lifecycleText('no_show'));
+      break;
+    }
+    case 'cancelled': {
+      await closeConsultation('cancelled');
+      if (before.status === 'cancelled') break;
+      if (before.status === 'completed') throw new ConflictError('A completed appointment cannot be cancelled.');
+      await service.setStatus(id, { status: 'cancelled' });
+      const text = statusMessage('cancelled', before, clinic.clinicName);
+      if (text) messaged = await send('cancelled', 'cancelled', text);
+      break;
+    }
+  }
+
+  appointmentsChanged(ctx.tenantId, { id, kind: `queue_${body.status}` });
+  return { status: body.status, messaged, notifiable };
 }

@@ -59,14 +59,14 @@ export function DealCard({ deal, stage, onEdit, isOverlay }: DealCardProps) {
         e.stopPropagation();
         onEdit(deal);
       }}
-      className={`group relative w-full cursor-pointer overflow-hidden rounded-xl border border-border/80 bg-card py-3 pl-4 pr-3 text-left shadow-xs transition-all ${
+      className={`group relative w-full cursor-pointer overflow-hidden rounded-lg border border-border/70 bg-card py-2.5 pl-3.5 pr-2.5 text-left shadow-xs transition-all ${
         isOverlay ? "rotate-1 shadow-xl ring-2 ring-primary/30" : "hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
       }`}
     >
       <span aria-hidden className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: stage?.color ?? "#94a3b8" }} />
 
       <div className="flex items-start justify-between gap-2">
-        <h4 className="line-clamp-2 flex-1 text-sm font-semibold leading-snug">{deal.title}</h4>
+        <h4 className="line-clamp-2 flex-1 text-[13px] font-semibold leading-snug">{deal.title}</h4>
         {deal.status === "won" && (
           <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
             <Check className="size-3" /> Won
@@ -79,23 +79,23 @@ export function DealCard({ deal, stage, onEdit, isOverlay }: DealCardProps) {
         )}
       </div>
 
-      <p className="mt-1.5 text-base font-bold tabular-nums">{formatMoney(deal.value, deal.currency)}</p>
+      <p className="mt-1 text-[13px] font-bold tabular-nums">{formatMoney(deal.value, deal.currency)}</p>
 
-      <div className="mt-2.5 flex items-center justify-between gap-2">
+      <div className="mt-2 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          <span className={`flex size-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-foreground ${avatarClass(deal.contact_id ?? deal.id)}`}>
+          <span className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold text-foreground ${avatarClass(deal.contact_id ?? deal.id)}`}>
             {initials(deal.contact?.name, deal.contact?.phone)}
           </span>
-          <span className="truncate text-xs text-muted-foreground">{contactLabel}</span>
+          <span className="truncate text-[11px] text-muted-foreground">{contactLabel}</span>
         </div>
         {deal.assignee?.full_name && (
-          <span title={`Owner: ${deal.assignee.full_name}`} className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-semibold text-primary">
+          <span title={`Owner: ${deal.assignee.full_name}`} className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[9px] font-semibold text-primary">
             {initials(deal.assignee.full_name)}
           </span>
         )}
       </div>
 
-      <div className="mt-2.5 flex items-center justify-between border-t border-border/60 pt-2 text-[11px] text-muted-foreground">
+      <div className="mt-2 flex items-center justify-between border-t border-border/60 pt-1.5 text-[10px] text-muted-foreground">
         {close ? (
           <span className={`inline-flex items-center gap-1 ${overdue ? "font-medium text-red-600 dark:text-red-400" : ""}`}>
             {overdue ? <AlertCircle className="size-3" /> : <CalendarDays className="size-3" />}

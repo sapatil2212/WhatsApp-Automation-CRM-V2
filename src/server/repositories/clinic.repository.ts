@@ -17,6 +17,7 @@ import type { Prisma } from '@prisma/client';
 
 import { scoped, type TenantDb } from '../kernel';
 import { BaseRepository } from './base.repository';
+import { invalidateClinicCacheByClinicId } from '@/lib/healthcare/clinic-cache';
 
 const clinicSelect = {
   id: true,
@@ -124,6 +125,7 @@ export class ClinicRepository extends BaseRepository {
     const existing = await this.db.clinic.findFirst({ select: { id: true } });
     if (existing) {
       await this.db.clinic.updateMany({ where: { id: existing.id }, data: input.data });
+      invalidateClinicCacheByClinicId(existing.id);
       return this.require();
     }
     return this.db.clinic.create({
@@ -158,6 +160,7 @@ export class ClinicRepository extends BaseRepository {
       await tx.clinicTiming.deleteMany({ where: { clinicId } });
       await tx.clinicTiming.createMany({ data: timings.map((timing) => ({ clinicId, ...timing })) });
     });
+    invalidateClinicCacheByClinicId(clinicId);
     return this.listTimings(clinicId);
   }
 
@@ -176,7 +179,9 @@ export class ClinicRepository extends BaseRepository {
   }
 
   async createDoctor(clinicId: string, data: Prisma.DoctorUncheckedCreateInput): Promise<DoctorRow> {
-    return this.db.doctor.create({ data: { ...data, clinicId }, select: doctorSelect });
+    const row = await this.db.doctor.create({ data: { ...data, clinicId }, select: doctorSelect });
+    invalidateClinicCacheByClinicId(clinicId);
+    return row;
   }
 
   async updateDoctor(
@@ -185,11 +190,13 @@ export class ClinicRepository extends BaseRepository {
     data: Prisma.DoctorUpdateManyMutationInput,
   ): Promise<DoctorRow> {
     this.requireAffected(await this.db.doctor.updateMany({ where: { id: doctorId, clinicId }, data }));
+    invalidateClinicCacheByClinicId(clinicId);
     return this.requireFound(await this.findDoctor(clinicId, doctorId));
   }
 
   async deleteDoctor(clinicId: string, doctorId: string): Promise<void> {
     this.requireAffected(await this.db.doctor.deleteMany({ where: { id: doctorId, clinicId } }));
+    invalidateClinicCacheByClinicId(clinicId);
   }
 
   // ── services ──────────────────────────────────────────────────────
@@ -206,7 +213,9 @@ export class ClinicRepository extends BaseRepository {
     clinicId: string,
     data: Omit<Prisma.ClinicServiceUncheckedCreateInput, 'clinicId'>,
   ): Promise<ClinicServiceRow> {
-    return this.db.clinicService.create({ data: { ...data, clinicId }, select: serviceSelect });
+    const row = await this.db.clinicService.create({ data: { ...data, clinicId }, select: serviceSelect });
+    invalidateClinicCacheByClinicId(clinicId);
+    return row;
   }
 
   async updateService(
@@ -217,6 +226,7 @@ export class ClinicRepository extends BaseRepository {
     this.requireAffected(
       await this.db.clinicService.updateMany({ where: { id: serviceId, clinicId }, data }),
     );
+    invalidateClinicCacheByClinicId(clinicId);
     return this.requireFound(
       await this.db.clinicService.findFirst({ where: { id: serviceId, clinicId }, select: serviceSelect }),
     );
@@ -226,6 +236,7 @@ export class ClinicRepository extends BaseRepository {
     this.requireAffected(
       await this.db.clinicService.deleteMany({ where: { id: serviceId, clinicId } }),
     );
+    invalidateClinicCacheByClinicId(clinicId);
   }
 
   // ── FAQs ──────────────────────────────────────────────────────────
@@ -242,7 +253,9 @@ export class ClinicRepository extends BaseRepository {
     clinicId: string,
     data: { question: string; answer: string; keywords: string | null },
   ): Promise<ClinicFaqRow> {
-    return this.db.clinicFAQ.create({ data: { ...data, clinicId }, select: faqSelect });
+    const row = await this.db.clinicFAQ.create({ data: { ...data, clinicId }, select: faqSelect });
+    invalidateClinicCacheByClinicId(clinicId);
+    return row;
   }
 
   async updateFaq(
@@ -251,6 +264,7 @@ export class ClinicRepository extends BaseRepository {
     data: Prisma.ClinicFAQUpdateManyMutationInput,
   ): Promise<ClinicFaqRow> {
     this.requireAffected(await this.db.clinicFAQ.updateMany({ where: { id: faqId, clinicId }, data }));
+    invalidateClinicCacheByClinicId(clinicId);
     return this.requireFound(
       await this.db.clinicFAQ.findFirst({ where: { id: faqId, clinicId }, select: faqSelect }),
     );
@@ -258,6 +272,7 @@ export class ClinicRepository extends BaseRepository {
 
   async deleteFaq(clinicId: string, faqId: string): Promise<void> {
     this.requireAffected(await this.db.clinicFAQ.deleteMany({ where: { id: faqId, clinicId } }));
+    invalidateClinicCacheByClinicId(clinicId);
   }
 
   /** Bulk import, atomic. `replace` clears the existing set first. */
@@ -266,7 +281,7 @@ export class ClinicRepository extends BaseRepository {
     faqs: Array<{ question: string; answer: string; keywords: string | null }>,
     mode: 'append' | 'replace',
   ): Promise<number> {
-    return this.db.$transaction(async (tx) => {
+    const count = await this.db.$transaction(async (tx) => {
       if (mode === 'replace') {
         await tx.clinicFAQ.deleteMany({ where: { clinicId } });
       }
@@ -275,6 +290,8 @@ export class ClinicRepository extends BaseRepository {
       });
       return result.count;
     });
+    invalidateClinicCacheByClinicId(clinicId);
+    return count;
   }
 
   // ── AI settings ───────────────────────────────────────────────────
@@ -298,6 +315,7 @@ export class ClinicRepository extends BaseRepository {
       update: data,
       select: { id: true },
     });
+    invalidateClinicCacheByClinicId(clinicId);
     return this.requireFound(await this.findAiSettings(clinicId));
   }
 }

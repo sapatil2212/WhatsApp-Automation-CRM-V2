@@ -34,6 +34,48 @@ export interface SendMessageNodeConfig {
   next_node_key: string;
 }
 
+export interface SendMediaNodeConfig {
+  media_type: "image" | "video" | "document";
+  /** Public https URL Meta can fetch. */
+  url: string;
+  caption?: string;
+  /** Shown for documents. */
+  filename?: string;
+  next_node_key: string;
+}
+
+export interface SendTemplateNodeConfig {
+  /** Approved Meta template; works outside the 24-hour window. */
+  template_name: string;
+  language?: string;
+  /** Body variables in order; can interpolate {{vars.X}}. */
+  params?: string[];
+  next_node_key: string;
+}
+
+export interface DelayNodeConfig {
+  amount: number;
+  unit: "minutes" | "hours" | "days";
+  /** End the run (without consuming the reply) if the customer writes during the wait. */
+  stop_on_reply?: boolean;
+  next_node_key: string;
+}
+
+export interface HttpRequestNodeConfig {
+  /** Public https URL; {{vars.x}} values are URL-encoded into it. */
+  url: string;
+  method: "GET" | "POST";
+  /** Sent as the Authorization header, e.g. "Bearer abc". */
+  auth_header?: string;
+  /** Variable that receives the response (raw text, or the value at json_path). */
+  save_as?: string;
+  /** Dotted path into a JSON response, e.g. "data.0.status". */
+  json_path?: string;
+  next_node_key: string;
+  /** Where to go when the call fails; without it the run fails. */
+  on_error_next_key?: string;
+}
+
 export interface SendButtonsNodeConfig {
   text: string;
   /** Optional header / footer lines around the buttons. */
@@ -158,6 +200,10 @@ export type EndNodeConfig = Record<string, never>;
 export type FlowNodeConfig =
   | { node_type: "start"; config: StartNodeConfig }
   | { node_type: "send_message"; config: SendMessageNodeConfig }
+  | { node_type: "send_media"; config: SendMediaNodeConfig }
+  | { node_type: "send_template"; config: SendTemplateNodeConfig }
+  | { node_type: "delay"; config: DelayNodeConfig }
+  | { node_type: "http_request"; config: HttpRequestNodeConfig }
   | { node_type: "send_buttons"; config: SendButtonsNodeConfig }
   | { node_type: "send_list"; config: SendListNodeConfig }
   | { node_type: "collect_input"; config: CollectInputNodeConfig }

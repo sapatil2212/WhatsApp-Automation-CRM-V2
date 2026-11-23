@@ -7,6 +7,7 @@
  * once (tracked in `remindersSent.closureNotified`).
  */
 
+import { publicSiteUrl } from '../site-origin';
 import { blockingExceptions } from '@/lib/healthcare/exceptions';
 import { getLogger, systemDb } from '../kernel';
 import { bookingSlugFor } from './booking-slug';
@@ -16,7 +17,7 @@ import { appointmentValues, deliverAppointmentMessage } from './appointment-noti
 const log = getLogger('closure-notify');
 
 function siteUrl(): string {
-  return (process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '');
+  return publicSiteUrl();
 }
 
 export async function notifyAffectedAppointments(input: { clinicId: string; doctorId?: string }): Promise<number> {

@@ -6,13 +6,15 @@ import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
   AlertTriangle, ArrowLeft, CalendarClock, CheckCheck, Clock, Download, Eye, Loader2, MessageCircleReply,
-  Pause, Rocket, Send, Square, Trash2, XCircle,
+  Pause, Pencil, Rocket, Send, Square, Trash2, XCircle,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { api, type BroadcastDto, type RecipientDto } from '@/lib/campaigns/api';
 import { STATUS_STYLE } from '@/lib/campaigns/status';
 import { CampaignControls } from '@/components/campaigns/campaign-controls';
+import { RenameCampaignDialog } from '@/components/campaigns/rename-campaign-dialog';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 type RecipientFilter = 'all' | RecipientDto['status'];
 const PAGE_SIZE = 50;
@@ -42,6 +44,8 @@ export default function CampaignDetailPage() {
   const router = useRouter();
   const [campaign, setCampaign] = useState<BroadcastDto | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [recipients, setRecipients] = useState<RecipientDto[]>([]);
   const [recTotal, setRecTotal] = useState(0);
   const [recPage, setRecPage] = useState(1);
@@ -146,7 +150,6 @@ export default function CampaignDetailPage() {
   }
 
   async function remove() {
-    if (!window.confirm('Delete this campaign? This cannot be undone.')) return;
     setBusy('delete');
     try {
       await api(`/api/broadcasts/${id}`, { method: 'DELETE' });
@@ -155,6 +158,7 @@ export default function CampaignDetailPage() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Delete failed');
       setBusy(null);
+      throw err;
     }
   }
 
@@ -239,11 +243,16 @@ export default function CampaignDetailPage() {
                 {busy === 'export' ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />} Export CSV
               </Button>
             )}
-            {campaign.editable && (
-              <Button variant="ghost" onClick={remove} disabled={busy !== null} className="gap-1.5 text-muted-foreground hover:text-destructive">
-                <Trash2 className="size-4" /> Delete
-              </Button>
-            )}
+            <Button variant="outline" onClick={() => setRenameOpen(true)} className="gap-1.5"><Pencil className="size-4" /> Rename</Button>
+            <Button
+              variant="ghost"
+              onClick={() => setDeleteOpen(true)}
+              disabled={busy !== null || campaign.status === 'sending'}
+              title={campaign.status === 'sending' ? 'Pause or cancel before deleting' : undefined}
+              className="gap-1.5 text-muted-foreground hover:text-destructive"
+            >
+              <Trash2 className="size-4" /> Delete
+            </Button>
           </div>
         </div>
       </div>
@@ -384,6 +393,17 @@ export default function CampaignDetailPage() {
           </div>
         )}
       </div>
+
+      <RenameCampaignDialog campaign={renameOpen ? campaign : null} onClose={() => setRenameOpen(false)} onSaved={setCampaign} />
+      <ConfirmationDialog
+        isOpen={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Delete this campaign?"
+        description={`"${campaign.name}" and its recipient results will be permanently removed. Messages already sent to customers are not recalled. This cannot be undone.`}
+        confirmText="Delete"
+        variant="destructive"
+        onConfirm={remove}
+      />
     </div>
   );
 }

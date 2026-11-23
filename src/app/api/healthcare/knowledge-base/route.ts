@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { verifyAccessToken, rotateRefreshToken } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import { invalidateClinicCache } from '@/lib/healthcare/clinic-cache'
+import { invalidateClinicCacheForTenant } from '@/lib/healthcare/clinic-cache'
 
 async function getAuthContext() {
   // 1. Try JWT cookies with Prisma
@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
     })
 
     // Invalidate in-memory cache so WhatsApp auto-responder immediately uses new knowledge
-    invalidateClinicCache(ctx.userId)
+    invalidateClinicCacheForTenant(ctx.tenantId)
 
     return NextResponse.json({
       success: true,

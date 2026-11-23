@@ -763,7 +763,7 @@ export function InboxApp() {
   return (
     <div className="wa-inbox -m-4 flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden bg-[var(--wa-panel-header)] sm:-m-6">
       {waConnected === false && (
-        <div className="flex shrink-0 items-center justify-center gap-2 bg-amber-500/15 px-4 py-1.5 text-[13px] text-amber-600 dark:text-amber-400">
+        <div className="flex shrink-0 items-center justify-center gap-2 bg-amber-500/15 px-4 py-1.5 text-[12px] text-amber-600 dark:text-amber-400">
           <WifiOff className="h-4 w-4" /> WhatsApp is not connected — messages can&apos;t be delivered. Connect it in Settings.
         </div>
       )}
@@ -884,21 +884,21 @@ export function InboxApp() {
             </>
           ) : (
             <div className="relative flex flex-1 flex-col items-center justify-center border-l border-[var(--wa-border)] bg-[var(--wa-panel-header)] px-8 text-center">
-              <div className="flex h-28 w-28 items-center justify-center rounded-full bg-[var(--wa-chip-active)]">
-                <MessagesSquare className="h-14 w-14 text-[var(--wa-accent-strong)]" />
+              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[var(--wa-chip-active)]">
+                <MessagesSquare className="h-10 w-10 text-[var(--wa-accent-strong)]" />
               </div>
-              <h2 className="mt-8 text-[32px] font-light text-[var(--wa-text)]">ChatNexGen Inbox</h2>
-              <p className="mt-3 max-w-md text-[14px] leading-5 text-[var(--wa-text-2)]">
+              <h2 className="mt-6 text-lg font-semibold text-[var(--wa-text)]">ChatNexGen Inbox</h2>
+              <p className="mt-3 max-w-md text-[12.5px] leading-5 text-[var(--wa-text-2)]">
                 Reply to customers, hand chats between the AI assistant and your team, and resolve conversations — all in real time.
               </p>
-              <p className="mt-2 text-[13px] text-[var(--wa-text-2)]">
+              <p className="mt-2 text-[12px] text-[var(--wa-text-2)]">
                 Press <kbd className="font-mono">?</kbd> for keyboard shortcuts.
               </p>
-              <p className="absolute bottom-8 flex items-center gap-1.5 text-[13px] text-[var(--wa-text-2)]">
+              <p className="absolute bottom-8 flex items-center gap-1.5 text-[12px] text-[var(--wa-text-2)]">
                 <Lock className="h-3.5 w-3.5" /> Delivered through the official WhatsApp Business Platform
               </p>
               {active === null && activeId && (
-                <p className="mt-4 text-[13px] text-[var(--wa-text-2)]">Opening chat…</p>
+                <p className="mt-4 text-[12px] text-[var(--wa-text-2)]">Opening chat…</p>
               )}
             </div>
           )}

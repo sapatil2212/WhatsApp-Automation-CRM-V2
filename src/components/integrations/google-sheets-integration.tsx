@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Check, CheckCircle2, Copy, ExternalLink, FileSpreadsheet, Loader2, RefreshCw, Send, Unplug } from 'lucide-react';
+import { Check, Copy, ExternalLink, FileSpreadsheet, Loader2, RefreshCw, Send, Unplug } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 /** Apps Script the tenant pastes into Extensions → Apps Script. */
 export const APPS_SCRIPT = `/**
@@ -65,7 +66,7 @@ const STEPS = [
   { title: 'Paste the script', body: 'Copy the script below, paste it into Code.gs and click Save (💾).' },
   { title: 'Deploy as a web app', body: 'Click Deploy → New deployment → gear icon → Web app. Set "Execute as: Me" and "Who has access: Anyone". Click Deploy and approve the permissions (Advanced → Go to project → Allow).' },
   { title: 'Copy the Web app URL', body: 'Copy the URL that ends with /exec and paste it below, then click Connect. We send a test row to confirm.' },
-  { title: 'Done — data flows automatically', body: 'New leads, appointments (with token numbers) and bookings land in separate tabs: Leads, Appointments, Bookings. Status changes update the same row.' },
+  { title: 'Done. Data flows automatically', body: 'New leads, appointments (with queue numbers) and bookings land in separate tabs: Leads, Appointments, Bookings. Status changes update the same row.' },
 ];
 
 export function GoogleSheetsIntegration() {
@@ -74,6 +75,7 @@ export function GoogleSheetsIntegration() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<null | 'save' | 'test' | 'backfill' | 'disconnect'>(null);
   const [copied, setCopied] = useState(false);
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
 
   useEffect(() => {
     fetch('/api/integrations/google-sheets', { cache: 'no-store' })
@@ -98,83 +100,108 @@ export function GoogleSheetsIntegration() {
   }
 
   async function copyScript() {
-    await navigator.clipboard.writeText(APPS_SCRIPT);
+    try {
+      await navigator.clipboard.writeText(APPS_SCRIPT);
+    } catch {
+      toast.error('Could not copy. Select the script and copy it manually.');
+      return;
+    }
     setCopied(true);
     toast.success('Script copied');
     setTimeout(() => setCopied(false), 1800);
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-border/70 bg-card p-5">
-        <div className="flex items-start gap-3">
-          <span className="flex size-11 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600"><FileSpreadsheet className="size-6" /></span>
-          <div>
-            <p className="font-semibold">Google Sheets</p>
-            <p className="max-w-xl text-sm text-muted-foreground">Automatically collect every lead, appointment and booking in a Google Sheet your team already uses — no Zapier needed.</p>
-          </div>
+    <div className="space-y-4">
+      <div className={`flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3 ${connected ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-border/70 bg-card'}`}>
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"><FileSpreadsheet className="size-4" /></span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold">{loading ? 'Google Sheets' : connected ? 'Connected to Google Sheets' : 'Google Sheets · not connected'}</p>
+          <p className="truncate text-xs text-muted-foreground">
+            {connected ? 'New leads, appointments and bookings are added to your sheet automatically.' : 'Collect every lead, appointment and booking in a Google Sheet. No Zapier needed.'}
+          </p>
         </div>
-        {loading ? (
-          <span className="h-6 w-24 animate-pulse rounded-full bg-muted" />
-        ) : connected ? (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400"><CheckCircle2 className="size-3.5" /> Connected</span>
+        {loading ? <span className="h-6 w-24 animate-pulse rounded-full bg-muted" /> : connected ? (
+          <div className="flex shrink-0 flex-wrap gap-1.5">
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={async () => { if (await call('POST', { action: 'test' }, 'test')) toast.success('Test row sent'); }} disabled={Boolean(busy)}>
+              {busy === 'test' ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />} Send test row
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={async () => { const d = await call('POST', { action: 'backfill' }, 'backfill'); if (d) toast.success(`Synced ${d.sent} rows from the last 30 days`); }} disabled={Boolean(busy)}>
+              {busy === 'backfill' ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />} Sync last 30 days
+            </Button>
+          </div>
         ) : (
-          <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">Not connected</span>
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">Not connected</span>
         )}
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-        <div className="space-y-4 rounded-2xl border border-border/70 bg-card p-5">
-          <p className="text-sm font-semibold">How to connect (5 minutes)</p>
-          <ol className="space-y-3">
-            {STEPS.map((s, i) => (
-              <li key={s.title} className="flex gap-3">
-                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{i + 1}</span>
-                <div>
-                  <p className="text-sm font-medium">{s.title}</p>
-                  <p className="text-xs leading-relaxed text-muted-foreground">{s.body}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-          <a href="https://sheets.new" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">Create a new Google Sheet <ExternalLink className="size-3" /></a>
-
-          <div className="space-y-2 border-t border-border/60 pt-4">
-            <p className="text-sm font-semibold">Web app URL</p>
-            <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://script.google.com/macros/s/…/exec" className="font-mono text-xs" />
-            <div className="flex flex-wrap gap-2">
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+        <div className="space-y-4">
+          <section className="rounded-xl border border-border/70 bg-card p-4">
+            <h3 className="text-sm font-semibold">Web app URL</h3>
+            <p className="mb-2 text-xs text-muted-foreground">Paste the Apps Script deployment URL ending in <code className="rounded bg-muted px-1">/exec</code>. We send a test row to confirm.</p>
+            <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://script.google.com/macros/s/…/exec" className="h-8 font-mono text-[12px] md:text-[12px]" />
+            <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
               <Button
-                onClick={async () => { const d = await call('PUT', { url }, 'save'); if (d) { setConnected(d.url); toast.success('Google Sheet connected — a test row was added.'); } }}
-                disabled={Boolean(busy) || !url.trim()}
+                size="sm"
                 className="gap-1.5"
+                onClick={async () => { const d = await call('PUT', { url }, 'save'); if (d) { setConnected(d.url); toast.success('Google Sheet connected. A test row was added.'); } }}
+                disabled={Boolean(busy) || !url.trim() || url.trim() === connected}
               >
-                {busy === 'save' ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />} {connected ? 'Update' : 'Connect'}
+                {busy === 'save' ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />} {connected ? 'Update URL' : 'Connect'}
               </Button>
               {connected && (
-                <>
-                  <Button variant="outline" onClick={async () => { if (await call('POST', { action: 'test' }, 'test')) toast.success('Test row sent'); }} disabled={Boolean(busy)} className="gap-1.5">
-                    {busy === 'test' ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />} Send test row
-                  </Button>
-                  <Button variant="outline" onClick={async () => { const d = await call('POST', { action: 'backfill' }, 'backfill'); if (d) toast.success(`Synced ${d.sent} rows from the last 30 days`); }} disabled={Boolean(busy)} className="gap-1.5">
-                    {busy === 'backfill' ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />} Sync last 30 days
-                  </Button>
-                  <Button variant="ghost" onClick={async () => { const d = await call('PUT', { url: null }, 'disconnect'); if (d) { setConnected(null); setUrl(''); toast.success('Disconnected'); } }} disabled={Boolean(busy)} className="gap-1.5 text-muted-foreground hover:text-destructive">
-                    <Unplug className="size-4" /> Disconnect
-                  </Button>
-                </>
+                <Button size="sm" variant="ghost" className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setConfirmDisconnect(true)} disabled={Boolean(busy)}>
+                  <Unplug className="size-3.5" /> Disconnect
+                </Button>
               )}
             </div>
-          </div>
+          </section>
+
+          <section className="rounded-xl border border-border/70 bg-card p-4">
+            <h3 className="text-sm font-semibold">How to connect</h3>
+            <p className="mb-3 text-xs text-muted-foreground">About 5 minutes. <a href="https://sheets.new" target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 font-medium text-primary hover:underline">Create a new sheet <ExternalLink className="size-3" /></a></p>
+            <ol className="space-y-2.5">
+              {STEPS.map((s, i) => (
+                <li key={s.title} className="flex gap-2.5">
+                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">{i + 1}</span>
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-medium">{s.title}</p>
+                    <p className="text-[11px] leading-relaxed text-muted-foreground">{s.body}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </section>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-border/70 bg-card">
-          <div className="flex items-center justify-between border-b border-border/60 px-4 py-2.5">
-            <p className="text-sm font-semibold">Apps Script (Code.gs)</p>
-            <Button size="sm" variant="outline" onClick={copyScript} className="h-7 gap-1.5 text-xs">{copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />} {copied ? 'Copied' : 'Copy script'}</Button>
+        <section className="overflow-hidden rounded-xl border border-border/70 bg-card lg:sticky lg:top-4">
+          <div className="flex items-center justify-between border-b border-border/70 px-4 py-2.5">
+            <div>
+              <p className="text-sm font-semibold">Apps Script</p>
+              <p className="text-[11px] text-muted-foreground">Paste into Code.gs</p>
+            </div>
+            <Button size="sm" variant="outline" onClick={copyScript} className="gap-1.5">{copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />} {copied ? 'Copied' : 'Copy script'}</Button>
           </div>
-          <pre className="max-h-[520px] overflow-auto bg-muted/40 p-4 text-[11px] leading-relaxed"><code>{APPS_SCRIPT}</code></pre>
-        </div>
+          <pre className="max-h-[480px] overflow-auto bg-muted/40 p-4 text-[11px] leading-relaxed"><code>{APPS_SCRIPT}</code></pre>
+        </section>
       </div>
+
+      <ConfirmationDialog
+        isOpen={confirmDisconnect}
+        onOpenChange={setConfirmDisconnect}
+        title="Disconnect Google Sheets?"
+        description="New leads, appointments and bookings stop being added to your sheet."
+        notes={['Rows already in the sheet are not removed.']}
+        confirmText="Disconnect"
+        variant="destructive"
+        icon="warning"
+        onConfirm={async () => {
+          setConfirmDisconnect(false);
+          const d = await call('PUT', { url: null }, 'disconnect');
+          if (d) { setConnected(null); setUrl(''); toast.success('Google Sheets disconnected'); }
+        }}
+      />
     </div>
   );
 }

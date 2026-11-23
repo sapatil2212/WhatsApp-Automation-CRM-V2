@@ -216,7 +216,7 @@ export function AiImportDialog({ open, onOpenChange, tags, aiAvailable, onImport
                     <th className="w-10 px-3 py-2">
                       <input
                         type="checkbox"
-                        className="size-4 accent-[var(--primary)]"
+                        className="rx-check"
                         aria-label="Select all"
                         checked={rows.length > 0 && rows.every((r) => r.selected)}
                         onChange={(e) => setRows((rs) => rs.map((r) => ({ ...r, selected: e.target.checked })))}
@@ -232,7 +232,7 @@ export function AiImportDialog({ open, onOpenChange, tags, aiAvailable, onImport
                 <tbody className="divide-y divide-border">
                   {rows.slice(0, 500).map((r, i) => (
                     <tr key={i} className={r.valid ? 'hover:bg-muted/40' : 'bg-amber-500/5'}>
-                      <td className="px-3 py-1.5"><input type="checkbox" className="size-4 accent-[var(--primary)]" checked={r.selected} onChange={(e) => updateRow(i, { selected: e.target.checked })} aria-label={`Select ${r.name || r.phone}`} /></td>
+                      <td className="px-3 py-1.5"><input type="checkbox" className="size-4 rx-check" checked={r.selected} onChange={(e) => updateRow(i, { selected: e.target.checked })} aria-label={`Select ${r.name || r.phone}`} /></td>
                       <td className="px-1 py-1"><Input value={r.name} onChange={(e) => updateRow(i, { name: e.target.value })} className="h-7 border-transparent bg-transparent px-1.5 text-xs shadow-none hover:border-border focus:border-border" /></td>
                       <td className="px-1 py-1">
                         <Input value={r.phone} onChange={(e) => updateRow(i, { phone: e.target.value })} className={`h-7 px-1.5 font-mono text-xs shadow-none ${r.valid ? 'border-transparent bg-transparent hover:border-border' : 'border-amber-500/60'}`} title={r.issue} />

@@ -798,75 +798,75 @@ html[data-mtheme="light"] textarea::placeholder {
 }
 
 /* ============================================================
- * TEAM INBOX — WhatsApp Web palette
+ * TEAM INBOX
  *
  * Scoped to `.wa-inbox` so the rest of the dashboard keeps its own
  * theme tokens. Dark is the default (matches the dashboard default);
- * `html[data-mtheme="light"]` swaps to WhatsApp Web's light palette.
+ * `html[data-mtheme="light"]` swaps to the light palette. Clean slate
+ * surfaces, one emerald accent, soft borders.
  * ============================================================ */
 .wa-inbox {
-  --wa-panel: #111b21;
-  --wa-panel-header: #202c33;
-  --wa-panel-hover: #202c33;
-  --wa-panel-active: #2a3942;
-  --wa-chat-bg: #0b141a;
-  --wa-wallpaper-opacity: 0.06;
-  --wa-in: #202c33;
-  --wa-out: #005c4b;
-  --wa-text: #e9edef;
-  --wa-text-2: #8696a0;
-  --wa-text-out-meta: rgba(233, 237, 239, 0.6);
-  --wa-border: #222d34;
-  --wa-input: #2a3942;
-  --wa-chip: #202c33;
-  --wa-chip-active: #0a332c;
-  --wa-chip-active-text: #00a884;
-  --wa-date: #182229;
-  --wa-accent: #00a884;
-  --wa-accent-strong: #06cf9c;
-  --wa-badge: #00a884;
-  --wa-badge-text: #111b21;
+  --wa-panel: #0f1720;
+  --wa-panel-header: #131c27;
+  --wa-panel-hover: #151f2b;
+  --wa-panel-active: #1b2736;
+  --wa-chat-bg: #0b121a;
+  --wa-wallpaper-opacity: 0;
+  --wa-in: #162130;
+  --wa-out: #0e5b49;
+  --wa-text: #e6edf3;
+  --wa-text-2: #8b9aab;
+  --wa-text-out-meta: rgba(230, 237, 243, 0.62);
+  --wa-border: #1d2836;
+  --wa-input: #162130;
+  --wa-chip: #162130;
+  --wa-chip-active: #0d3b30;
+  --wa-chip-active-text: #34d399;
+  --wa-date: #131c27;
+  --wa-accent: #10b981;
+  --wa-accent-strong: #34d399;
+  --wa-badge: #10b981;
+  --wa-badge-text: #04130d;
   --wa-tick-read: #53bdeb;
-  --wa-quote-in: rgba(255, 255, 255, 0.06);
-  --wa-quote-out: rgba(0, 0, 0, 0.18);
-  --wa-system: #182229;
+  --wa-quote-in: rgba(255, 255, 255, 0.05);
+  --wa-quote-out: rgba(0, 0, 0, 0.2);
+  --wa-system: #131c27;
   --wa-note: #3b3418;
   --wa-note-border: #6b5b1a;
-  --wa-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13);
+  --wa-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
   color: var(--wa-text);
 }
 
 html[data-mtheme="light"] .wa-inbox {
   --wa-panel: #ffffff;
-  --wa-panel-header: #f0f2f5;
-  --wa-panel-hover: #f5f6f6;
-  --wa-panel-active: #f0f2f5;
-  --wa-chat-bg: #efeae2;
-  --wa-wallpaper-opacity: 0.35;
+  --wa-panel-header: #f8fafc;
+  --wa-panel-hover: #f8fafc;
+  --wa-panel-active: #eef2f6;
+  --wa-chat-bg: #f3f5f9;
+  --wa-wallpaper-opacity: 0;
   --wa-in: #ffffff;
-  --wa-out: #d9fdd3;
-  --wa-text: #111b21;
-  --wa-text-2: #667781;
-  --wa-text-out-meta: #667781;
-  --wa-border: #e9edef;
+  --wa-out: #dcf5ea;
+  --wa-text: #0f172a;
+  --wa-text-2: #64748b;
+  --wa-text-out-meta: #5b7a6c;
+  --wa-border: #e6eaf0;
   --wa-input: #ffffff;
-  --wa-chip: #f0f2f5;
-  --wa-chip-active: #e7fce3;
-  --wa-chip-active-text: #008069;
+  --wa-chip: #f1f5f9;
+  --wa-chip-active: #dcfce7;
+  --wa-chip-active-text: #15803d;
   --wa-date: #ffffff;
-  --wa-accent: #008069;
-  --wa-accent-strong: #00a884;
-  --wa-badge: #25d366;
+  --wa-accent: #059669;
+  --wa-accent-strong: #059669;
+  --wa-badge: #10b981;
   --wa-badge-text: #ffffff;
-  --wa-tick-read: #53bdeb;
-  --wa-quote-in: rgba(0, 0, 0, 0.05);
-  --wa-quote-out: rgba(0, 0, 0, 0.06);
+  --wa-tick-read: #2b9fd9;
+  --wa-quote-in: rgba(15, 23, 42, 0.05);
+  --wa-quote-out: rgba(5, 150, 105, 0.1);
   --wa-system: #ffffff;
   --wa-note: #fff6d5;
   --wa-note-border: #f0d77a;
-  --wa-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13);
+  --wa-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
 }
-
 .wa-wallpaper {
   position: relative;
   background-color: var(--wa-chat-bg);
@@ -894,3 +894,46 @@ html[data-mtheme="light"] .wa-inbox {
   30% { background-color: rgba(0, 168, 132, 0.18); }
 }
 .wa-flash { animation: wa-flash 1.4s ease-out; }
+
+/* Themed checkbox: native ones follow the page color-scheme (dark), so they look black in light mode. */
+input[type="checkbox"].rx-check {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-grid;
+  place-content: center;
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  border: 1.5px solid var(--muted-foreground);
+  border-radius: 0.3rem;
+  background: var(--card);
+  cursor: pointer;
+  transition: background-color 120ms, border-color 120ms, box-shadow 120ms;
+}
+input[type="checkbox"].rx-check::after {
+  content: "";
+  width: 0.3rem;
+  height: 0.55rem;
+  border: solid var(--primary-foreground, #fff);
+  border-width: 0 2px 2px 0;
+  transform: translateY(-1px) rotate(45deg) scale(0);
+  transition: transform 120ms;
+}
+input[type="checkbox"].rx-check:checked,
+input[type="checkbox"].rx-check:indeterminate {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+input[type="checkbox"].rx-check:checked::after {
+  transform: translateY(-1px) rotate(45deg) scale(1);
+}
+input[type="checkbox"].rx-check:indeterminate::after {
+  width: 0.5rem;
+  height: 0;
+  border-width: 0 0 2px 0;
+  transform: none;
+}
+input[type="checkbox"].rx-check:hover:not(:disabled) { border-color: var(--primary); }
+input[type="checkbox"].rx-check:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+input[type="checkbox"].rx-check:disabled { opacity: 0.5; cursor: not-allowed; }

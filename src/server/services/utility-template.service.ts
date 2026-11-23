@@ -20,7 +20,7 @@ import type { Prisma } from '@prisma/client';
 import {
   detectVertical,
   EVENT_LABEL,
-  LIBRARY_VERSION,
+  libraryVersionFor,
   libraryFor,
   lintUtilityBody,
   TEMPLATE_EVENTS,
@@ -169,7 +169,7 @@ function toDto(row: TemplateRow, latestApprovedId: string | null) {
     updatedAt: row.updatedAt.toISOString(),
     /** The version the notification engine will send for this event. */
     inUse: row.id === latestApprovedId,
-    libraryOutdated: (row.libraryVersion ?? LIBRARY_VERSION) < LIBRARY_VERSION,
+    libraryOutdated: (row.libraryVersion ?? 1) < libraryVersionFor(row.eventType ?? ''),
   };
 }
 export type UtilityTemplateDto = ReturnType<typeof toDto>;

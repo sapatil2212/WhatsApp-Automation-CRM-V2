@@ -3,37 +3,22 @@
  *
  *   GET  /api/public/booking/[id]         public business profile for the booking page
  *   GET  /api/public/booking/[id]/slots   free slots (doctor or service)
+ *   GET  /api/public/booking/[id]/logo    clinic logo (from Prescription setup)
  *   POST /api/public/booking/[id]         book → token + WhatsApp confirmation
  *   GET  /api/booking-link                (tenant) link + QR code for sharing
  */
 
+import { requestOrigin as siteOrigin } from '../site-origin';
 import QRCode from 'qrcode';
 import { z } from 'zod';
 
-import { createHandler, NotFoundError } from '../kernel';
-import { bookingIdForUser, publicBook, publicBookingBodySchema, publicProfile, publicSlots } from '../services/public-booking.service';
+import { createHandler, createRawHandler, NotFoundError } from '../kernel';
+import { bookingIdForUser, publicBook, publicBookingBodySchema, publicLogo, publicProfile, publicSlots } from '../services/public-booking.service';
 
 // A readable slug (sunrise-clinic) or a legacy UUID.
 const params = z.object({ id: z.string().min(1).max(80).regex(/^[A-Za-z0-9-]+$/) });
 const ipKey = ({ request }: { request: Request }) =>
   `public-booking:${(request.headers.get('x-forwarded-for') ?? '').split(',')[0].trim() || 'unknown'}`;
-
-/**
- * Public origin for shareable links/QR codes. The domain the dashboard is actually opened on wins,
- * so a deployment on a new domain needs no config. The env URL is only a fallback for when the
- * request host is missing or internal (localhost, 0.0.0.0, a bare IP).
- */
-function siteOrigin(request: Request): string {
-  const env = (process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '');
-  const url = new URL(request.url);
-  const first = (v: string | null) => (v ?? '').split(',')[0].trim();
-  const host = first(request.headers.get('x-forwarded-host')) || first(request.headers.get('host')) || url.host;
-  const hostname = host.replace(/:\d+$/, '').toLowerCase();
-  const internal = !hostname || hostname === 'localhost' || hostname === '0.0.0.0' || hostname.endsWith('.local') || /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname) || hostname.startsWith('[');
-  if (internal && env) return env;
-  const proto = first(request.headers.get('x-forwarded-proto')) || url.protocol.replace(':', '');
-  return `${proto}://${host}`;
-}
 
 export const bookingController = {
   profile: createHandler({
@@ -58,6 +43,27 @@ export const bookingController = {
     response: z.any(),
     rateLimit: { limit: 120, windowMs: 60_000, key: ipKey as never },
     handle: async ({ params: p, query }) => publicSlots(p.id, query),
+  }),
+
+  logo: createRawHandler({
+    operation: 'booking.publicLogo',
+    auth: 'public',
+    async handle({ request }) {
+      // /api/public/booking/[id]/logo
+      const ref = decodeURIComponent(new URL(request.url).pathname.split('/').at(-2) ?? '');
+      const parsed = params.safeParse({ id: ref });
+      if (!parsed.success) throw new NotFoundError('Logo');
+      const img = await publicLogo(parsed.data.id);
+      if (!img || !/^image\/(png|jpe?g|webp|gif)$/i.test(img.mimeType)) throw new NotFoundError('Logo');
+      return new Response(Buffer.from(img.data), {
+        headers: {
+          'Content-Type': img.mimeType,
+          // URL carries ?v=<updatedAt>, so a new upload gets a new URL.
+          'Cache-Control': 'public, max-age=86400',
+          'X-Content-Type-Options': 'nosniff',
+        },
+      });
+    },
   }),
 
   book: createHandler({

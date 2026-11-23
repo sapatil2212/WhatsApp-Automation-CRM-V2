@@ -59,12 +59,12 @@ export const ChatList = forwardRef<HTMLInputElement, ChatListProps>(function Cha
   return (
     <div className="flex h-full w-full flex-col border-r border-[var(--wa-border)] bg-[var(--wa-panel)]">
       {/* Header */}
-      <header className="flex h-[59px] shrink-0 items-center justify-between bg-[var(--wa-panel-header)] px-4">
+      <header className="flex h-[52px] shrink-0 items-center justify-between bg-[var(--wa-panel-header)] px-4">
         <div className="flex min-w-0 items-center gap-3">
-          {me && <WaAvatar name={me.name} seed={me.id} url={me.avatarUrl} size={40} />}
+          {me && <WaAvatar name={me.name} seed={me.id} url={me.avatarUrl} size={32} />}
           <div className="min-w-0">
-            <h1 className="truncate text-[16px] font-medium leading-tight">Chats</h1>
-            <p className="flex items-center gap-1 text-[12px] text-[var(--wa-text-2)]">
+            <h1 className="truncate text-[13.5px] font-medium leading-tight">Chats</h1>
+            <p className="flex items-center gap-1 text-[11px] text-[var(--wa-text-2)]">
               {connected ? (
                 <>
                   <span className="h-1.5 w-1.5 rounded-full bg-[var(--wa-accent-strong)]" /> Live
@@ -79,25 +79,25 @@ export const ChatList = forwardRef<HTMLInputElement, ChatListProps>(function Cha
         </div>
         <div className="flex items-center gap-1 text-[var(--wa-text-2)]">
           <IconButton label="Quick replies" onClick={onOpenQuickReplies}>
-            <Zap className="h-5 w-5" />
+            <Zap className="h-4 w-4" />
           </IconButton>
           <IconButton label="Keyboard shortcuts (?)" onClick={onOpenShortcuts}>
-            <Keyboard className="h-5 w-5" />
+            <Keyboard className="h-4 w-4" />
           </IconButton>
         </div>
       </header>
 
       {/* Search */}
       <div className="shrink-0 px-3 pb-2 pt-2">
-        <div className="flex h-[35px] items-center gap-3 rounded-lg bg-[var(--wa-panel-header)] px-3">
+        <div className="flex h-8 items-center gap-2 rounded-full border border-[var(--wa-border)] bg-[var(--wa-panel-header)] px-3 focus-within:border-[var(--wa-accent)]">
           <Search className="h-4 w-4 shrink-0 text-[var(--wa-text-2)]" />
           <input
             ref={searchRef}
             value={search}
             onChange={(e) => onSearch(e.target.value)}
-            placeholder="Search or start a new chat"
+            placeholder="Search chats"
             aria-label="Search chats"
-            className="min-w-0 flex-1 bg-transparent text-[14px] text-[var(--wa-text)] outline-none placeholder:text-[var(--wa-text-2)]"
+            className="min-w-0 flex-1 bg-transparent text-[12.5px] text-[var(--wa-text)] outline-none placeholder:text-[var(--wa-text-2)]"
             onKeyDown={(e) => {
               if (e.key === "Escape") {
                 onSearch("");
@@ -125,7 +125,7 @@ export const ChatList = forwardRef<HTMLInputElement, ChatListProps>(function Cha
                 type="button"
                 onClick={() => onFilter(f.value)}
                 className={cn(
-                  "flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[14px] transition-colors",
+                  "flex h-6 shrink-0 items-center gap-1 rounded-full px-2.5 text-[12.5px] transition-colors",
                   active
                     ? "bg-[var(--wa-chip-active)] text-[var(--wa-chip-active-text)]"
                     : "bg-[var(--wa-chip)] text-[var(--wa-text-2)] hover:text-[var(--wa-text)]",
@@ -134,7 +134,7 @@ export const ChatList = forwardRef<HTMLInputElement, ChatListProps>(function Cha
                 {f.value === "starred" && <Star className="h-3.5 w-3.5" />}
                 {f.label}
                 {count !== undefined && count > 0 && f.value !== "all" && (
-                  <span className="text-[12px] opacity-80">{count > 999 ? "999+" : count}</span>
+                  <span className="text-[11px] opacity-80">{count > 999 ? "999+" : count}</span>
                 )}
               </button>
             );
@@ -172,7 +172,7 @@ export const ChatList = forwardRef<HTMLInputElement, ChatListProps>(function Cha
           <div className="space-y-0">
             {Array.from({ length: conversations.length ? 2 : 8 }).map((_, i) => (
               <div key={i} className="flex items-center gap-3 px-3 py-3">
-                <div className="h-[49px] w-[49px] animate-pulse rounded-full bg-[var(--wa-panel-header)]" />
+                <div className="h-[38px] w-[38px] animate-pulse rounded-full bg-[var(--wa-panel-header)]" />
                 <div className="flex-1 space-y-2">
                   <div className="h-3 w-2/5 animate-pulse rounded bg-[var(--wa-panel-header)]" />
                   <div className="h-3 w-4/5 animate-pulse rounded bg-[var(--wa-panel-header)]" />
@@ -212,10 +212,10 @@ const ChatRow = memo(function ChatRow({
         onClick={() => onSelect(c)}
         className={cn(
           "group flex w-full items-center gap-3 pl-3 text-left transition-colors",
-          active ? "bg-[var(--wa-panel-active)]" : "hover:bg-[var(--wa-panel-hover)]",
+          active ? "bg-[var(--wa-panel-active)] shadow-[inset_2px_0_0_var(--wa-accent)]" : "hover:bg-[var(--wa-panel-hover)]",
         )}
       >
-        <div className="relative py-[9px]">
+        <div className="relative py-[7px]">
           <WaAvatar name={name} seed={c.contact.id} url={c.contact.avatarUrl} />
           {c.status === "closed" && (
             <span
@@ -224,12 +224,12 @@ const ChatRow = memo(function ChatRow({
             />
           )}
         </div>
-        <div className="flex min-w-0 flex-1 flex-col justify-center border-b border-[var(--wa-border)] py-[11px] pr-3.5">
+        <div className="flex min-w-0 flex-1 flex-col justify-center border-b border-[var(--wa-border)] py-[8px] pr-3.5">
           <div className="flex items-baseline justify-between gap-2">
-            <span className="truncate text-[16px] leading-[21px] text-[var(--wa-text)]">{name}</span>
+            <span className="truncate text-[13.5px] leading-[18px] text-[var(--wa-text)]">{name}</span>
             <span
               className={cn(
-                "shrink-0 text-[12px]",
+                "shrink-0 text-[11px]",
                 unread ? "font-medium text-[var(--wa-badge)]" : "text-[var(--wa-text-2)]",
               )}
             >
@@ -237,7 +237,7 @@ const ChatRow = memo(function ChatRow({
             </span>
           </div>
           <div className="mt-0.5 flex items-center justify-between gap-2">
-            <p className="flex min-w-0 items-center gap-1 text-[14px] leading-5 text-[var(--wa-text-2)]">
+            <p className="flex min-w-0 items-center gap-1 text-[12.5px] leading-5 text-[var(--wa-text-2)]">
               {outgoing && c.lastMessage && <Ticks status={c.lastMessage.status} />}
               {isBot && <Bot className="h-3.5 w-3.5 shrink-0" aria-label="Bot" />}
               {c.lastMessage?.status === "failed" && outgoing ? (
@@ -254,7 +254,7 @@ const ChatRow = memo(function ChatRow({
               {c.starred && <Star className="h-3.5 w-3.5 fill-current" aria-label="Starred" />}
               {c.pinned && <Pin className="h-3.5 w-3.5 rotate-45 fill-current" aria-label="Pinned" />}
               {unread && (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--wa-badge)] px-1.5 text-[12px] font-semibold text-[var(--wa-badge-text)]">
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--wa-badge)] px-1.5 text-[11px] font-semibold text-[var(--wa-badge-text)]">
                   {c.unreadCount > 99 ? "99+" : c.unreadCount}
                 </span>
               )}
@@ -263,14 +263,14 @@ const ChatRow = memo(function ChatRow({
           {(c.contact.tags.length > 0 || assigneeName || c.status === "pending") && (
             <div className="mt-1 flex min-w-0 items-center gap-1 overflow-hidden">
               {c.status === "pending" && (
-                <span className="flex shrink-0 items-center gap-0.5 rounded bg-[var(--wa-panel-header)] px-1.5 py-px text-[11px] text-[var(--wa-text-2)]">
+                <span className="flex shrink-0 items-center gap-0.5 rounded bg-[var(--wa-panel-header)] px-1.5 py-px text-[10px] text-[var(--wa-text-2)]">
                   <Bot className="h-3 w-3" /> AI
                 </span>
               )}
               {assigneeName && (
                 <span
                   className={cn(
-                    "shrink-0 truncate rounded px-1.5 py-px text-[11px]",
+                    "shrink-0 truncate rounded px-1.5 py-px text-[10px]",
                     assignedToMe
                       ? "bg-[var(--wa-chip-active)] text-[var(--wa-chip-active-text)]"
                       : "bg-[var(--wa-panel-header)] text-[var(--wa-text-2)]",
@@ -282,14 +282,14 @@ const ChatRow = memo(function ChatRow({
               {c.contact.tags.slice(0, 3).map((t) => (
                 <span
                   key={t.id}
-                  className="max-w-24 shrink-0 truncate rounded px-1.5 py-px text-[11px]"
+                  className="max-w-24 shrink-0 truncate rounded px-1.5 py-px text-[10px]"
                   style={{ backgroundColor: `${t.color}26`, color: t.color }}
                 >
                   {t.name}
                 </span>
               ))}
               {c.contact.tags.length > 3 && (
-                <span className="text-[11px] text-[var(--wa-text-2)]">+{c.contact.tags.length - 3}</span>
+                <span className="text-[10px] text-[var(--wa-text-2)]">+{c.contact.tags.length - 3}</span>
               )}
             </div>
           )}
@@ -322,7 +322,7 @@ export function IconButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--wa-text-2)] transition-colors hover:bg-[var(--wa-panel-active)] disabled:opacity-40",
+        "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--wa-text-2)] transition-colors hover:bg-[var(--wa-panel-active)] disabled:opacity-40",
         active && "bg-[var(--wa-panel-active)] text-[var(--wa-text)]",
         className,
       )}

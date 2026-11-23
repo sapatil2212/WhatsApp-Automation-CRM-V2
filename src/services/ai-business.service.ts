@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { prisma } from '@/lib/prisma'
+import { getLogger, systemDb, tenantDb } from '@/server/kernel'
 import { callLLM, inferTaskCriticality, parseJSONFromLLM } from '@/lib/ai/llm'
+import { AiUnavailableError } from '@/lib/ai/outcome'
 import type { ReplyContext } from '@/lib/ai/reply-context'
 import { publicBook, publicSlots } from '@/server/services/public-booking.service'
 import { pretty, prettyTime } from '@/server/services/booking-notify'
@@ -41,6 +42,8 @@ interface OpenAIResponse {
   }
 }
 
+const log = getLogger('ai.business')
+
 export async function processBusinessAIMessage(options: {
   messageText: string
   senderPhone: string
@@ -65,35 +68,38 @@ export async function processBusinessAIMessage(options: {
   } = options
 
   // Resolve tenantId from profile
-  const profile = await prisma.profile.findUnique({
-    where: { userId }
+  // Justified systemDb: resolves the tenant for this WhatsApp number's owner.
+  const profile = await systemDb.profile.findUnique({
+    where: { userId },
+    select: { tenantId: true, businessType: true },
   })
   if (!profile || !profile.tenantId) return false
+  const tenantId = profile.tenantId
 
   // Fetch Business Profile
-  const business = await prisma.businessProfile.findUnique({
+  const business = await tenantDb(tenantId).businessProfile.findUnique({
     where: { userId }
   })
   if (!business) {
-    console.log('[AI Business] No business profile registered for user ID:', userId)
+    log.info('declined: no business profile', { userId })
     return false
   }
 
   // Fetch AI settings
-  const aiSettings = await prisma.businessAISettings.findUnique({
+  const aiSettings = await tenantDb(tenantId).businessAISettings.findUnique({
     where: { businessId: business.id }
   })
   if (!aiSettings || !aiSettings.aiEnabled) {
-    console.log('[AI Business] AI automation is disabled or not set up.')
+    log.info('declined: AI disabled', { businessId: business.id })
     return false
   }
 
   const segment = getBusinessSegment(profile.businessType);
   // Fetch contextual services, FAQs, staff in parallel
   const [services, faqs, staff] = await Promise.all([
-    prisma.businessService.findMany({ where: { businessId: business.id, isActive: true } }),
-    prisma.businessFAQ.findMany({ where: { businessId: business.id } }),
-    prisma.businessStaff.findMany({ where: { businessId: business.id, isActive: true } }),
+    tenantDb(tenantId).businessService.findMany({ where: { businessId: business.id, isActive: true } }),
+    tenantDb(tenantId).businessFAQ.findMany({ where: { businessId: business.id } }),
+    tenantDb(tenantId).businessStaff.findMany({ where: { businessId: business.id, isActive: true } }),
   ])
 
   // Build working hours context
@@ -109,7 +115,7 @@ export async function processBusinessAIMessage(options: {
           .join('\n')
       }
     } catch (e) {
-      console.error('Failed to parse working hours:', e)
+      log.warn('could not parse working hours', { err: e })
     }
   }
 
@@ -224,7 +230,7 @@ Omit booking_details unless detected_intent is book_appointment. confidence_scor
 `
 
   // Fetch recent conversation history (last 8 messages)
-  const recentMessages = await prisma.message.findMany({
+  const recentMessages = await tenantDb(tenantId).message.findMany({
     where: { conversationId },
     orderBy: { createdAt: 'desc' },
     take: 8,
@@ -262,7 +268,7 @@ Omit booking_details unless detected_intent is book_appointment. confidence_scor
       `${systemPrompt}\n\nCONVERSATION:\n${history}\n\nReturn ONLY the required JSON object.`,
       { taskCriticality: inferTaskCriticality(messageText), maxTokens: 1400, temperature: 0.2, jsonMode: true },
     )
-    if (!response.success || !response.text) throw new Error('Gemini did not return a response.')
+    if (!response.success || !response.text) throw new AiUnavailableError('LLM did not return a response.')
     return response.text
   }
 
@@ -270,8 +276,7 @@ Omit booking_details unless detected_intent is book_appointment. confidence_scor
     const rawResult = await callBusinessLLM()
     const result = parseJSONFromLLM<OpenAIResponse>(rawResult)
     if (!result || typeof result.ai_response !== 'string') {
-      console.warn('[AI Business] Unparseable model output; leaving the message for flows/automations.')
-      return false
+      throw new AiUnavailableError('Unparseable model output.')
     }
     result.confidence_score = Number(result.confidence_score) || 0
 
@@ -279,26 +284,26 @@ Omit booking_details unless detected_intent is book_appointment. confidence_scor
     if (result.detected_intent === 'opt_out') {
       try {
         const tag =
-          (await prisma.tag.findFirst({ where: { tenantId: profile.tenantId, name: 'Unsubscribed' } })) ??
-          (await prisma.tag.create({ data: { tenantId: profile.tenantId, userId, name: 'Unsubscribed', color: '#ef4444' } }))
-        await prisma.contactTag.upsert({
+          (await tenantDb(tenantId).tag.findFirst({ where: { name: 'Unsubscribed' } })) ??
+          (await tenantDb(tenantId).tag.create({ data: { tenantId: profile.tenantId, userId, name: 'Unsubscribed', color: '#ef4444' } }))
+        await tenantDb(tenantId).contactTag.upsert({
           where: { contactId_tagId: { contactId, tagId: tag.id } },
           create: { contactId, tagId: tag.id },
           update: {},
         })
       } catch (error) {
-        console.error('[AI Business] Failed to tag opt-out:', error)
+        log.error('opt-out tag failed', { contactId, err: error })
       }
     }
 
     if (result.confidence_score < 0.6 && result.detected_intent !== 'opt_out' && result.detected_intent !== 'human_handoff') {
-      console.log('[AI Business] Confidence score too low. Skipping automated reply.')
+      log.info('declined: low confidence', { confidence: result.confidence_score, intent: result.detected_intent })
       return false
     }
 
     // Handle Human Handover Escalation
     if ((result.is_escalation || result.detected_intent === 'human_handoff') && aiSettings.humanHandoverEnabled) {
-      await prisma.conversation.update({
+      await tenantDb(tenantId).conversation.update({
         where: { id: conversationId },
         data: { status: 'open' } // Reopen for human agent review
       })
@@ -340,7 +345,7 @@ Omit booking_details unless detected_intent is book_appointment. confidence_scor
       })
 
       // Create AI Response Message log in CRM conversation inbox
-      await prisma.message.create({
+      await tenantDb(tenantId).message.create({
         data: {
           conversationId,
           senderType: 'bot',
@@ -351,7 +356,7 @@ Omit booking_details unless detected_intent is book_appointment. confidence_scor
       })
 
       // Create AI Log Activity record
-      await prisma.businessAILog.create({
+      await tenantDb(tenantId).businessAILog.create({
         data: {
           businessId: business.id,
           contactId,
@@ -367,7 +372,8 @@ Omit booking_details unless detected_intent is book_appointment. confidence_scor
 
     return true
   } catch (error) {
-    console.error('[AI Business] Error executing automation:', error)
-    return false
+    // Let the router decide: retry if nothing was sent, otherwise treat as handled.
+    log.error('reply failed', { conversationId, err: error })
+    throw error
   }
 }

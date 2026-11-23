@@ -30,6 +30,10 @@ export const patientListSchema = z.object({
   departmentId: z.string().uuid().optional(),
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  /** active = seen or booked in the last 6 months. */
+  status: z.enum(['active', 'inactive']).optional(),
+  allergies: z.enum(['yes']).optional(),
+  bloodGroup: z.enum(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(5).max(100).default(25),
 });
@@ -48,8 +52,14 @@ export async function listPatients(db: TenantDb, q: z.infer<typeof patientListSc
   }
   if (q.from) and.push({ createdAt: { gte: new Date(`${q.from}T00:00:00Z`) } });
   if (q.to) and.push({ createdAt: { lte: new Date(`${q.to}T23:59:59Z`) } });
+  const activeSince = new Date(Date.now() - 180 * 864e5);
+  const activeAppt: Prisma.AppointmentWhereInput = { clinicId: clinic.id, appointmentDate: { gte: activeSince } };
+  if (q.status === 'active') and.push({ appointments: { some: activeAppt } });
+  if (q.status === 'inactive') and.push({ appointments: { none: activeAppt } });
+  if (q.allergies === 'yes') and.push({ patientProfile: { is: { allergies: { not: null }, NOT: { allergies: '' } } } });
+  if (q.bloodGroup) and.push({ patientProfile: { is: { bloodGroup: q.bloodGroup } } });
   const where: Prisma.ContactWhereInput = { AND: and };
-  const [total, rows, newThisMonth, withAllergies] = await Promise.all([
+  const [total, rows, newThisMonth, withAllergies, active, upcomingToday] = await Promise.all([
     db.contact.count({ where }),
     db.contact.findMany({
       where,
@@ -69,8 +79,10 @@ export async function listPatients(db: TenantDb, q: z.infer<typeof patientListSc
     }),
     db.contact.count({ where: { appointments: { some: { clinicId: clinic.id } }, createdAt: { gte: new Date(Date.now() - 30 * 864e5) } } }),
     db.patientProfile.count({ where: { allergies: { not: null }, NOT: { allergies: '' } } }),
+    db.contact.count({ where: { appointments: { some: activeAppt } } }),
+    db.appointment.count({ where: { clinicId: clinic.id, status: 'scheduled', appointmentDate: new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00Z') } }),
   ]);
-  const sixMonths = Date.now() - 180 * 864e5;
+  const sixMonths = activeSince.getTime();
   return {
     items: rows.map((c) => {
       const last = c.appointments[0];
@@ -91,7 +103,7 @@ export async function listPatients(db: TenantDb, q: z.infer<typeof patientListSc
       };
     }),
     pagination: { page: q.page, pageSize: q.pageSize, total, totalPages: Math.max(1, Math.ceil(total / q.pageSize)) },
-    stats: { total, newThisMonth, withAllergies },
+    stats: { total, newThisMonth, withAllergies, active, todayAppointments: upcomingToday },
   };
 }
 
@@ -114,7 +126,7 @@ export async function patientRecord(db: TenantDb, contactId: string) {
     db.prescription.findMany({
       where: { contactId, status: 'finalized' },
       orderBy: { finalizedAt: 'desc' },
-      select: { id: true, prescriptionNo: true, finalizedAt: true, medicines: true, deliveryStatus: true, deliveryError: true, sentAt: true, deliveredAt: true, readAt: true, consultationId: true, doctor: { select: { doctorName: true } }, consultation: { select: { diagnoses: true } } },
+      select: { id: true, prescriptionNo: true, finalizedAt: true, medicines: true, advice: true, deliveryStatus: true, deliveryError: true, sentAt: true, deliveredAt: true, readAt: true, consultationId: true, doctor: { select: { doctorName: true } }, consultation: { select: { diagnoses: true } } },
     }),
     db.patientDocument.findMany({ where: { contactId, deletedAt: null }, orderBy: { createdAt: 'desc' }, select: { id: true, kind: true, title: true, fileName: true, mimeType: true, size: true, createdAt: true, consultationId: true } }),
     db.patientIntake.findMany({ where: { contactId }, orderBy: { createdAt: 'desc' }, take: 20, select: { id: true, symptoms: true, allergies: true, currentMedications: true, medicalHistory: true, urgencyLevel: true, createdAt: true } }),
@@ -173,6 +185,7 @@ export async function patientRecord(db: TenantDb, contactId: string) {
       doctor: p.doctor?.doctorName ?? null,
       diagnoses: asArray<Diagnosis>(p.consultation.diagnoses).map((d) => d.text),
       medicineCount: asArray<MedicineLine>(p.medicines).length,
+      medicines: asArray<MedicineLine>(p.medicines).map((m) => ({ name: m.name, strength: m.strength ?? '', dosage: m.dosage ?? '', frequency: m.frequency ?? '', timing: m.timing ?? '', duration: m.duration ?? '', instructions: m.instructions ?? '' })),
       deliveryStatus: p.deliveryStatus,
       deliveryError: p.deliveryError,
       sentAt: iso(p.sentAt),
@@ -180,7 +193,42 @@ export async function patientRecord(db: TenantDb, contactId: string) {
       readAt: iso(p.readAt),
     })),
     investigations: consultations.flatMap((c) => asArray<string>(c.investigations).map((t) => ({ test: t, orderedAt: (c.completedAt ?? c.startedAt).toISOString(), doctor: c.doctor?.doctorName ?? null, consultationId: c.id }))),
-    documents: documents.map((d) => ({ ...d, createdAt: d.createdAt.toISOString() })),
+    appointments: appointments.map((a) => ({
+      id: a.id,
+      ref: a.detail?.appointmentRef ?? null,
+      date: a.appointmentDate.toISOString().slice(0, 10),
+      time: a.appointmentTime,
+      status: a.status,
+      doctor: a.doctor?.doctorName ?? null,
+    })),
+    nextAppointment: (() => {
+      const today = new Date().toISOString().slice(0, 10);
+      const next = [...appointments]
+        .filter((a) => a.status === 'scheduled' && a.appointmentDate.toISOString().slice(0, 10) >= today)
+        .sort((x, y) => `${x.appointmentDate.toISOString()} ${x.appointmentTime}`.localeCompare(`${y.appointmentDate.toISOString()} ${y.appointmentTime}`))[0];
+      return next ? { id: next.id, date: next.appointmentDate.toISOString().slice(0, 10), time: next.appointmentTime, doctor: next.doctor?.doctorName ?? null } : null;
+    })(),
+    /** Problem list: every diagnosis across completed consultations, most recent first. */
+    problems: (() => {
+      const map = new Map<string, { label: string; count: number; first: string; last: string }>();
+      for (const c of consultations) {
+        if (c.status !== 'completed') continue;
+        const when = (c.completedAt ?? c.startedAt).toISOString();
+        for (const d of asArray<Diagnosis>(c.diagnoses)) {
+          const label = d.code ? `${d.code} ${d.text}` : d.text;
+          if (!label?.trim()) continue;
+          const key = (d.code || d.text).toLowerCase();
+          const cur = map.get(key);
+          if (!cur) map.set(key, { label, count: 1, first: when, last: when });
+          else {
+            cur.count += 1;
+            if (when < cur.first) cur.first = when;
+            if (when > cur.last) cur.last = when;
+          }
+        }
+      }
+      return [...map.values()].sort((a, b) => b.last.localeCompare(a.last));
+    })(),    documents: documents.map((d) => ({ ...d, createdAt: d.createdAt.toISOString() })),
     intakes: intakes.map((i) => ({ ...i, createdAt: i.createdAt.toISOString() })),
     communications: comms.map((c) => ({ ...c, createdAt: c.createdAt.toISOString(), sentAt: iso(c.sentAt) })),
     timeline,

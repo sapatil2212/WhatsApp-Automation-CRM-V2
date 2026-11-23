@@ -100,6 +100,8 @@ export type ImportAudienceBody = z.infer<typeof importAudienceBodySchema>;
 export const broadcastParamsSchema = z.object({ id: idSchema });
 export type BroadcastParams = z.infer<typeof broadcastParamsSchema>;
 
+export const bulkDeleteBroadcastsBodySchema = z.object({ ids: z.array(idSchema).min(1).max(200) });
+
 /**
  * One pass of the server-side sender. Bounded so a single invocation
  * cannot run unbounded inside a request; the caller (a cron tick or the

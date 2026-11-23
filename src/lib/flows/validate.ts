@@ -23,6 +23,9 @@
  * `node_key`; trigger-scoped use `scope: 'trigger'`.
  */
 
+import { checkWebhookUrl } from "./safe-url";
+
+
 import { INTERACTIVE_LIMITS } from "@/lib/whatsapp/meta-api";
 
 export interface ValidationIssue {
@@ -127,6 +130,32 @@ export function validateFlowForActivation(
           scope: "node",
           node_key: n.node_key,
           message: `Node "${n.node_key}" is unreachable from the entry node.`,
+        });
+      }
+    }
+  }
+
+  // Variables a message uses but no step collects render empty for the
+  // customer ("Patient: " instead of their name).
+  const collected = new Set<string>();
+  for (const n of nodes) {
+    const c = (n.config ?? {}) as Record<string, unknown>;
+    if (typeof c.var_key === "string" && c.var_key) collected.add(c.var_key);
+    if (typeof c.save_as === "string" && c.save_as) collected.add(c.save_as);
+  }
+  for (const n of nodes) {
+    const c = (n.config ?? {}) as Record<string, unknown>;
+    for (const field of ["text", "prompt_text", "note", "caption"]) {
+      const value = c[field];
+      if (typeof value !== "string") continue;
+      for (const m of value.matchAll(/\{\{\s*(?:vars\.)?([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g)) {
+        if (collected.has(m[1])) continue;
+        issues.push({
+          severity: "warning",
+          scope: "node",
+          node_key: n.node_key,
+          field,
+          message: `"{{${m[1]}}}" is never collected by an earlier step, so it will be blank. Add a question that saves "${m[1]}" or fix the name.`,
         });
       }
     }
@@ -642,6 +671,97 @@ function validateNode(
       break;
     }
 
+    case "send_media": {
+      const cfg = node.config as { media_type?: string; url?: string; caption?: string; filename?: string; next_node_key?: string };
+      const err = (field: string, message: string) =>
+        issues.push({ severity: "error", scope: "node", node_key: node.node_key, field, message });
+      if (!cfg.media_type || !["image", "video", "document"].includes(cfg.media_type)) {
+        err("media_type", "Send-media needs a type (image, video or document).");
+      }
+      if (!cfg.url?.trim()) {
+        err("url", "Send-media needs a file link.");
+      } else if (!/^https:\/\/[^\s]+$/i.test(cfg.url.trim())) {
+        err("url", "The file link must be a public https:// URL that WhatsApp can download.");
+      }
+      if (cfg.caption && cfg.caption.length > 1024) err("caption", "Captions can be at most 1024 characters.");
+      if (!cfg.next_node_key) {
+        err("next_node_key", "Send-media must point to a next node.");
+      } else if (!knownKeys.has(cfg.next_node_key)) {
+        err("next_node_key", `Send-media points to non-existent node "${cfg.next_node_key}".`);
+      }
+      break;
+    }
+
+    case "delay": {
+      const cfg = node.config as { amount?: unknown; unit?: string; next_node_key?: string };
+      const err = (field: string, message: string) =>
+        issues.push({ severity: "error", scope: "node", node_key: node.node_key, field, message });
+      const amount = Number(cfg.amount);
+      if (!["minutes", "hours", "days"].includes(cfg.unit ?? "")) err("unit", "Pick minutes, hours or days.");
+      if (!Number.isFinite(amount) || amount < 1) {
+        err("amount", "The wait must be at least 1.");
+      } else {
+        const per = cfg.unit === "days" ? 1440 : cfg.unit === "hours" ? 60 : 1;
+        const minutes = amount * per;
+        if (minutes > 30 * 1440) err("amount", "The longest wait is 30 days.");
+        else if (minutes >= 23 * 60) {
+          issues.push({
+            severity: "warning",
+            scope: "node",
+            node_key: node.node_key,
+            field: "amount",
+            message: "After a wait of about a day, WhatsApp only allows approved templates — follow this step with Send template, not a plain message.",
+          });
+        }
+      }
+      if (!cfg.next_node_key) {
+        err("next_node_key", "Delay must point to a next node.");
+      } else if (!knownKeys.has(cfg.next_node_key)) {
+        err("next_node_key", `Delay points to non-existent node "${cfg.next_node_key}".`);
+      }
+      break;
+    }
+
+    case "http_request": {
+      const cfg = node.config as {
+        url?: string; method?: string; save_as?: string; json_path?: string; next_node_key?: string; on_error_next_key?: string; auth_header?: string;
+      };
+      const err = (field: string, message: string) =>
+        issues.push({ severity: "error", scope: "node", node_key: node.node_key, field, message });
+      const urlProblem = checkWebhookUrl(cfg.url ?? "");
+      if (urlProblem) err("url", urlProblem);
+      if (cfg.method !== undefined && !["GET", "POST"].includes(cfg.method)) err("method", "Method must be GET or POST.");
+      if (cfg.save_as && !/^[a-zA-Z0-9_]+$/.test(cfg.save_as)) err("save_as", "Variable names use letters, numbers and underscores only.");
+      if (cfg.json_path && !cfg.save_as) err("save_as", "Choose a variable to store the value from the response.");
+      if (cfg.json_path && !/^[a-zA-Z0-9_.\[\]-]+$/.test(cfg.json_path)) err("json_path", "Use a path like data.status or items.0.name.");
+      if (cfg.auth_header && /[\r\n]/.test(cfg.auth_header)) err("auth_header", "The Authorization value must be a single line.");
+      if (!cfg.next_node_key) {
+        err("next_node_key", "HTTP request must point to a next node.");
+      } else if (!knownKeys.has(cfg.next_node_key)) {
+        err("next_node_key", `HTTP request points to non-existent node "${cfg.next_node_key}".`);
+      }
+      if (cfg.on_error_next_key && !knownKeys.has(cfg.on_error_next_key)) {
+        err("on_error_next_key", `The error path points to non-existent node "${cfg.on_error_next_key}".`);
+      }
+      break;
+    }
+
+    case "send_template": {
+      const cfg = node.config as { template_name?: string; params?: unknown; next_node_key?: string };
+      const err = (field: string, message: string) =>
+        issues.push({ severity: "error", scope: "node", node_key: node.node_key, field, message });
+      if (!cfg.template_name?.trim()) err("template_name", "Send-template needs the name of an approved template.");
+      if (cfg.params !== undefined && (!Array.isArray(cfg.params) || cfg.params.length > 20)) {
+        err("params", "Template variables must be a list of at most 20 values.");
+      }
+      if (!cfg.next_node_key) {
+        err("next_node_key", "Send-template must point to a next node.");
+      } else if (!knownKeys.has(cfg.next_node_key)) {
+        err("next_node_key", `Send-template points to non-existent node "${cfg.next_node_key}".`);
+      }
+      break;
+    }
+
     case "handoff":
     case "end":
       // Terminal nodes have no outgoing edges; nothing to validate
@@ -704,6 +824,16 @@ function outgoingEdges(node: NodeInput): string[] {
       if (cfg.true_next) out.push(cfg.true_next);
       if (cfg.false_next) out.push(cfg.false_next);
       return out;
+    }
+    case "send_media":
+    case "send_template":
+    case "delay": {
+      const cfg = node.config as { next_node_key?: string };
+      return cfg.next_node_key ? [cfg.next_node_key] : [];
+    }
+    case "http_request": {
+      const cfg = node.config as { next_node_key?: string; on_error_next_key?: string };
+      return [cfg.next_node_key, cfg.on_error_next_key].filter((k): k is string => !!k);
     }
     case "send_buttons": {
       const cfg = node.config as {

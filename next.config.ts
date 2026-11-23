@@ -56,6 +56,11 @@ const SECURITY_HEADERS = [
 ] as const;
 
 const nextConfig: NextConfig = {
+  // pdf-parse (pdf.js) loads `pdf.worker.mjs` relative to its own file.
+  // Bundled into .next/server that path no longer exists ("Setting up fake
+  // worker failed: Cannot find module './pdf.worker.mjs'"), so load it with
+  // plain Node `require` from node_modules instead.
+  serverExternalPackages: ["pdf-parse"],
   experimental: {
     // Business-setup documents can be up to 50 MB; the proxy buffers bodies.
     proxyClientMaxBodySize: "55mb",

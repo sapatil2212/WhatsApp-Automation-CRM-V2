@@ -10,6 +10,7 @@ import {
   type BuilderInitial,
   type ServerStepNode,
 } from "@/components/automations/automation-builder"
+import { getAutomation } from "@/lib/automations/client"
 import type { AutomationTriggerType } from "@/types"
 
 export default function EditAutomationPage({
@@ -25,24 +26,22 @@ export default function EditAutomationPage({
   useEffect(() => {
     let cancelled = false
     async function load() {
-      const res = await fetch(`/api/automations/${id}`)
-      if (!res.ok) {
-        if (!cancelled) setError(`Failed to load (${res.status})`)
-        return
+      try {
+        const a = await getAutomation(id)
+        if (cancelled) return
+        setInitial({
+          id: a.id,
+          name: a.name ?? "",
+          description: a.description ?? "",
+          trigger_type: a.triggerType as AutomationTriggerType,
+          trigger_config: a.triggerConfig ?? {},
+          is_active: a.isActive,
+          steps: fromServerSteps(a.steps as ServerStepNode[]),
+        })
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load automation")
       }
-      const body = await res.json()
-      if (cancelled) return
-      setInitial({
-        id: body.automation.id,
-        name: body.automation.name ?? "",
-        description: body.automation.description ?? "",
-        trigger_type: body.automation.trigger_type as AutomationTriggerType,
-        trigger_config: body.automation.trigger_config ?? {},
-        is_active: !!body.automation.is_active,
-        steps: fromServerSteps((body.steps ?? []) as ServerStepNode[]),
-      })
-    }
-    load()
+    }    load()
     return () => {
       cancelled = true
     }

@@ -42,26 +42,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Message is required for testing' }, { status: 400 })
     }
 
-    let kbText = customKb
-    let clinicName = 'Our Clinic'
-
-    if (!kbText) {
-      const clinic = await prisma.clinic.findFirst({
-        where: {
-          OR: [{ userId: ctx.userId }, { tenantId: ctx.tenantId }],
-        },
-        include: { faqs: true },
-      })
-      if (clinic) {
-        clinicName = clinic.clinicName
-        kbText = clinic.aiKnowledgeBase || ''
-        if (clinic.faqs && clinic.faqs.length > 0) {
-          kbText += `\n\n### APPROVED CLINIC FAQS:\n`
-          clinic.faqs.forEach((f) => {
-            kbText += `Q: ${f.question}\nA: ${f.answer}\n`
-          })
-        }
+    // Always build the same context the live WhatsApp AI sees: knowledge base
+    // (the unsaved editor text when provided) + doctors + services + FAQs.
+    const clinic = await prisma.clinic.findFirst({
+      where: { OR: [{ userId: ctx.userId }, { tenantId: ctx.tenantId }] },
+      include: { faqs: true, doctors: true, services: { where: { isActive: true } } },
+    })
+    const clinicName = clinic?.clinicName || 'Our Clinic'
+    let kbText: string = typeof customKb === 'string' ? customKb : clinic?.aiKnowledgeBase || ''
+    if (clinic?.doctors.length) {
+      kbText += `\n\n### DOCTORS:\n`
+      for (const d of clinic.doctors) {
+        const fee = Number(d.consultationFee) > 0 ? `, fee ₹${Number(d.consultationFee)}` : ''
+        const hours = d.availableStartTime && d.availableEndTime ? `, ${d.availableStartTime}-${d.availableEndTime}` : ''
+        kbText += `- ${d.doctorName}${d.specialization ? ` (${d.specialization})` : ''}${d.qualification ? `, ${d.qualification}` : ''}${hours}${fee}\n`
       }
+    }
+    if (clinic?.services.length) {
+      kbText += `\n\n### SERVICES:\n`
+      for (const s of clinic.services) {
+        const price = Number(s.startingPrice) > 0 ? ` (from ₹${Number(s.startingPrice)})` : ''
+        kbText += `- ${s.serviceName}${price}${s.description ? `: ${s.description}` : ''}\n`
+      }
+    }
+    if (clinic?.faqs.length) {
+      kbText += `\n\n### APPROVED CLINIC FAQS:\n`
+      for (const f of clinic.faqs) kbText += `Q: ${f.question}\nA: ${f.answer}\n`
     }
 
     if (!kbText || !kbText.trim()) {

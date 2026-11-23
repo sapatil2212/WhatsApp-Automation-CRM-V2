@@ -6,10 +6,11 @@ import { useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import {
   AlertTriangle, ArrowDown, ArrowLeft, ArrowUp, CheckCircle2, ClipboardList, Copy, Download, Eye, FileText, Info, Loader2, Mic, Plus, Printer,
-  Save, Send, ShieldCheck, Sparkles, Trash2, X,
+  Pencil, Save, Send, ShieldCheck, Sparkles, Trash2, X,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
@@ -91,6 +92,7 @@ export default function ConsultationWorkspacePage() {
   const [error, setError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<'saved' | 'dirty' | 'saving' | 'error'>('saved');
   const [finalizeOpen, setFinalizeOpen] = useState(false);
+  const [reopenOpen, setReopenOpen] = useState(false);
   const [pdfOpen, setPdfOpen] = useState(false);
   const [pdfKey, setPdfKey] = useState(0);
   const [aiModal, setAiModal] = useState<'text' | 'voice' | null>(null);
@@ -296,6 +298,11 @@ export default function ConsultationWorkspacePage() {
           <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={async () => { await flush(); setPdfKey((k) => k + 1); setPdfOpen(true); }}><Eye className="size-4" /> {readOnly ? 'View PDF' : 'Preview'}</Button>
           {readOnly && rx?.status === 'finalized' ? (
             <>
+              <Button
+                size="sm"
+                className="h-8 gap-1.5 text-xs"
+                onClick={() => setReopenOpen(true)}
+              ><Pencil className="size-4" /> Edit prescription</Button>
               <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" render={<a href={`/api/healthcare/prescriptions/${rx.id}/pdf?download=1`} />}><Download className="size-4" /> Download</Button>
               <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => window.open(`/api/healthcare/prescriptions/${rx.id}/pdf`, '_blank')?.addEventListener('load', (e) => (e.currentTarget as Window).print())}><Printer className="size-4" /> Print</Button>
             </>
@@ -496,6 +503,31 @@ export default function ConsultationWorkspacePage() {
         </div>
       )}
 
+      <ConfirmationDialog
+        isOpen={reopenOpen}
+        onOpenChange={setReopenOpen}
+        title="Edit this prescription?"
+        description="It goes back to draft so you can correct it."
+        details={rx?.number ? <span className="font-mono text-[12px]">{rx.number}</span> : undefined}
+        notes={[
+          'The prescription number and QR link stay the same.',
+          'Finalize again to sign it and send the corrected PDF to the patient.',
+          'Until then, the QR verification shows it as not issued.',
+        ]}
+        confirmText="Edit prescription"
+        icon="warning"
+        onConfirm={async () => {
+          try {
+            await api(`/api/healthcare/consultations/${ws.id}/reopen`, { method: 'POST' });
+            toast.success('Prescription re-opened. You can edit it now.');
+            await load();
+          } catch (e) {
+            toast.error((e as Error).message, { duration: 8000 });
+            throw e;
+          }
+        }}
+      />
+
       {finalizeOpen && (
         <FinalizeDialog
           ws={ws}
@@ -638,7 +670,7 @@ function PrescriptionBuilder({ meds, setMeds, advice, setAdvice, templates, doct
               {!readOnly && (
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                   <label className={`flex items-center gap-2 text-xs font-medium ${m.verified ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>
-                    <input type="checkbox" className="size-4 accent-[var(--primary)]" checked={m.verified} onChange={(e) => patch(m.id, { verified: e.target.checked })} />
+                    <input type="checkbox" className="size-4 rx-check" checked={m.verified} onChange={(e) => patch(m.id, { verified: e.target.checked })} />
                     {m.verified ? 'Confirmed by doctor' : m.source === 'ai' ? 'AI suggestion — confirm after checking' : 'Confirm this line'}
                   </label>
                   <div className="flex gap-1">
@@ -705,7 +737,7 @@ function FinalizeDialog({ ws, issues, revision, onClose, onDone }: { ws: Workspa
               <li>• After this the prescription cannot be edited.</li>
             </ul>
             <label className="mt-4 flex items-start gap-2 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm">
-              <input type="checkbox" className="mt-0.5 size-4 accent-[var(--primary)]" checked={approved} onChange={(e) => setApproved(e.target.checked)} />
+              <input type="checkbox" className="mt-0.5 size-4 rx-check" checked={approved} onChange={(e) => setApproved(e.target.checked)} />
               <span>I, <strong>{ws.doctor?.name ?? 'the treating doctor'}</strong>, have reviewed the diagnosis and every medicine, dose, frequency and duration, and I approve and sign this prescription.</span>
             </label>
             <div className="mt-5 flex justify-end gap-2">

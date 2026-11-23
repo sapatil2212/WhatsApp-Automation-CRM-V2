@@ -33,6 +33,7 @@ import {
   Stethoscope,
   ClipboardList,
   FileSignature,
+  CreditCard,
 } from "lucide-react";
 
 interface NavItem {
@@ -61,6 +62,7 @@ const navItems: NavItem[] = [
 
 const bottomNavItems = [
   { href: "/connections", label: "Integrations", icon: Plug },
+  { href: "/subscription", label: "Subscription", icon: CreditCard },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -95,7 +97,8 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         ]
       : []),
     { href: `/${segment}/setup`, label: term.businessSetupLabel, icon: Building },
-    { href: `/${segment}/faqs`, label: "AI Knowledge Base", icon: HelpCircle },
+    // Healthcare trains the AI inside Business Setup (AI Training step).
+    ...(isHealthcare ? [] : [{ href: `/${segment}/faqs`, label: "AI Knowledge Base", icon: HelpCircle }]),
     { href: `/${segment}/logs`, label: "AI Chat Logs", icon: History },
   ];
 

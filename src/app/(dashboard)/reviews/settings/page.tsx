@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { toast } from 'sonner';
-import { CheckCircle2, Loader2, PlayCircle, RefreshCw, ShieldCheck, XCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Loader2, PlayCircle, RefreshCw, ShieldCheck, XCircle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { BusinessPicker, Card, ErrorPanel, fmtDate, PageHead, Pill, Skeleton, SmallInput, useApi } from '@/components/reviews/shared';
@@ -45,11 +46,12 @@ export default function ReviewSettingsPage() {
 
   return (
     <div className="space-y-4">
-      <PageHead title="Review settings" subtitle="Google link help, automation worker status and the fairness rules this module follows." />
+      <Link href="/reviews" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><ArrowLeft className="size-3.5" /> Overview</Link>
+      <PageHead title="Settings" subtitle="Check a Google review link, see the automation worker and the rules this module follows." />
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="p-4">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-[13px] font-semibold">Automation worker</p>
+            <p className="text-sm font-semibold">Automation worker</p>
             <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" onClick={() => void health.reload()}><RefreshCw className="size-3.5" /> Refresh</Button>
           </div>
           {health.error ? <ErrorPanel message={health.error} onRetry={health.reload} /> : !health.data ? <Skeleton rows={2} /> : (
@@ -63,20 +65,20 @@ export default function ReviewSettingsPage() {
           <div className="mt-4 border-t border-border/70 pt-3">
             <p className="text-xs font-medium">Test a business&apos;s Google link</p>
             <p className="text-[11px] text-muted-foreground">The worker opens the link in an isolated browser and saves a screenshot. Nothing is posted.</p>
-            <div className="mt-2 flex flex-wrap gap-2"><BusinessPicker value={testBiz} onChange={setTestBiz} allowAll={false} /><Button size="sm" className="h-8 gap-1.5 text-xs" disabled={testing} onClick={testLink}>{testing ? <Loader2 className="size-3.5 animate-spin" /> : <PlayCircle className="size-3.5" />} Run check</Button></div>
+            <div className="mt-2 flex flex-wrap gap-2"><BusinessPicker value={testBiz} onChange={setTestBiz} allowAll={false} /><Button size="sm" className="gap-1.5" disabled={testing} onClick={testLink}>{testing ? <Loader2 className="size-3.5 animate-spin" /> : <PlayCircle className="size-3.5" />} Run check</Button></div>
           </div>
         </Card>
 
         <Card className="p-4">
-          <p className="text-[13px] font-semibold">Find and check your Google review link</p>
+          <p className="text-sm font-semibold">Find and check your Google review link</p>
           <ol className="mt-2 list-decimal space-y-1 pl-5 text-xs">{GOOGLE_LINK_STEPS.map((s) => <li key={s}>{s}</li>)}</ol>
-          <div className="mt-3 flex gap-2"><SmallInput value={url} onChange={(e) => { setUrl(e.target.value); setCheck(null); }} placeholder="Paste the link to check it" /><Button size="sm" variant="outline" className="h-8 text-xs" disabled={checking || !url.trim()} onClick={validate}>{checking ? <Loader2 className="size-3.5 animate-spin" /> : 'Check'}</Button></div>
+          <div className="mt-3 flex gap-2"><SmallInput value={url} onChange={(e) => { setUrl(e.target.value); setCheck(null); }} placeholder="Paste the link to check it" /><Button size="sm" variant="outline" disabled={checking || !url.trim()} onClick={validate}>{checking ? <Loader2 className="size-3.5 animate-spin" /> : 'Check'}</Button></div>
           {check && (check.valid ? <p className="mt-2 flex items-center gap-1 text-xs text-emerald-600"><CheckCircle2 className="size-3.5" /> Valid ({check.kind?.replace('_', ' ')}). Saved as: <span className="break-all">{check.normalized}</span></p> : <p className="mt-2 flex items-center gap-1 text-xs text-destructive"><XCircle className="size-3.5" /> {check.reason}</p>)}
         </Card>
       </div>
 
       <Card className="p-4">
-        <p className="flex items-center gap-1.5 text-[13px] font-semibold"><ShieldCheck className="size-4 text-primary" /> How this module keeps reviews honest</p>
+        <p className="flex items-center gap-1.5 text-sm font-semibold"><ShieldCheck className="size-4 text-primary" /> How this module keeps reviews honest</p>
         <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-muted-foreground">
           <li>Every rating from 1 to 5 gets the same page and the same Google link. Low ratings are never hidden or redirected elsewhere.</li>
           <li>The AI only rewrites what the customer said. It never invents experiences, and low ratings stay critical.</li>

@@ -10,7 +10,7 @@ interface LinkData { url: string; name: string; kind: 'clinic' | 'business'; qrP
 
 /**
  * Shareable booking link + QR code. Customers book from it without
- * WhatsApp back-and-forth; every booking gets a token number and a WhatsApp
+ * WhatsApp back-and-forth; every booking gets a queue number and a WhatsApp
  * confirmation.
  */
 export function BookingLinkCard({ compact = false }: { compact?: boolean }) {
@@ -59,7 +59,7 @@ export function BookingLinkCard({ compact = false }: { compact?: boolean }) {
       .u{margin-top:24px;font-size:15px;color:#047857;word-break:break-all}.s{margin-top:36px;font-size:13px;color:#94a3b8}</style>
       </head><body><h1>${data.name.replace(/</g, '&lt;')}</h1><p>Scan to book your appointment instantly</p>
       <img src="${data.qrPng}" alt="QR code"/><div class="u">${data.url}</div>
-      <div class="s">Get your token number and reminders on WhatsApp</div>
+      <div class="s">Get your queue number and reminders on WhatsApp</div>
       <script>window.onload=()=>{window.print()}</script></body></html>`);
     w.document.close();
   }
@@ -84,7 +84,7 @@ export function BookingLinkCard({ compact = false }: { compact?: boolean }) {
       <div className="min-w-0 flex-1 space-y-2.5">
         <div>
           <p className="flex items-center gap-1.5 text-sm font-semibold"><QrCode className="size-4 text-primary" /> Your booking link</p>
-          <p className="text-xs text-muted-foreground">Share it on WhatsApp, Instagram, Google Business or print the QR at your front desk. Customers pick a slot and get a token number on WhatsApp.</p>
+          <p className="text-xs text-muted-foreground">Share it on WhatsApp, Instagram, Google Business or print the QR at your front desk. Customers pick a slot and get a queue number on WhatsApp.</p>
         </div>
         <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
           <span className="min-w-0 flex-1 truncate font-mono text-xs">{data.url}</span>

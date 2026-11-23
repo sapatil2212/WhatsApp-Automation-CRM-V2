@@ -10,7 +10,7 @@ export function WaAvatar({
   name,
   seed,
   url,
-  size = 49,
+  size = 38,
   className,
 }: {
   name: string;
@@ -77,7 +77,7 @@ export function BubbleTail({ side }: { side: "in" | "out" }) {
 
 export function Kbd({ children }: { children: React.ReactNode }) {
   return (
-    <kbd className="rounded border border-[var(--wa-border)] bg-[var(--wa-panel-header)] px-1.5 py-0.5 font-mono text-[11px] text-[var(--wa-text-2)]">
+    <kbd className="rounded border border-[var(--wa-border)] bg-[var(--wa-panel-header)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--wa-text-2)]">
       {children}
     </kbd>
   );

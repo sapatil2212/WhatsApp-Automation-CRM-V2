@@ -84,24 +84,29 @@ export function useApi<T>(path: string | null) {
 
 // ── layout bits ──────────────────────────────────────────────────────
 
+/**
+ * The four everyday pages. Campaigns, automation jobs and settings are
+ * advanced tools reached from links inside these pages; they highlight the
+ * tab they belong to.
+ */
 export const REVIEW_TABS = [
-  { href: '/reviews', label: 'Overview' },
-  { href: '/reviews/businesses', label: 'Businesses' },
-  { href: '/reviews/campaigns', label: 'Review Campaigns' },
-  { href: '/reviews/qr-codes', label: 'QR Codes' },
-  { href: '/reviews/jobs', label: 'Automation Jobs' },
-  { href: '/reviews/analytics', label: 'Analytics' },
-  { href: '/reviews/settings', label: 'Settings' },
+  { href: '/reviews', label: 'Overview', also: ['/reviews/jobs', '/reviews/settings'] },
+  { href: '/reviews/businesses', label: 'Businesses', also: [] },
+  { href: '/reviews/qr-codes', label: 'QR codes', also: ['/reviews/campaigns'] },
+  { href: '/reviews/analytics', label: 'Analytics', also: [] },
 ];
+
+export const isReviewTabActive = (t: (typeof REVIEW_TABS)[number], pathname: string) =>
+  (t.href === '/reviews' ? pathname === '/reviews' : pathname.startsWith(t.href)) || t.also.some((a) => pathname.startsWith(a));
 
 export function ReviewTabs() {
   const pathname = usePathname();
   return (
-    <nav className="-mx-1 flex gap-1 overflow-x-auto border-b border-border pb-px" aria-label="Reviews">
+    <nav className="flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl border border-border/70 bg-card p-1" aria-label="Reviews">
       {REVIEW_TABS.map((t) => {
-        const active = t.href === '/reviews' ? pathname === '/reviews' : pathname.startsWith(t.href);
+        const active = isReviewTabActive(t, pathname);
         return (
-          <Link key={t.href} href={t.href} className={cn('whitespace-nowrap border-b-2 px-3 py-2 text-xs font-medium transition-colors', active ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>
+          <Link key={t.href} href={t.href} aria-current={active ? 'page' : undefined} className={cn('whitespace-nowrap rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors', active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}>
             {t.label}
           </Link>
         );
@@ -114,8 +119,8 @@ export function PageHead({ title, subtitle, actions }: { title: string; subtitle
   return (
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
-        {subtitle && <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>}
+        <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+        {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
@@ -126,15 +131,22 @@ export function Card({ children, className }: { children: ReactNode; className?:
   return <div className={cn('rounded-xl border border-border/70 bg-card', className)}>{children}</div>;
 }
 
-export function Stat({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
+export function Stat({ label, value, hint, icon: Icon }: { label: string; value: ReactNode; hint?: string; icon?: React.ElementType }) {
   return (
-    <Card className="px-3 py-2.5">
-      <p className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-1 text-xl font-semibold leading-none tabular-nums">{value}</p>
-      {hint && <p className="mt-1 text-[10px] text-muted-foreground">{hint}</p>}
-    </Card>
+    <div className="rounded-xl border border-border/70 bg-card px-3 py-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <p className="truncate text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
+        {Icon && <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary"><Icon className="size-3.5" /></span>}
+      </div>
+      <p className="mt-1 text-xl font-bold leading-tight tabular-nums">{value}</p>
+      {hint && <p className="text-[10px] text-muted-foreground">{hint}</p>}
+    </div>
   );
 }
+
+/** Table styling shared by the review pages. */
+export const tableCls = 'w-full text-[13px]';
+export const theadCls = 'border-b border-border bg-muted/40 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground';
 
 export function Empty({ title, body, action }: { title: string; body?: string; action?: ReactNode }) {
   return (
@@ -174,7 +186,11 @@ export function Pill({ children, tone = 'muted' }: { children: ReactNode; tone?:
   return <span className={cn('inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium', cls)}>{children}</span>;
 }
 
-export function Modal({ title, subtitle, onClose, busy, children, wide }: { title: string; subtitle?: string; onClose: () => void; busy?: boolean; children: ReactNode; wide?: boolean }) {
+/**
+ * Review-module dialog. Never taller than the screen: the header and the
+ * optional `footer` stay put and only the body scrolls.
+ */
+export function Modal({ title, subtitle, onClose, busy, children, wide, footer }: { title: string; subtitle?: string; onClose: () => void; busy?: boolean; children: ReactNode; wide?: boolean; footer?: ReactNode }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !busy) onClose();
@@ -183,16 +199,17 @@ export function Modal({ title, subtitle, onClose, busy, children, wide }: { titl
     return () => window.removeEventListener('keydown', onKey);
   }, [busy, onClose]);
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center" role="dialog" aria-modal="true" aria-label={title} onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
-      <div className={cn('w-full rounded-xl bg-popover p-5 shadow-2xl ring-1 ring-foreground/10', wide ? 'max-w-2xl' : 'max-w-md')}>
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold">{title}</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4" role="dialog" aria-modal="true" aria-label={title} onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
+      <div className={cn('flex max-h-[calc(100dvh-1.5rem)] w-full flex-col overflow-hidden rounded-xl bg-popover shadow-2xl ring-1 ring-foreground/10 sm:max-h-[calc(100dvh-2rem)]', wide ? 'max-w-2xl' : 'max-w-md')}>
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border/70 px-5 py-3.5">
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold">{title}</h2>
             {subtitle && <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>}
           </div>
           <Button size="icon-sm" variant="ghost" aria-label="Close" className="size-7" onClick={onClose} disabled={busy}><X className="size-4" /></Button>
         </div>
-        <div className="mt-4">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
+        {footer && <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border/70 bg-muted/20 px-5 py-3">{footer}</div>}
       </div>
     </div>
   );
@@ -208,8 +225,8 @@ export function Field({ label, children, hint, className }: { label: string; chi
   );
 }
 
-export const inputCls = 'h-8 text-xs md:text-xs';
-export const selectCls = 'h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/40';
+export const inputCls = 'h-8 text-[13px] md:text-[13px]';
+export const selectCls = 'h-8 w-full rounded-md border border-input bg-background px-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring/40';
 
 export function SmallInput(props: React.ComponentProps<typeof Input>) {
   return <Input {...props} className={cn(inputCls, props.className)} />;

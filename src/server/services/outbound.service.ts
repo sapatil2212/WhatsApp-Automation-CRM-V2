@@ -178,6 +178,7 @@ export class OutboundMessageService {
     contentText: string | null;
     templateName: string | null;
     preview: string;
+    mediaUrl?: string;
   }): Promise<OutboundResult> {
     const message = await this.deps.messages.create({
       conversationId: input.target.conversationId,
@@ -187,6 +188,7 @@ export class OutboundMessageService {
       senderId: this.userId,
       contentType: input.contentType,
       contentText: input.contentText,
+      mediaUrl: input.mediaUrl,
       templateName: input.templateName,
       whatsappMessageId: input.whatsappMessageId,
       status: 'sent',
@@ -243,6 +245,30 @@ export class OutboundMessageService {
       contentText: null,
       templateName: input.templateName,
       preview: `[template] ${input.templateName}`,
+    });
+  }
+
+  /** Image / video / document by public URL. Free-form, so the 24-hour window applies. */
+  async sendMedia(
+    target: SendTarget,
+    input: { type: 'image' | 'video' | 'document'; url: string; caption?: string; filename?: string },
+  ): Promise<OutboundResult> {
+    this.assertSendable(target, false);
+    const { whatsappMessageId } = await this.deps.transport.sendMedia({
+      to: target.phone,
+      contentType: input.type,
+      mediaUrl: input.url,
+      caption: input.caption,
+      filename: input.filename,
+    });
+    return this.persist({
+      target,
+      whatsappMessageId,
+      contentType: input.type,
+      contentText: input.caption ?? input.filename ?? null,
+      templateName: null,
+      preview: input.caption || `[${input.type}]`,
+      mediaUrl: input.url,
     });
   }
 

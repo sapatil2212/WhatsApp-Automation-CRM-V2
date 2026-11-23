@@ -299,6 +299,7 @@ export const flowController = {
       tenants: z.number().int(),
       scanned: z.number().int(),
       timedOut: z.number().int(),
+      resumed: z.number().int(),
     }),
     handle: async () => {
       // Justified use of systemDb: a cron sweep legitimately spans tenants,
@@ -312,6 +313,7 @@ export const flowController = {
 
       let scanned = 0;
       let timedOut = 0;
+      let resumed = 0;
 
       for (const owner of owners) {
         const db = tenantDb(owner.tenantId);
@@ -323,12 +325,13 @@ export const flowController = {
           const swept = await engine.sweepStale();
           scanned += swept.scanned;
           timedOut += swept.timedOut;
+          resumed += (await engine.resumeDue()).resumed;
         } catch (error) {
           log.error('flow sweep failed for tenant', { tenantId: owner.tenantId, err: error });
         }
       }
 
-      return result({ tenants: owners.length, scanned, timedOut }, { message: 'Flow runs swept.' });
+      return result({ tenants: owners.length, scanned, timedOut, resumed }, { message: 'Flow runs swept.' });
     },
   }),
 };

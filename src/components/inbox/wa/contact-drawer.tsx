@@ -52,7 +52,7 @@ function Section({ title, icon, children, action }: { title: string; icon: React
   return (
     <section className="bg-[var(--wa-panel)] px-6 py-4 lg:px-[30px]">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="flex items-center gap-2 text-[14px] text-[var(--wa-text-2)]">
+        <h3 className="flex items-center gap-2 text-[12.5px] text-[var(--wa-text-2)]">
           {icon}
           {title}
         </h3>
@@ -88,11 +88,11 @@ export function ContactDrawer({
 
   return (
     <aside className="flex h-full w-full flex-col bg-[var(--wa-chat-bg)]" aria-label="Contact info">
-      <header className="flex h-[59px] shrink-0 items-center gap-6 bg-[var(--wa-panel-header)] px-4">
+      <header className="flex h-[52px] shrink-0 items-center gap-6 bg-[var(--wa-panel-header)] px-4">
         <IconButton label="Close contact info" onClick={onClose}>
-          <X className="h-5 w-5" />
+          <X className="h-4 w-4" />
         </IconButton>
-        <h2 className="text-[16px]">Contact info</h2>
+        <h2 className="text-[13.5px]">Contact info</h2>
       </header>
 
       <div className="wa-scroll flex-1 space-y-2.5 overflow-y-auto pb-6">
@@ -107,12 +107,12 @@ export function ContactDrawer({
               setCopied(true);
               setTimeout(() => setCopied(false), 1500);
             }}
-            className="mt-1 flex items-center gap-1.5 text-[16px] text-[var(--wa-text-2)] hover:text-[var(--wa-text)]"
+            className="mt-1 flex items-center gap-1.5 text-[13.5px] text-[var(--wa-text-2)] hover:text-[var(--wa-text)]"
           >
             {conversation.contact.phone}
             {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
           </button>
-          <div className="mt-3 flex flex-wrap justify-center gap-2 text-[12px]">
+          <div className="mt-3 flex flex-wrap justify-center gap-2 text-[11px]">
             <span
               className={cn(
                 "rounded-full px-2.5 py-1",
@@ -131,7 +131,7 @@ export function ContactDrawer({
 
         {/* Conversation controls */}
         <Section title="Conversation" icon={<UserRound className="h-4 w-4" />}>
-          <div className="space-y-3 text-[14px]">
+          <div className="space-y-3 text-[12.5px]">
             <div className="flex items-center justify-between gap-3">
               <span className="text-[var(--wa-text-2)]">Assigned to</span>
               <DropdownMenu>
@@ -170,7 +170,7 @@ export function ContactDrawer({
             </div>
             <div className="flex items-center justify-between gap-3">
               <span className="text-[var(--wa-text-2)]">Status</span>
-              <div className="flex overflow-hidden rounded-md border border-[var(--wa-border)] text-[13px]">
+              <div className="flex overflow-hidden rounded-md border border-[var(--wa-border)] text-[12px]">
                 {(
                   [
                     ["open", "Open"],
@@ -194,7 +194,7 @@ export function ContactDrawer({
                 ))}
               </div>
             </div>
-            <p className="flex items-start gap-2 rounded-md bg-[var(--wa-panel-header)] px-3 py-2 text-[12px] text-[var(--wa-text-2)]">
+            <p className="flex items-start gap-2 rounded-md bg-[var(--wa-panel-header)] px-3 py-2 text-[11px] text-[var(--wa-text-2)]">
               <Bot className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               {conversation.status === "open"
                 ? "A human is handling this chat — the AI assistant only sends a holding message."
@@ -246,13 +246,13 @@ export function ContactDrawer({
           }
         >
           {tags.length === 0 ? (
-            <p className="text-[13px] text-[var(--wa-text-2)]">No labels yet.</p>
+            <p className="text-[12px] text-[var(--wa-text-2)]">No labels yet.</p>
           ) : (
             <div className="flex flex-wrap gap-1.5">
               {tags.map((t) => (
                 <span
                   key={t.id}
-                  className="group flex items-center gap-1 rounded-full px-2.5 py-1 text-[13px]"
+                  className="group flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px]"
                   style={{ backgroundColor: `${t.color}26`, color: t.color }}
                 >
                   {t.name}
@@ -267,7 +267,7 @@ export function ContactDrawer({
 
         {/* Details */}
         <Section title="Details" icon={<Phone className="h-4 w-4" />}>
-          <dl className="space-y-2 text-[14px]">
+          <dl className="space-y-2 text-[12.5px]">
             <div className="flex justify-between gap-3">
               <dt className="text-[var(--wa-text-2)]">Phone</dt>
               <dd className="truncate">{conversation.contact.phone}</dd>
@@ -300,18 +300,18 @@ export function ContactDrawer({
           <Section title="Appointments" icon={<CalendarDays className="h-4 w-4" />}>
             <ul className="space-y-2">
               {context.appointments.map((a) => (
-                <li key={a.id} className="flex items-start justify-between gap-3 rounded-md bg-[var(--wa-panel-header)] px-3 py-2 text-[13px]">
+                <li key={a.id} className="flex items-start justify-between gap-3 rounded-md bg-[var(--wa-panel-header)] px-3 py-2 text-[12px]">
                   <div className="min-w-0">
                     <p>
                       {new Date(`${a.date}T00:00:00`).toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" })} · {a.time}
                     </p>
-                    <p className="truncate text-[12px] text-[var(--wa-text-2)]">
+                    <p className="truncate text-[11px] text-[var(--wa-text-2)]">
                       {[a.doctorName, a.reason].filter(Boolean).join(" · ") || "Appointment"}
                     </p>
                   </div>
                   <span
                     className={cn(
-                      "shrink-0 rounded-full px-2 py-0.5 text-[11px] capitalize",
+                      "shrink-0 rounded-full px-2 py-0.5 text-[10px] capitalize",
                       a.status === "cancelled"
                         ? "bg-red-500/15 text-red-500"
                         : a.status === "completed"
@@ -332,24 +332,24 @@ export function ContactDrawer({
           title="Pipeline"
           icon={<TrendingUp className="h-4 w-4" />}
           action={
-            <Link href="/pipelines" className="text-[12px] text-[var(--wa-accent-strong)] hover:underline">
+            <Link href="/pipelines" className="text-[11px] text-[var(--wa-accent-strong)] hover:underline">
               Open pipelines
             </Link>
           }
         >
           {!context || context.deals.length === 0 ? (
-            <p className="text-[13px] text-[var(--wa-text-2)]">No deals for this contact.</p>
+            <p className="text-[12px] text-[var(--wa-text-2)]">No deals for this contact.</p>
           ) : (
             <ul className="space-y-2">
               {context.deals.map((d) => (
-                <li key={d.id} className="rounded-md bg-[var(--wa-panel-header)] px-3 py-2 text-[13px]">
+                <li key={d.id} className="rounded-md bg-[var(--wa-panel-header)] px-3 py-2 text-[12px]">
                   <div className="flex items-center justify-between gap-2">
                     <span className="truncate font-medium">{d.title}</span>
                     <span className="shrink-0">
                       {new Intl.NumberFormat(undefined, { style: "currency", currency: d.currency || "USD", maximumFractionDigits: 0 }).format(d.value)}
                     </span>
                   </div>
-                  <div className="mt-1 flex items-center gap-2 text-[12px] text-[var(--wa-text-2)]">
+                  <div className="mt-1 flex items-center gap-2 text-[11px] text-[var(--wa-text-2)]">
                     {d.stage && (
                       <span className="flex items-center gap-1">
                         <span className="h-2 w-2 rounded-full" style={{ backgroundColor: d.stage.color }} />
@@ -384,7 +384,7 @@ export function ContactDrawer({
               onChange={(e) => setNote(e.target.value)}
               rows={2}
               placeholder="Add a note for your team…"
-              className="w-full resize-none rounded-md border border-[var(--wa-note-border)] bg-[var(--wa-note)] px-3 py-2 text-[13px] text-[var(--wa-text)] outline-none placeholder:text-[var(--wa-text-2)]"
+              className="w-full resize-none rounded-md border border-[var(--wa-note-border)] bg-[var(--wa-note)] px-3 py-2 text-[12px] text-[var(--wa-text)] outline-none placeholder:text-[var(--wa-text-2)]"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) (e.currentTarget.form as HTMLFormElement).requestSubmit();
               }}
@@ -393,7 +393,7 @@ export function ContactDrawer({
               <button
                 type="submit"
                 disabled={!note.trim() || savingNote}
-                className="rounded-full bg-[var(--wa-accent)] px-3 py-1 text-[12px] font-medium text-white disabled:opacity-40"
+                className="rounded-full bg-[var(--wa-accent)] px-3 py-1 text-[11px] font-medium text-white disabled:opacity-40"
               >
                 {savingNote ? "Saving…" : "Add note"}
               </button>
@@ -402,13 +402,13 @@ export function ContactDrawer({
           {!context ? (
             <div className="h-10 animate-pulse rounded bg-[var(--wa-panel-header)]" />
           ) : context.notes.length === 0 ? (
-            <p className="text-[13px] text-[var(--wa-text-2)]">No notes yet.</p>
+            <p className="text-[12px] text-[var(--wa-text-2)]">No notes yet.</p>
           ) : (
             <ul className="space-y-2">
               {context.notes.map((n) => (
-                <li key={n.id} className="group rounded-md border-l-2 border-[var(--wa-note-border)] bg-[var(--wa-note)] px-3 py-2 text-[13px]">
+                <li key={n.id} className="group rounded-md border-l-2 border-[var(--wa-note-border)] bg-[var(--wa-note)] px-3 py-2 text-[12px]">
                   <p className="whitespace-pre-wrap break-words">{n.text}</p>
-                  <div className="mt-1 flex items-center justify-between text-[11px] text-[var(--wa-text-2)]">
+                  <div className="mt-1 flex items-center justify-between text-[10px] text-[var(--wa-text-2)]">
                     <span>
                       {n.authorName ?? "Team"} · {new Date(n.createdAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
                     </span>

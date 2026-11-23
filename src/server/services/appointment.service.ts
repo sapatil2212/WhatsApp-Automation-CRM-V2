@@ -199,6 +199,53 @@ export class AppointmentService {
     };
   }
 
+  /**
+   * 1-based position of `time` in the doctor's full slot grid for `date`
+   * (booked or not, past or not), e.g. the 14th of 14 slots is 14. This is the
+   * clinic queue number. Null when the time is not on the grid (booked under an
+   * older schedule, or the day has no grid).
+   */
+  async slotNumber(doctorId: string, date: string, time: string): Promise<number | null> {
+    const clinic = await this.requireClinic();
+    const context = await this.loadSlotContext(clinic.id, doctorId);
+    const day = computeDaySlots({
+      date,
+      timings: context.timings,
+      clinicDateExceptions: context.clinicDateExceptions,
+      doctor: context.doctorAvailability,
+      slotMinutes: context.slotMinutes,
+      bookedTimes: [],
+      // A "now" before the date keeps slots that are already past today.
+      now: new Date(`${addDays(date, -2)}T00:00:00.000Z`),
+      timeZone: CLINIC_TIME_ZONE,
+    });
+    const index = day.slots.indexOf(time.slice(0, 5));
+    return index >= 0 ? index + 1 : null;
+  }
+
+  /**
+   * Puts a cancelled or no-show appointment back on the schedule at the same
+   * slot. `setStatus` refuses to leave `cancelled`, because a cancelled slot
+   * may have been rebooked; this checks that nobody else holds it now.
+   */
+  async reinstate(appointmentId: string): Promise<AppointmentDto> {
+    const clinic = await this.requireClinic();
+    const existing = await this.deps.appointments.findById(clinic.id, appointmentId);
+    if (existing.status === 'scheduled') return toAppointmentDto(existing);
+    if (existing.status === 'completed') {
+      throw new ConflictError('A completed appointment cannot be reopened.');
+    }
+    if (existing.doctorId) {
+      const date = toDateOnly(existing.appointmentDate);
+      const day = new Date(`${date}T00:00:00.000Z`);
+      const taken = await this.deps.appointments.findBookedSlots(existing.doctorId, day, day, appointmentId);
+      if (taken.some((row) => row.appointmentTime === existing.appointmentTime)) {
+        throw new ConflictError(`${existing.appointmentTime} on ${date} has been booked by another patient. Reschedule this appointment instead.`);
+      }
+    }
+    return toAppointmentDto(await this.deps.appointments.setStatus(clinic.id, appointmentId, 'scheduled'));
+  }
+
   /** Rejects a slot that availability would not have offered. */
   private async assertSlotOffered(input: {
     clinicId: string;

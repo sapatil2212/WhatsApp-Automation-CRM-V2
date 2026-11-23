@@ -207,6 +207,7 @@ const runSelect = {
   repromptCount: true,
   startedAt: true,
   lastAdvancedAt: true,
+  resumeAt: true,
   endedAt: true,
   endReason: true,
   contactId: true,
@@ -372,7 +373,8 @@ export class FlowRunRepository extends BaseRepository {
    */
   async findStaleActive(limit: number) {
     return this.db.flowRun.findMany({
-      where: { status: 'active' },
+      // A run waiting at a delay node is not abandoned.
+      where: { status: 'active', resumeAt: null },
       select: {
         id: true,
         flowId: true,
@@ -382,6 +384,34 @@ export class FlowRunRepository extends BaseRepository {
       orderBy: { lastAdvancedAt: 'asc' },
       take: limit,
     });
+  }
+
+  /** Parks a run at a delay node until `resumeAt`. The pointer stays on the delay node. */
+  async park(input: { runId: string; nodeKey: string; resumeAt: Date }): Promise<boolean> {
+    const affected = await this.db.flowRun.updateMany({
+      where: { id: input.runId, status: 'active' },
+      data: { currentNodeKey: input.nodeKey, resumeAt: input.resumeAt, lastAdvancedAt: new Date() },
+    });
+    return affected.count > 0;
+  }
+
+  /** Runs whose delay has elapsed. */
+  async findDueParked(now: Date, limit: number): Promise<FlowRunRow[]> {
+    return this.db.flowRun.findMany({
+      where: { status: 'active', resumeAt: { not: null, lte: now } },
+      select: runSelect,
+      orderBy: { resumeAt: 'asc' },
+      take: limit,
+    });
+  }
+
+  /** Atomic claim: exactly one caller wins a due run. */
+  async claimResume(runId: string, now: Date): Promise<boolean> {
+    const affected = await this.db.flowRun.updateMany({
+      where: { id: runId, status: 'active', resumeAt: { not: null, lte: now } },
+      data: { resumeAt: null, lastAdvancedAt: now },
+    });
+    return affected.count > 0;
   }
 
   async timeOut(runId: string): Promise<boolean> {

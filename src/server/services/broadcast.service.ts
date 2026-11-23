@@ -249,9 +249,16 @@ export class BroadcastService {
   async update(id: string, body: UpdateBroadcastBody): Promise<BroadcastDto> {
     const existing = await this.deps.broadcasts.findById(id);
     if (!isEditableBroadcastStatus(existing.status)) {
-      throw new ConflictError(`A ${existing.status} campaign can no longer be edited.`, {
-        details: { status: existing.status },
-      });
+      // History stays editable by name only: the template, schedule and
+      // audience of a campaign that already ran are a record of what happened.
+      const keys = Object.keys(body).filter((k) => (body as Record<string, unknown>)[k] !== undefined);
+      if (keys.some((k) => k !== 'name')) {
+        throw new ConflictError(`A ${existing.status} campaign can only be renamed.`, {
+          details: { status: existing.status },
+        });
+      }
+      await this.deps.broadcasts.update(id, { name: body.name });
+      return this.getById(id);
     }
 
     let storedVariables: Record<string, unknown> | undefined;
@@ -300,6 +307,21 @@ export class BroadcastService {
       throw new ConflictError('A campaign cannot be deleted while it is sending.');
     }
     await this.deps.broadcasts.delete(id);
+  }
+
+  /** Deletes many campaigns (any status except one that is sending right now). */
+  async deleteMany(ids: string[]): Promise<{ deleted: string[]; blocked: Array<{ id: string; reason: string }> }> {
+    const deletedIds: string[] = [];
+    const blocked: Array<{ id: string; reason: string }> = [];
+    for (const id of [...new Set(ids)]) {
+      try {
+        await this.delete(id);
+        deletedIds.push(id);
+      } catch (error) {
+        blocked.push({ id, reason: error instanceof Error ? error.message : 'Could not delete.' });
+      }
+    }
+    return { deleted: deletedIds, blocked };
   }
 
   async listRecipients(id: string, query: ListRecipientsQuery): Promise<Page<BroadcastRecipientDto>> {

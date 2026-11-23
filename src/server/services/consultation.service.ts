@@ -11,6 +11,7 @@
  *    are frozen; later branding changes never alter it.
  */
 
+import { publicSiteUrl } from '../site-origin';
 import crypto from 'node:crypto';
 import { z } from 'zod';
 
@@ -145,11 +146,15 @@ export async function ensurePatientProfile(db: TenantDb, tenantId: string, clini
   throw new ConflictError('Could not allocate a patient ID. Please retry.');
 }
 
-type ConsultStatus = 'waiting' | 'ready' | 'in_progress' | 'completed' | 'cancelled';
+type ConsultStatus = 'waiting' | 'ready' | 'in_progress' | 'completed' | 'no_show' | 'cancelled';
 function statusOf(a: { status: string; appointmentDate: Date; consultation: { status: string } | null }, today: string): ConsultStatus {
-  if (a.status === 'cancelled' || a.consultation?.status === 'cancelled') return 'cancelled';
+  if (a.status === 'cancelled') return 'cancelled';
+  // A cancelled draft on a reinstated appointment: the patient is back in the queue.
   if (a.consultation?.status === 'completed') return 'completed';
   if (a.consultation?.status === 'in_progress') return 'in_progress';
+  // Set manually from the queue or the appointments board, without a consultation.
+  if (a.status === 'completed') return 'completed';
+  if (a.status === 'no_show') return 'no_show';
   return dateOnly(a.appointmentDate) <= today ? 'ready' : 'waiting';
 }
 
@@ -162,7 +167,7 @@ export async function consultationQueue(db: TenantDb, q: z.infer<typeof queueQue
   const and: Prisma.AppointmentWhereInput[] = [{ clinicId: clinic.id }];
   if (q.tab === 'today') and.push({ appointmentDate: todayDate, status: { not: 'cancelled' } });
   if (q.tab === 'upcoming') and.push({ appointmentDate: { gt: todayDate }, status: 'scheduled' });
-  if (q.tab === 'waiting') and.push({ appointmentDate: { lte: todayDate }, status: 'scheduled', consultation: { is: null } });
+  if (q.tab === 'waiting') and.push({ appointmentDate: { lte: todayDate }, status: 'scheduled', OR: [{ consultation: { is: null } }, { consultation: { is: { status: 'cancelled' } } }] });
   if (q.tab === 'in_progress') and.push({ consultation: { is: { status: 'in_progress' } } });
   if (q.tab === 'completed') and.push({ consultation: { is: { status: 'completed' } } });
   if (q.doctorId) and.push({ doctorId: q.doctorId });
@@ -266,9 +271,15 @@ export async function startConsultation(db: TenantDb, ctx: AuthContext, appointm
   const clinic = await requireClinic(db);
   const appt = await db.appointment.findFirst({
     where: { id: appointmentId, clinicId: clinic.id },
-    include: { consultation: { select: { id: true } }, detail: { select: { patientGender: true } } },
+    include: { consultation: { select: { id: true, status: true } }, detail: { select: { patientGender: true } } },
   });
   if (!appt) throw new NotFoundError('Appointment');
+  if (appt.consultation?.status === 'cancelled' && appt.status !== 'cancelled') {
+    // Reinstated appointment: resume the earlier draft instead of losing its notes.
+    await db.consultation.updateMany({ where: { id: appt.consultation.id, status: 'cancelled' }, data: { status: 'in_progress', completedAt: null, completedBy: null, durationSec: null } });
+    appointmentsChanged(clinic.tenantId, { id: appointmentId, kind: 'consultation_started' });
+    return { consultationId: appt.consultation.id, created: false };
+  }
   if (appt.consultation) return { consultationId: appt.consultation.id, created: false };
   if (appt.status === 'cancelled') throw new ConflictError('This appointment was cancelled.');
 
@@ -763,14 +774,16 @@ export async function previewPdf(db: TenantDb, consultationId: string): Promise<
 }
 
 function siteUrl(): string {
-  return (process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '');
+  return publicSiteUrl();
 }
 
 export async function finalizeConsultation(db: TenantDb, ctx: AuthContext, consultationId: string, body: { doctorApproved: boolean; revision: number }, opts: { origin?: string } = {}) {
   assertCanSign(ctx);
-  const c = await db.consultation.findFirst({ where: { id: consultationId }, select: { id: true, status: true, revision: true, startedAt: true, appointmentId: true, tenantId: true, contactId: true, prescription: { select: { id: true, status: true } } } });
+  const c = await db.consultation.findFirst({ where: { id: consultationId }, select: { id: true, status: true, revision: true, startedAt: true, appointmentId: true, tenantId: true, contactId: true, prescription: { select: { id: true, status: true, prescriptionNo: true, verifyToken: true } } } });
   if (!c?.prescription) throw new NotFoundError('Consultation');
   if (c.prescription.status === 'finalized') throw new ConflictError('This prescription is already finalized.');
+  // An amended prescription keeps its number and QR link; a first-time one gets new ones.
+  const keptNo = c.prescription.prescriptionNo && !c.prescription.prescriptionNo.startsWith('DRAFT-') ? c.prescription.prescriptionNo : null;
   if (body.revision !== c.revision) throw new ConflictError('Unsaved changes: wait for autosave to finish, then finalize.', { details: { revision: c.revision } });
 
   const ws = await consultationWorkspace(db, consultationId);
@@ -785,12 +798,12 @@ export async function finalizeConsultation(db: TenantDb, ctx: AuthContext, consu
 
   // Per-tenant daily sequence; the unique index guards against races.
   const day = todayIn(CLINIC_TIME_ZONE);
-  const verifyToken = crypto.randomBytes(16).toString('hex');
+  const verifyToken = (keptNo && c.prescription.verifyToken) || crypto.randomBytes(16).toString('hex');
   for (let attempt = 0; attempt < 5; attempt++) {
-    const count = await db.prescription.count({ where: { status: 'finalized', prescriptionNo: { startsWith: prescriptionNumber(day, 0).slice(0, 10) } } });
-    const number = prescriptionNumber(day, count + 1 + attempt);
-    // Configured site URL, else the origin the doctor is using, for the QR link.
-    const base = siteUrl() || (opts.origin ?? '').replace(/\/$/, '');
+    const count = keptNo ? 0 : await db.prescription.count({ where: { status: 'finalized', prescriptionNo: { startsWith: prescriptionNumber(day, 0).slice(0, 10) } } });
+    const number = keptNo ?? prescriptionNumber(day, count + 1 + attempt);
+    // The domain the doctor is using (resolved by the controller), else the configured site URL, for the QR link.
+    const base = (opts.origin ?? '').replace(/\/$/, '') || siteUrl();
     const verifyUrl = base ? `${base}/verify/rx/${verifyToken}` : null;
     const { snapshot, images } = await buildSnapshot(db, consultationId, number, verifyUrl);
     const pdf = await renderPrescriptionPdf(snapshot, images, { final: true });
@@ -829,6 +842,53 @@ export async function finalizeConsultation(db: TenantDb, ctx: AuthContext, consu
     return { prescriptionId: c.prescription.id, prescriptionNo: number, sha256: sha };
   }
   throw new ConflictError('Could not allocate a prescription number. Please retry.');
+}
+
+/**
+ * Discards a consultation that is still in progress: the draft notes,
+ * transcripts and draft prescription go; the appointment stays and returns to
+ * the queue as Ready. A completed consultation is a medical record and is
+ * never deleted here.
+ */
+export async function discardConsultation(db: TenantDb, ctx: AuthContext, consultationId: string) {
+  assertCanSign(ctx);
+  const c = await db.consultation.findFirst({
+    where: { id: consultationId },
+    select: { id: true, status: true, appointmentId: true, tenantId: true, prescription: { select: { status: true } } },
+  });
+  if (!c) throw new NotFoundError('Consultation');
+  if (c.status === 'completed' || c.prescription?.status === 'finalized') {
+    throw new ConflictError('A completed consultation is part of the medical record and cannot be deleted.');
+  }
+  // Children cascade (prescription, transcripts) on the consultation FK.
+  const removed = await db.consultation.deleteMany({ where: { id: consultationId, status: { not: 'completed' } } });
+  if (!removed.count) throw new ConflictError('This consultation was completed in the meantime.');
+  appointmentsChanged(c.tenantId, { id: c.appointmentId, kind: 'consultation_discarded' });
+  return { deleted: true, appointmentId: c.appointmentId };
+}
+/**
+ * Re-opens a finalized prescription so the doctor can correct it. The record goes back to a
+ * draft (same prescription number and QR link). Finalizing again re-signs it, builds a new PDF
+ * and sends the corrected copy to the patient.
+ */
+export async function reopenConsultation(db: TenantDb, ctx: AuthContext, consultationId: string) {
+  assertCanSign(ctx);
+  const c = await db.consultation.findFirst({ where: { id: consultationId }, select: { id: true, appointmentId: true, tenantId: true, prescription: { select: { id: true, status: true } } } });
+  if (!c?.prescription) throw new NotFoundError('Consultation');
+  if (c.prescription.status !== 'finalized') throw new ConflictError('This prescription is not finalized, so it can already be edited.');
+  await db.$transaction(async (tx) => {
+    const moved = await tx.prescription.updateMany({
+      where: { id: c.prescription!.id, status: 'finalized' },
+      data: { status: 'draft', pdf: null, pdfSha256: null, finalizedAt: null, finalizedBy: null, deliveryStatus: 'not_sent', deliveryError: null, deliveryAttempts: 0, whatsappMessageId: null, mediaId: null, sentAt: null, deliveredAt: null, readAt: null },
+    });
+    if (!moved.count) throw new ConflictError('This prescription was already re-opened.');
+    await tx.consultation.updateMany({
+      where: { id: consultationId },
+      data: { status: 'in_progress', completedAt: null, completedBy: null, durationSec: null, revision: { increment: 1 } },
+    });
+  });
+  appointmentsChanged(c.tenantId, { id: c.appointmentId, kind: 'consultation_reopened' });
+  return { consultationId, prescriptionId: c.prescription.id };
 }
 
 async function rememberMedicines(db: TenantDb, tenantId: string, medicines: MedicineLine[]) {

@@ -75,7 +75,7 @@ export async function proxy(request: NextRequest) {
   const protectedPaths = [
     '/dashboard', '/inbox', '/contacts', '/pipelines',
     '/campaigns', '/automations', '/settings',
-    '/templates', '/flows', '/healthcare', '/connections',
+    '/templates', '/flows', '/healthcare', '/connections', '/subscription',
   ]
   if (!user && protectedPaths.some(p => path.startsWith(p))) {
     const url = request.nextUrl.clone()

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
+import { invalidateClinicCacheByClinicId } from "@/lib/healthcare/clinic-cache";
 import { verifyAccessToken, rotateRefreshToken } from "@/lib/auth";
 import { getBusinessSegment } from "@/lib/business/terminology";
 import {
@@ -102,6 +103,7 @@ export async function PUT(req: NextRequest) {
       create: { clinicId: clinic.id, inboundRoutingMode: mode },
       update: { inboundRoutingMode: mode },
     });
+    invalidateClinicCacheByClinicId(clinic.id);
   } else {
     const business = await prisma.businessProfile.findUnique({
       where: { userId: ctx.userId },

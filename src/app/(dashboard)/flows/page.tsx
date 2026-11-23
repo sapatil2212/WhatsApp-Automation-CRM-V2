@@ -119,7 +119,7 @@ export default function FlowsPage() {
     (async () => {
       try {
         const [flowsRes, tmplRes] = await Promise.all([
-          fetch("/api/flows"),
+          fetch("/api/flows?pageSize=100"),
           fetch("/api/flows/templates"),
         ]);
         if (!flowsRes.ok) {
@@ -301,7 +301,7 @@ export default function FlowsPage() {
         <span className="hidden shrink-0 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground transition-transform group-hover:translate-x-0.5 sm:block">Start with AI →</span>
       </button>
 
-      <RoutingModeCard />
+      <RoutingModeCard activeFlowCount={flows.filter((f) => f.status === "active").length} />
 
       {flows.length > 0 && (
         <div className="flex items-center justify-between">

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { verifyAccessToken, rotateRefreshToken } from '@/lib/auth'
-import { invalidateClinicCache } from '@/lib/healthcare/clinic-cache'
+import { invalidateClinicCacheForTenant } from '@/lib/healthcare/clinic-cache'
 import { notifyAffectedAppointments } from '@/server/services/closure-notify'
 import { invalidateBookingSlugs } from '@/server/services/booking-slug'
 import { provisionTemplates } from '@/server/services/utility-template.service'
@@ -181,7 +181,7 @@ export async function POST(req: NextRequest) {
       })
 
       // Refresh cached clinic context so AI picks up new info without waiting for TTL
-      invalidateClinicCache(ctx.userId)
+      invalidateClinicCacheForTenant(ctx.tenantId)
 
       // Provision this tenant's appointment utility templates for its vertical
       // (idempotent; existing templates and their approvals are untouched).
@@ -363,7 +363,7 @@ export async function POST(req: NextRequest) {
       })
 
       // Invalidate cache
-      invalidateClinicCache(ctx.userId)
+      invalidateClinicCacheForTenant(ctx.tenantId)
 
       return NextResponse.json({ success: true })
     }

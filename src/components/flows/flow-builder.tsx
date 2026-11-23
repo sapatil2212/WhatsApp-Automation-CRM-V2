@@ -47,6 +47,10 @@ import {
   GitFork,
   Tag,
   Zap,
+  ImageIcon,
+  LayoutTemplate,
+  Timer,
+  Globe,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -73,6 +77,7 @@ import {
   validateFlowForActivation,
   type ValidationIssue,
 } from "@/lib/flows/validate";
+import { checkWebhookUrl } from "@/lib/flows/safe-url";
 import type { FlowNodeRow, FlowRow } from "@/lib/flows/types";
 
 interface FlowBuilderProps {
@@ -94,6 +99,10 @@ type NodeType =
   | "collect_input"
   | "condition"
   | "set_tag"
+  | "send_media"
+  | "send_template"
+  | "delay"
+  | "http_request"
   | "handoff"
   | "end";
 
@@ -152,6 +161,26 @@ const NODE_META: Record<
     label: "Tag contact",
     icon: Tag,
     color: "text-pink-400",
+  },
+  send_media: {
+    label: "Send image / file",
+    icon: ImageIcon,
+    color: "text-sky-500",
+  },
+  send_template: {
+    label: "Send template",
+    icon: LayoutTemplate,
+    color: "text-violet-500",
+  },
+  delay: {
+    label: "Wait / delay",
+    icon: Timer,
+    color: "text-orange-500",
+  },
+  http_request: {
+    label: "Call a webhook",
+    icon: Globe,
+    color: "text-cyan-500",
   },
   handoff: {
     label: "Handoff to agent",
@@ -278,6 +307,26 @@ function summarizeNode(node: BuilderNode): string | null {
       // multiple set_tag nodes at a glance.
       return tagId ? `${mode} tag ${tagId.slice(0, 8)}…` : `${mode} tag (none picked)`;
     }
+    case "send_media": {
+      const type = typeof cfg.media_type === "string" ? cfg.media_type : "image";
+      const caption = typeof cfg.caption === "string" ? cfg.caption : "";
+      const url = typeof cfg.url === "string" ? cfg.url : "";
+      return caption ? `${type}: ${truncate(caption, 50)}` : url ? `${type}: ${truncate(url, 50)}` : `${type} (no link yet)`;
+    }
+    case "send_template": {
+      const name = typeof cfg.template_name === "string" ? cfg.template_name : "";
+      return name ? `Template ${name}` : "Template (none picked)";
+    }
+    case "delay": {
+      const amount = Number(cfg.amount);
+      const unit = typeof cfg.unit === "string" ? cfg.unit : "hours";
+      return Number.isFinite(amount) && amount > 0 ? `Wait ${amount} ${amount === 1 ? unit.replace(/s$/, "") : unit}` : "Wait (set a duration)";
+    }
+    case "http_request": {
+      const url = typeof cfg.url === "string" ? cfg.url : "";
+      const method = cfg.method === "POST" ? "POST" : "GET";
+      return url ? `${method} ${truncate(url.replace(/^https:\/\//, ""), 48)}` : "Webhook (no URL yet)";
+    }
     case "handoff": {
       const note = typeof cfg.note === "string" ? cfg.note : "";
       return note.length > 0 ? truncate(note) : null;
@@ -326,6 +375,14 @@ function defaultConfigFor(type: NodeType): Record<string, unknown> {
       };
     case "set_tag":
       return { mode: "add", tag_id: "", next_node_key: "" };
+    case "send_media":
+      return { media_type: "image", url: "", caption: "", filename: "", next_node_key: "" };
+    case "send_template":
+      return { template_name: "", language: "en_US", params: [], next_node_key: "" };
+    case "delay":
+      return { amount: 1, unit: "hours", stop_on_reply: false, next_node_key: "" };
+    case "http_request":
+      return { url: "", method: "GET", auth_header: "", save_as: "", json_path: "", next_node_key: "", on_error_next_key: "" };
     case "handoff":
       return { note: "" };
     case "end":
@@ -627,7 +684,7 @@ export function FlowBuilder({ initialFlow, initialNodes }: FlowBuilderProps) {
         const nodes = [...s.nodes];
         if (nodes.length > 0) {
           const last = nodes[nodes.length - 1];
-          const autoWireTypes = ["start", "send_message", "collect_input", "set_tag"];
+          const autoWireTypes = ["start", "send_message", "collect_input", "set_tag", "send_media", "send_template", "delay", "http_request"];
           if (autoWireTypes.includes(last.node_type)) {
             const cfg = last.config as { next_node_key?: string };
             if (!cfg.next_node_key) {
@@ -670,7 +727,7 @@ export function FlowBuilder({ initialFlow, initialNodes }: FlowBuilderProps) {
         // Auto-wire: point the previous node at the new node, and
         // point the new node at whatever the previous node pointed to.
         const prev = nodes[idx];
-        const autoWireTypes = ["start", "send_message", "collect_input", "set_tag"];
+        const autoWireTypes = ["start", "send_message", "collect_input", "set_tag", "send_media", "send_template", "delay", "http_request"];
         if (autoWireTypes.includes(prev.node_type)) {
           const oldNext = (prev.config as { next_node_key?: string }).next_node_key || "";
           nodes[idx] = { ...prev, config: { ...prev.config, next_node_key: node_key } };
@@ -1516,6 +1573,42 @@ function NodeConfigForm({
         />
       )}
 
+      {node.node_type === "send_media" && (
+        <SendMediaForm
+          cfg={cfg as SendMediaCfg}
+          allNodes={allNodes}
+          currentKey={node.node_key}
+          onUpdateConfig={onUpdateConfig}
+        />
+      )}
+
+      {node.node_type === "send_template" && (
+        <SendTemplateForm
+          cfg={cfg as SendTemplateCfg}
+          allNodes={allNodes}
+          currentKey={node.node_key}
+          onUpdateConfig={onUpdateConfig}
+        />
+      )}
+
+      {node.node_type === "delay" && (
+        <DelayForm
+          cfg={cfg as DelayCfg}
+          allNodes={allNodes}
+          currentKey={node.node_key}
+          onUpdateConfig={onUpdateConfig}
+        />
+      )}
+
+      {node.node_type === "http_request" && (
+        <HttpRequestForm
+          cfg={cfg as HttpRequestCfg}
+          allNodes={allNodes}
+          currentKey={node.node_key}
+          onUpdateConfig={onUpdateConfig}
+        />
+      )}
+
       {node.node_type === "handoff" && (
         <TextRow
           label="Internal note (for the agent picking up)"
@@ -2119,6 +2212,388 @@ function ConditionForm({
   );
 }
 
+// ---- delay form ----
+
+interface DelayCfg {
+  amount?: number;
+  unit?: "minutes" | "hours" | "days";
+  stop_on_reply?: boolean;
+  next_node_key?: string;
+}
+
+function DelayForm({
+  cfg,
+  allNodes,
+  currentKey,
+  onUpdateConfig,
+}: {
+  cfg: DelayCfg;
+  allNodes: BuilderNode[];
+  currentKey: string;
+  onUpdateConfig: (patch: Record<string, unknown>) => void;
+}) {
+  const unit = cfg.unit ?? "hours";
+  const amount = cfg.amount ?? 1;
+  const minutes = amount * (unit === "days" ? 1440 : unit === "hours" ? 60 : 1);
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1 block text-xs text-muted-foreground">Wait for</label>
+          <Input
+            type="number"
+            min={1}
+            value={amount}
+            onChange={(e) => onUpdateConfig({ amount: Math.max(1, Number(e.target.value) || 1) })}
+            className="bg-muted"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-muted-foreground">Unit</label>
+          <Select value={unit} onValueChange={(v) => onUpdateConfig({ unit: v })}>
+            <SelectTrigger className="bg-muted">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="minutes">Minutes</SelectItem>
+              <SelectItem value="hours">Hours</SelectItem>
+              <SelectItem value="days">Days</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          className="rx-check mt-0.5"
+          checked={Boolean(cfg.stop_on_reply)}
+          onChange={(e) => onUpdateConfig({ stop_on_reply: e.target.checked })}
+        />
+        <span>
+          Stop waiting if the customer replies
+          <span className="block text-xs text-muted-foreground">
+            The flow ends and your team or AI answers the message. Off: the flow continues after the wait.
+          </span>
+        </span>
+      </label>
+      {minutes >= 23 * 60 && (
+        <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+          After about a day WhatsApp only allows approved templates. Follow this step with “Send template”, not a plain message.
+        </p>
+      )}
+      <NextNodeRow
+        value={cfg.next_node_key ?? ""}
+        allNodes={allNodes}
+        currentKey={currentKey}
+        onChange={(v) => onUpdateConfig({ next_node_key: v })}
+        label="Then continue to"
+      />
+    </>
+  );
+}
+
+// ---- http_request form ----
+
+interface HttpRequestCfg {
+  url?: string;
+  method?: "GET" | "POST";
+  auth_header?: string;
+  save_as?: string;
+  json_path?: string;
+  next_node_key?: string;
+  on_error_next_key?: string;
+}
+
+function HttpRequestForm({
+  cfg,
+  allNodes,
+  currentKey,
+  onUpdateConfig,
+}: {
+  cfg: HttpRequestCfg;
+  allNodes: BuilderNode[];
+  currentKey: string;
+  onUpdateConfig: (patch: Record<string, unknown>) => void;
+}) {
+  const url = cfg.url ?? "";
+  const urlProblem = url ? checkWebhookUrl(url) : null;
+  const method = cfg.method ?? "GET";
+  return (
+    <>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+        <div>
+          <label className="mb-1 block text-xs text-muted-foreground">Method</label>
+          <Select value={method} onValueChange={(v) => onUpdateConfig({ method: v })}>
+            <SelectTrigger className="bg-muted">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="GET">GET</SelectItem>
+              <SelectItem value="POST">POST</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="md:col-span-3">
+          <label className="mb-1 block text-xs text-muted-foreground">URL (https, supports {"{{vars.phone}}"})</label>
+          <Input
+            value={url}
+            onChange={(e) => onUpdateConfig({ url: e.target.value.trim() })}
+            placeholder="https://api.example.com/orders?id={{vars.order_id}}"
+            className="bg-muted font-mono text-xs"
+            aria-invalid={Boolean(urlProblem)}
+          />
+          {urlProblem && <p className="mt-1 text-[11px] text-destructive">{urlProblem}</p>}
+        </div>
+      </div>
+      {method === "POST" && (
+        <p className="text-[11px] text-muted-foreground">
+          POST sends JSON: the contact (name, phone, email) and everything collected so far in this flow.
+        </p>
+      )}
+      <div>
+        <label className="mb-1 block text-xs text-muted-foreground">Authorization header (optional)</label>
+        <Input
+          type="password"
+          autoComplete="off"
+          value={cfg.auth_header ?? ""}
+          onChange={(e) => onUpdateConfig({ auth_header: e.target.value.replace(/[\r\n]/g, "") })}
+          placeholder="Bearer your-token"
+          className="bg-muted font-mono text-xs"
+        />
+        <p className="mt-1 text-[11px] text-muted-foreground">Stored with the flow. Use a token that can only do what this step needs.</p>
+      </div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-xs text-muted-foreground">Save the answer as variable (optional)</label>
+          <Input
+            value={cfg.save_as ?? ""}
+            onChange={(e) => onUpdateConfig({ save_as: e.target.value.replace(/[^a-zA-Z0-9_]/g, "") })}
+            placeholder="order_status"
+            className="bg-muted"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-muted-foreground">Read this field of the JSON answer (optional)</label>
+          <Input
+            value={cfg.json_path ?? ""}
+            onChange={(e) => onUpdateConfig({ json_path: e.target.value.trim() })}
+            placeholder="data.status"
+            className="bg-muted font-mono text-xs"
+          />
+        </div>
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        Use the variable in later messages as {"{{vars.order_status}}"}. Answers over 64 KB, redirects and non-2xx replies count as a failure.
+      </p>
+      <NextNodeRow
+        value={cfg.next_node_key ?? ""}
+        allNodes={allNodes}
+        currentKey={currentKey}
+        onChange={(v) => onUpdateConfig({ next_node_key: v })}
+        label="On success, continue to"
+      />
+      <NextNodeRow
+        value={cfg.on_error_next_key ?? ""}
+        allNodes={allNodes}
+        currentKey={currentKey}
+        onChange={(v) => onUpdateConfig({ on_error_next_key: v })}
+        label="On failure, go to (leave empty to stop the run)"
+      />
+    </>
+  );
+}
+
+// ---- send_media form ----
+
+interface SendMediaCfg {
+  media_type?: "image" | "video" | "document";
+  url?: string;
+  caption?: string;
+  filename?: string;
+  next_node_key?: string;
+}
+
+function SendMediaForm({
+  cfg,
+  allNodes,
+  currentKey,
+  onUpdateConfig,
+}: {
+  cfg: SendMediaCfg;
+  allNodes: BuilderNode[];
+  currentKey: string;
+  onUpdateConfig: (patch: Record<string, unknown>) => void;
+}) {
+  const type = cfg.media_type ?? "image";
+  const url = cfg.url ?? "";
+  const badUrl = url.length > 0 && !/^https:\/\/\S+$/i.test(url);
+  return (
+    <>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div>
+          <label className="mb-1 block text-xs text-muted-foreground">Type</label>
+          <Select value={type} onValueChange={(v) => onUpdateConfig({ media_type: v })}>
+            <SelectTrigger className="bg-muted">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="image">Image</SelectItem>
+              <SelectItem value="video">Video</SelectItem>
+              <SelectItem value="document">Document (PDF, etc.)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="md:col-span-2">
+          <label className="mb-1 block text-xs text-muted-foreground">File link (public https URL)</label>
+          <Input
+            value={url}
+            onChange={(e) => onUpdateConfig({ url: e.target.value.trim() })}
+            placeholder="https://example.com/brochure.pdf"
+            className="bg-muted"
+            aria-invalid={badUrl}
+          />
+          {badUrl && <p className="mt-1 text-[11px] text-destructive">Must start with https:// and be reachable without a login.</p>}
+        </div>
+      </div>
+      {type === "document" && (
+        <div>
+          <label className="mb-1 block text-xs text-muted-foreground">File name shown to the customer</label>
+          <Input
+            value={cfg.filename ?? ""}
+            onChange={(e) => onUpdateConfig({ filename: e.target.value })}
+            placeholder="Price list.pdf"
+            className="bg-muted"
+          />
+        </div>
+      )}
+      <TextRow
+        label="Caption (optional, supports {{vars.name}})"
+        value={cfg.caption ?? ""}
+        onChange={(v) => onUpdateConfig({ caption: v })}
+        rows={2}
+      />
+      <NextNodeRow
+        value={cfg.next_node_key ?? ""}
+        allNodes={allNodes}
+        currentKey={currentKey}
+        onChange={(v) => onUpdateConfig({ next_node_key: v })}
+        label="Then advance to"
+      />
+    </>
+  );
+}
+
+// ---- send_template form ----
+
+interface SendTemplateCfg {
+  template_name?: string;
+  language?: string;
+  params?: string[];
+  next_node_key?: string;
+}
+
+interface ApprovedTemplate {
+  name: string;
+  language: string;
+}
+
+function SendTemplateForm({
+  cfg,
+  allNodes,
+  currentKey,
+  onUpdateConfig,
+}: {
+  cfg: SendTemplateCfg;
+  allNodes: BuilderNode[];
+  currentKey: string;
+  onUpdateConfig: (patch: Record<string, unknown>) => void;
+}) {
+  const [templates, setTemplates] = useState<ApprovedTemplate[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/whatsapp/templates").catch(() => null);
+        if (!res || !res.ok) return;
+        const raw = await res.json();
+        const list = (Array.isArray(raw?.data) ? raw.data : Array.isArray(raw?.templates) ? raw.templates : Array.isArray(raw) ? raw : []) as Array<Record<string, unknown>>;
+        const approved = list
+          .filter((t) => String(t.status ?? "").toLowerCase() === "approved")
+          .map((t) => ({ name: String(t.name ?? ""), language: String(t.language ?? "en_US") }))
+          .filter((t) => t.name);
+        if (!cancelled) setTemplates(approved);
+      } catch {
+        // Falls back to typing the template name.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const params = cfg.params ?? [];
+  return (
+    <>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-xs text-muted-foreground">Approved template</label>
+          {templates.length > 0 ? (
+            <Select
+              value={cfg.template_name ?? ""}
+              onValueChange={(v) => {
+                const t = templates.find((x) => x.name === v);
+                onUpdateConfig({ template_name: v, language: t?.language ?? cfg.language ?? "en_US" });
+              }}
+            >
+              <SelectTrigger className="bg-muted">
+                <SelectValue placeholder="Pick a template…" />
+              </SelectTrigger>
+              <SelectContent>
+                {templates.map((t) => (
+                  <SelectItem key={`${t.name}:${t.language}`} value={t.name}>
+                    {t.name} ({t.language})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Input
+              value={cfg.template_name ?? ""}
+              onChange={(e) => onUpdateConfig({ template_name: e.target.value.trim() })}
+              placeholder="template_name"
+              className="bg-muted font-mono text-xs"
+            />
+          )}
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-muted-foreground">Language</label>
+          <Input
+            value={cfg.language ?? "en_US"}
+            onChange={(e) => onUpdateConfig({ language: e.target.value.trim() })}
+            className="bg-muted"
+          />
+        </div>
+      </div>
+      <TextRow
+        label="Variables, one per line ({{1}}, {{2}}…). Supports {{vars.name}}"
+        value={params.join("\n")}
+        onChange={(v) => onUpdateConfig({ params: v.split("\n").map((l) => l.trimEnd()).filter((l) => l.length > 0) })}
+        rows={3}
+      />
+      <p className="text-[11px] text-muted-foreground">
+        Templates can be sent at any time, even after the 24-hour window — use this to re-open a conversation.
+      </p>
+      <NextNodeRow
+        value={cfg.next_node_key ?? ""}
+        allNodes={allNodes}
+        currentKey={currentKey}
+        onChange={(v) => onUpdateConfig({ next_node_key: v })}
+        label="Then advance to"
+      />
+    </>
+  );
+}
+
 // ---- set_tag form ----
 
 interface SetTagCfg {
@@ -2343,6 +2818,10 @@ function InsertBetweenButton({
     "collect_input",
     "condition",
     "set_tag",
+    "send_media",
+    "send_template",
+    "delay",
+    "http_request",
     "handoff",
     "end",
   ];
@@ -2397,16 +2876,20 @@ const NODE_DESCRIPTIONS: Record<NodeType, string> = {
   collect_input: "Ask a question and store the answer",
   condition: "Branch based on a variable or tag",
   set_tag: "Add or remove a contact tag",
+  send_media: "Send an image, video or PDF",
+  send_template: "Send an approved template (works after 24h)",
+  delay: "Wait minutes, hours or days, then continue",
+  http_request: "Call your own API and use the answer",
   handoff: "Transfer to a human agent",
   end: "End the flow",
 };
 
 function AddNodeButton({ onAdd }: { onAdd: (type: NodeType) => void }) {
   const categories: { label: string; types: NodeType[] }[] = [
-    { label: "Flow control", types: ["start", "condition", "end"] },
-    { label: "Messages", types: ["send_message", "send_buttons", "send_list"] },
+    { label: "Flow control", types: ["start", "condition", "delay", "end"] },
+    { label: "Messages", types: ["send_message", "send_media", "send_template", "send_buttons", "send_list"] },
     { label: "Data", types: ["collect_input", "set_tag"] },
-    { label: "Actions", types: ["handoff"] },
+    { label: "Actions", types: ["http_request", "handoff"] },
   ];
   return (
     <DropdownMenu>

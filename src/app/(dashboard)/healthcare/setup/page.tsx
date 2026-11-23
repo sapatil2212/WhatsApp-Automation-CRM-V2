@@ -22,6 +22,8 @@ import {
   AlertCircle,
   Loader2,
   Layers,
+  CheckCircle2,
+  Link2,
 } from "lucide-react";
 import { DepartmentsManager } from "@/components/healthcare/departments-manager";
 import { DoctorsDirectory } from "@/components/healthcare/doctors-directory";
@@ -30,6 +32,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { AiSetupImport, type SetupSection } from "@/components/setup/ai-setup-import";
+import { AiTrainingStep } from "@/components/setup/ai-training-step";
 import { BookingLinkCard } from "@/components/booking/booking-link-card";
 import type { ExtractedSetup } from "@/lib/ai/setup-extract";
 import { Switch } from "@/components/ui/switch";
@@ -43,6 +46,16 @@ export default function ClinicSetupWizard() {
   const [saving, setSaving] = useState(false);
   const [clinicId, setClinicId] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [showLink, setShowLink] = useState(false);
+  // Last saved knowledge text, so the AI Training step can show unsaved changes.
+  const [savedKb, setSavedKb] = useState("");
+
+  // Deep link: /healthcare/setup?step=ai-training (the old AI Knowledge Base page redirects here).
+  useEffect(() => {
+    const step = new URLSearchParams(window.location.search).get("step");
+    const map: Record<string, number> = { "ai-training": 8, faqs: 5, "ai-settings": 6 };
+    if (step && map[step]) setCurrentStep(map[step]);
+  }, []);
 
   // --- Step 1 State: Clinic Info ---
   const [clinicInfo, setClinicInfo] = useState({
@@ -195,6 +208,7 @@ export default function ClinicSetupWizard() {
             facebook_url: clinic.facebook_url || "",
             ai_knowledge_base: clinic.ai_knowledge_base || "",
           });
+          setSavedKb(clinic.ai_knowledge_base || "");
           setClinicExceptions(clinic.date_exceptions || []);
 
           if (timingRows && timingRows.length > 0) {
@@ -623,6 +637,7 @@ export default function ClinicSetupWizard() {
         4: 'Services registered successfully!',
         5: 'FAQs saved successfully!',
         6: 'AI Healthcare Automation onboarding setup complete!',
+        8: 'AI knowledge saved. The WhatsApp AI uses it from the next message.',
       };
 
       const nextStep = stepsList[currentPos + 1]?.num;
@@ -655,6 +670,10 @@ export default function ClinicSetupWizard() {
       } else if (currentStep === 6) {
         if (!clinicId) { setSaving(false); return; }
         body.data = { clinic_id: clinicId, ai_settings: aiSettings };
+      } else if (currentStep === 8) {
+        // Knowledge text lives on the clinic profile, so it saves via step 1.
+        if (!clinicId) { setSaving(false); return; }
+        body = { step: 1, data: { ...clinicInfo } };
       }
 
       const res = await fetch('/api/healthcare/setup', {
@@ -674,6 +693,7 @@ export default function ClinicSetupWizard() {
       if (currentStep === 1 && json.clinic_id) {
         setClinicId(json.clinic_id);
       }
+      if (currentStep === 1 || currentStep === 8) setSavedKb(clinicInfo.ai_knowledge_base);
 
       toast.success(successMessages[currentStep]);
       if (nextStep) setCurrentStep(nextStep);
@@ -705,80 +725,115 @@ export default function ClinicSetupWizard() {
     { num: 2, label: "Clinic Hours", icon: Clock },
     { num: 4, label: "Services", icon: Stethoscope },
     { num: 5, label: "FAQs", icon: HelpCircle },
+    { num: 8, label: "AI Training", icon: Sparkles },
     { num: 6, label: "AI Settings", icon: Brain },
   ];
   const currentPos = Math.max(0, stepsList.findIndex((x) => x.num === currentStep));
   const currentMeta = stepsList[currentPos];
 
+  // What "done" means for each step, so the checklist shows real progress.
+  const filled = (v: unknown) => typeof v === "string" && v.trim().length > 0;
+  const stepDone: Record<number, boolean | null> = {
+    1: Boolean(clinicId) && filled(clinicInfo.clinic_name) && (filled(clinicInfo.phone) || filled(clinicInfo.whatsapp_number)) && (filled(clinicInfo.address) || filled(clinicInfo.city)),
+    7: null, // optional; managed in its own panel
+    3: doctors.some((d) => filled(d.doctor_name)),
+    2: timings.some((d) => !d.is_closed),
+    4: services.some((s) => filled(s.service_name)),
+    5: faqs.some((q) => filled(q.question) && filled(q.answer)),
+    6: Boolean(aiSettings.ai_enabled) && filled(aiSettings.greeting_message),
+    8: filled(savedKb),
+  };
+  const required = stepsList.filter((s) => stepDone[s.num] !== null);
+  const doneCount = required.filter((s) => stepDone[s.num]).length;
+  const progress = Math.round((doneCount / required.length) * 100);
+  const nextTodo = stepsList.find((s) => stepDone[s.num] === false);
+
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="space-y-5">
       {/* Page Title */}
-      <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Business Onboarding Setup</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Configure business information once, and let the AI handle WhatsApp inquiries and bookings.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Business Setup</h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            Configure business information once, and let the AI handle WhatsApp inquiries and bookings.
+          </p>
+        </div>
+        {clinicId && (
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowLink((v) => !v)} aria-expanded={showLink}>
+            <Link2 className="size-3.5" /> {showLink ? "Hide booking link" : "Booking link"}
+          </Button>
+        )}
       </div>
 
+      {showLink && clinicId && <BookingLinkCard />}
       <AiSetupImport isHealthcare onApply={applyAiSetup} />
-      {clinicId && <BookingLinkCard />}
 
-      {/* Wizard Steps Indicator */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2 border-b border-border pb-4">
-        {stepsList.map((step, pos) => {
-          const Icon = step.icon;
-          const isCompleted = pos < currentPos;
-          const isActive = step.num === currentStep;
-          return (
-            <div
-              key={step.num}
-              onClick={() => {
-                if (clinicId || step.num === 1) setCurrentStep(step.num);
-                else toast.error("Please complete the first step (Business Information) first.");
-              }}
-              className={`flex items-center gap-2.5 p-3 rounded-xl border text-left cursor-pointer transition-all duration-300 ${
-                isActive
-                  ? "bg-primary/10 border-primary text-primary font-medium"
-                  : isCompleted
-                  ? "bg-card border-emerald-500/30 text-emerald-400"
-                  : "bg-muted/40 border-border text-muted-foreground hover:border-foreground/20"
-              }`}
-            >
-              <div
-                className={`flex h-7 w-7 items-center justify-center rounded-lg text-xs font-bold ${
-                  isActive
-                    ? "bg-primary text-primary-foreground"
-                    : isCompleted
-                    ? "bg-emerald-500/10 text-emerald-400"
-                    : "bg-muted text-muted-foreground"
-                }`}
-              >
-                {pos + 1}
-              </div>
-              <span className="text-xs tracking-wide">{step.label}</span>
+      <div className="grid items-start gap-4 lg:grid-cols-[250px_minmax(0,1fr)]">
+        {/* Checklist */}
+        <aside className="space-y-3 lg:sticky lg:top-4">
+          <div className="rounded-2xl border border-border/70 bg-card p-3.5">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Setup progress</p>
+              <span className="text-[12px] font-semibold tabular-nums">{progress}%</span>
             </div>
-          );
-        })}
-      </div>
+            <div className="mt-2 h-1.5 rounded-full bg-muted">
+              <div className="h-1.5 rounded-full bg-primary transition-all" style={{ width: `${progress}%` }} />
+            </div>
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              {doneCount === required.length ? "All set. The AI has everything it needs." : `${doneCount} of ${required.length} steps complete${nextTodo ? ` · next: ${nextTodo.label}` : ""}`}
+            </p>
+          </div>
 
-      {/* Main Form Box */}
-      <Card className="border-border bg-muted/40 backdrop-blur-md">
-        <CardHeader>
+          <nav className="rounded-2xl border border-border/70 bg-card p-1.5" aria-label="Setup steps">
+            <ol className="flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
+              {stepsList.map((step, pos) => {
+                const Icon = step.icon;
+                const isActive = step.num === currentStep;
+                const locked = !clinicId && step.num !== 1;
+                const done = stepDone[step.num];
+                return (
+                  <li key={step.num} className="shrink-0">
+                    <button
+                      type="button"
+                      aria-current={isActive ? "step" : undefined}
+                      onClick={() => {
+                        if (!locked) setCurrentStep(step.num);
+                        else toast.error("Save the business information first.");
+                      }}
+                      className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] transition-colors ${
+                        isActive ? "bg-primary/10 font-medium text-primary" : locked ? "cursor-not-allowed text-muted-foreground/60" : "text-foreground/90 hover:bg-accent"
+                      }`}
+                    >
+                      <span
+                        className={`flex size-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                          done ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {done ? <CheckCircle2 className="size-3.5" /> : pos + 1}
+                      </span>
+                      <Icon className="size-3.5 shrink-0 opacity-70" />
+                      <span className="min-w-0 flex-1 truncate whitespace-nowrap">{step.label}</span>
+                      {done === null && <span className="hidden text-[10px] text-muted-foreground lg:inline">Optional</span>}
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+          </nav>
+        </aside>
+
+        <div className="min-w-0">      {/* Step body */}
+      <Card className="gap-0 overflow-visible rounded-2xl border border-border/70 bg-card py-0 shadow-none ring-0">
+        <CardHeader className="border-b border-border/70 px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className="bg-primary/10 p-2.5 rounded-lg text-primary">
-              {currentStep === 1 && <Building2 className="h-6 w-6" />}
-              {currentStep === 2 && <Clock className="h-6 w-6" />}
-              {currentStep === 3 && <UserRound className="h-6 w-6" />}
-              {currentStep === 4 && <Stethoscope className="h-6 w-6" />}
-              {currentStep === 5 && <HelpCircle className="h-6 w-6" />}
-              {currentStep === 6 && <Brain className="h-6 w-6" />}
-              {currentStep === 7 && <Layers className="h-6 w-6" />}
-            </div>
-            <div>
-              <CardTitle className="text-foreground text-xl">
-                Step {currentPos + 1} — {currentMeta.label}
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <currentMeta.icon className="size-4" />
+            </span>
+            <div className="min-w-0">
+              <CardTitle className="text-[15px] font-semibold text-foreground">
+                Step {currentPos + 1} of {stepsList.length} · {currentMeta.label}
               </CardTitle>
-              <CardDescription className="text-muted-foreground">
+              <CardDescription className="mt-0.5 text-[12px] text-muted-foreground">
                 {currentStep === 1 && "Basic details regarding location, name, and contact details."}
                 {currentStep === 2 && "Clinic opening times and holidays / closure dates (doctor slots come from each doctor's schedule)."}
                 {currentStep === 3 && "Add doctors, assign departments, and set each doctor's weekly sessions, slot length and breaks."}
@@ -786,143 +841,144 @@ export default function ClinicSetupWizard() {
                 {currentStep === 4 && "Define business services, starting prices, and standard durations."}
                 {currentStep === 5 && "Configure general FAQs to answer client WhatsApp questions instantly."}
                 {currentStep === 6 && "Instruct AI how to respond to clients, emergencies, or escalate conversations."}
+                {currentStep === 8 && "Everything else the AI should know to answer like your front desk. Test it on the right before saving."}
               </CardDescription>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-6 pt-4 border-t border-border">
+        <CardContent className="space-y-4 px-5 py-5">
           {/* STEP 1: Clinic Information */}
           {currentStep === 1 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="clinic_name" className="text-foreground/90">Business Name *</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="clinic_name" className="text-[12px] font-medium text-foreground/90">Business Name *</Label>
                 <Input
                   id="clinic_name"
                   name="clinic_name"
                   value={clinicInfo.clinic_name}
                   onChange={handleClinicInfoChange}
-                  className="bg-background border-border text-foreground"
+                  className="h-8 bg-background text-[13px] md:text-[13px]"
                   placeholder="E.g. ChatNexGen Support Agency"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="clinic_type" className="text-foreground/90">Business Category / Industry</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="clinic_type" className="text-[12px] font-medium text-foreground/90">Business Category / Industry</Label>
                 <Input
                   id="clinic_type"
                   name="clinic_type"
                   value={clinicInfo.clinic_type}
                   onChange={handleClinicInfoChange}
-                  className="bg-background border-border text-foreground"
+                  className="h-8 bg-background text-[13px] md:text-[13px]"
                   placeholder="E.g. Real Estate, Digital Marketing, Retail"
                 />
               </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="clinic_description" className="text-foreground/90">Business Description</Label>
+              <div className="space-y-1.5 md:col-span-2">
+                <Label htmlFor="clinic_description" className="text-[12px] font-medium text-foreground/90">Business Description</Label>
                 <Textarea
                   id="clinic_description"
                   name="clinic_description"
                   value={clinicInfo.clinic_description}
                   onChange={handleClinicInfoChange}
-                  className="bg-background border-border text-foreground min-h-[80px]"
+                  className="min-h-[72px] bg-background text-[13px] md:text-[13px]"
                   placeholder="A short snippet explaining the business focus for AI prompt building..."
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone" className="text-foreground/90">Landline / Phone</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="phone" className="text-[12px] font-medium text-foreground/90">Landline / Phone</Label>
                 <Input
                   id="phone"
                   name="phone"
                   value={clinicInfo.phone}
                   onChange={handleClinicInfoChange}
-                  className="bg-background border-border text-foreground"
+                  className="h-8 bg-background text-[13px] md:text-[13px]"
                   placeholder="+1 555-0199"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="whatsapp_number" className="text-foreground/90">WhatsApp Public Number</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="whatsapp_number" className="text-[12px] font-medium text-foreground/90">WhatsApp Public Number</Label>
                 <Input
                   id="whatsapp_number"
                   name="whatsapp_number"
                   value={clinicInfo.whatsapp_number}
                   onChange={handleClinicInfoChange}
-                  className="bg-background border-border text-foreground"
+                  className="h-8 bg-background text-[13px] md:text-[13px]"
                   placeholder="+1 555-0100"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-foreground/90">Clinic Email</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="email" className="text-[12px] font-medium text-foreground/90">Clinic Email</Label>
                 <Input
                   id="email"
                   name="email"
                   value={clinicInfo.email}
                   onChange={handleClinicInfoChange}
-                  className="bg-background border-border text-foreground"
+                  className="h-8 bg-background text-[13px] md:text-[13px]"
                   placeholder="info@clinic.com"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="website" className="text-foreground/90">Website URL</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="website" className="text-[12px] font-medium text-foreground/90">Website URL</Label>
                 <Input
                   id="website"
                   name="website"
                   value={clinicInfo.website}
                   onChange={handleClinicInfoChange}
-                  className="bg-background border-border text-foreground"
+                  className="h-8 bg-background text-[13px] md:text-[13px]"
                   placeholder="https://clinic.com"
                 />
               </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="address" className="text-foreground/90">Street Address</Label>
+              <div className="space-y-1.5 md:col-span-2">
+                <Label htmlFor="address" className="text-[12px] font-medium text-foreground/90">Street Address</Label>
                 <Input
                   id="address"
                   name="address"
                   value={clinicInfo.address}
                   onChange={handleClinicInfoChange}
-                  className="bg-background border-border text-foreground"
+                  className="h-8 bg-background text-[13px] md:text-[13px]"
                   placeholder="123 Health Ave, Suite 10"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="city" className="text-foreground/90">City</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="city" className="text-[12px] font-medium text-foreground/90">City</Label>
                 <Input
                   id="city"
                   name="city"
                   value={clinicInfo.city}
                   onChange={handleClinicInfoChange}
-                  className="bg-background border-border text-foreground"
+                  className="h-8 bg-background text-[13px] md:text-[13px]"
                   placeholder="New York"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="state" className="text-foreground/90">State / Region</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="state" className="text-[12px] font-medium text-foreground/90">State / Region</Label>
                 <Input
                   id="state"
                   name="state"
                   value={clinicInfo.state}
                   onChange={handleClinicInfoChange}
-                  className="bg-background border-border text-foreground"
+                  className="h-8 bg-background text-[13px] md:text-[13px]"
                   placeholder="NY"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="pincode" className="text-foreground/90">Pincode / Postal Code</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="pincode" className="text-[12px] font-medium text-foreground/90">Pincode / Postal Code</Label>
                 <Input
                   id="pincode"
                   name="pincode"
                   value={clinicInfo.pincode}
                   onChange={handleClinicInfoChange}
-                  className="bg-background border-border text-foreground"
+                  className="h-8 bg-background text-[13px] md:text-[13px]"
                   placeholder="10001"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="google_map_link" className="text-foreground/90">Google Business / Maps Link (GMB)</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="google_map_link" className="text-[12px] font-medium text-foreground/90">Google Business / Maps Link (GMB)</Label>
                 <Input
                   id="google_map_link"
                   name="google_map_link"
                   value={clinicInfo.google_map_link}
                   onChange={handleClinicInfoChange}
-                  className="bg-background border-border text-foreground"
+                  className="h-8 bg-background text-[13px] md:text-[13px]"
                   placeholder="https://g.page/... or https://goo.gl/maps/..."
                 />
               </div>
@@ -930,46 +986,33 @@ export default function ClinicSetupWizard() {
               {/* AI Training Sources */}
               <div className="md:col-span-2 mt-2 pt-4 border-t border-border">
                 <div className="flex items-center gap-2 mb-1">
-                  <Sparkles className="h-4 w-4 text-emerald-400" />
-                  <h3 className="text-sm font-bold text-foreground tracking-wide">AI Training Sources</h3>
+                  <Sparkles className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  <h3 className="text-[13px] font-semibold text-foreground">AI Training Sources</h3>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Add your public links so the AI can reference them and answer customers like an expert about your business.
                 </p>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="instagram_url" className="text-foreground/90">Instagram Profile</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="instagram_url" className="text-[12px] font-medium text-foreground/90">Instagram Profile</Label>
                 <Input
                   id="instagram_url"
                   name="instagram_url"
                   value={clinicInfo.instagram_url}
                   onChange={handleClinicInfoChange}
-                  className="bg-background border-border text-foreground"
+                  className="h-8 bg-background text-[13px] md:text-[13px]"
                   placeholder="https://instagram.com/yourbusiness"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="facebook_url" className="text-foreground/90">Facebook Page</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="facebook_url" className="text-[12px] font-medium text-foreground/90">Facebook Page</Label>
                 <Input
                   id="facebook_url"
                   name="facebook_url"
                   value={clinicInfo.facebook_url}
                   onChange={handleClinicInfoChange}
-                  className="bg-background border-border text-foreground"
+                  className="h-8 bg-background text-[13px] md:text-[13px]"
                   placeholder="https://facebook.com/yourbusiness"
-                />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="ai_knowledge_base" className="text-foreground/90">
-                  Expert Knowledge for AI <span className="text-muted-foreground font-normal">(optional)</span>
-                </Label>
-                <Textarea
-                  id="ai_knowledge_base"
-                  name="ai_knowledge_base"
-                  value={clinicInfo.ai_knowledge_base}
-                  onChange={handleClinicInfoChange}
-                  className="bg-background border-border text-foreground min-h-[100px]"
-                  placeholder="Paste anything the AI should know to answer like an expert: specialties, unique selling points, policies, common customer concerns, awards, experience, etc."
                 />
               </div>
             </div>
@@ -1000,7 +1043,7 @@ export default function ClinicSetupWizard() {
                       type="time"
                       value={time.opening_time || "09:00"}
                       onChange={(e) => handleTimingChange(idx, "opening_time", e.target.value)}
-                      className="bg-background border-border text-foreground text-xs px-2 h-8"
+                      className="h-8 bg-background px-2.5 text-[13px] md:text-[13px]"
                     />
                     <span className="text-muted-foreground">-</span>
                     <Input
@@ -1008,7 +1051,7 @@ export default function ClinicSetupWizard() {
                       type="time"
                       value={time.closing_time || "18:00"}
                       onChange={(e) => handleTimingChange(idx, "closing_time", e.target.value)}
-                      className="bg-background border-border text-foreground text-xs px-2 h-8"
+                      className="h-8 bg-background px-2.5 text-[13px] md:text-[13px]"
                     />
                   </div>
                   <div className="col-span-4 flex items-center gap-1.5">
@@ -1017,7 +1060,7 @@ export default function ClinicSetupWizard() {
                       type="time"
                       value={time.lunch_break_start || "13:00"}
                       onChange={(e) => handleTimingChange(idx, "lunch_break_start", e.target.value)}
-                      className="bg-background border-border text-foreground text-xs px-2 h-8"
+                      className="h-8 bg-background px-2.5 text-[13px] md:text-[13px]"
                     />
                     <span className="text-muted-foreground">-</span>
                     <Input
@@ -1025,7 +1068,7 @@ export default function ClinicSetupWizard() {
                       type="time"
                       value={time.lunch_break_end || "14:00"}
                       onChange={(e) => handleTimingChange(idx, "lunch_break_end", e.target.value)}
-                      className="bg-background border-border text-foreground text-xs px-2 h-8"
+                      className="h-8 bg-background px-2.5 text-[13px] md:text-[13px]"
                     />
                   </div>
                 </div>
@@ -1034,7 +1077,7 @@ export default function ClinicSetupWizard() {
               {/* Holidays & Date Exceptions Section */}
               <div className="border-t border-border pt-6 mt-6 space-y-4">
                 <div>
-                  <h3 className="text-foreground font-bold text-sm tracking-wider uppercase text-primary">Clinic Holidays & Schedule Exceptions</h3>
+                  <h3 className="text-[11px] font-semibold uppercase tracking-wider text-primary">Clinic Holidays & Schedule Exceptions</h3>
                   <p className="text-muted-foreground text-xs mt-1">Specify custom dates when the clinic is closed or has special working hours.</p>
                 </div>
                 
@@ -1046,7 +1089,7 @@ export default function ClinicSetupWizard() {
                       type="date"
                       value={newClinicException.date}
                       onChange={(e) => setNewClinicException({ ...newClinicException, date: e.target.value })}
-                      className="bg-background border-slate-850 text-foreground text-xs h-9"
+                      className="h-8 bg-background text-[13px] md:text-[13px]"
                     />
                   </div>
                   <div className="space-y-1">
@@ -1055,7 +1098,7 @@ export default function ClinicSetupWizard() {
                       placeholder="e.g. Christmas, Staff Day"
                       value={newClinicException.reason}
                       onChange={(e) => setNewClinicException({ ...newClinicException, reason: e.target.value })}
-                      className="bg-background border-slate-850 text-foreground text-xs h-9"
+                      className="h-8 bg-background text-[13px] md:text-[13px]"
                     />
                   </div>
                   <div className="space-y-1 pb-1">
@@ -1076,7 +1119,7 @@ export default function ClinicSetupWizard() {
                           type="time"
                           value={newClinicException.opening_time}
                           onChange={(e) => setNewClinicException({ ...newClinicException, opening_time: e.target.value })}
-                          className="bg-background border-slate-850 text-foreground text-xs h-9"
+                          className="h-8 bg-background text-[13px] md:text-[13px]"
                         />
                       </div>
                       <div className="space-y-1">
@@ -1085,7 +1128,7 @@ export default function ClinicSetupWizard() {
                           type="time"
                           value={newClinicException.closing_time}
                           onChange={(e) => setNewClinicException({ ...newClinicException, closing_time: e.target.value })}
-                          className="bg-background border-slate-850 text-foreground text-xs h-9"
+                          className="h-8 bg-background text-[13px] md:text-[13px]"
                         />
                       </div>
                     </>
@@ -1112,7 +1155,7 @@ export default function ClinicSetupWizard() {
                       });
                       toast.success("Exception added!");
                     }}
-                    className="bg-primary text-primary-foreground hover:bg-primary/95 text-xs h-9 md:col-span-1"
+                    className="h-8 text-xs md:col-span-1"
                   >
                     Add Exception
                   </Button>
@@ -1126,7 +1169,7 @@ export default function ClinicSetupWizard() {
                         <div className="space-y-1">
                           <span className="text-xs font-bold text-foreground block">{new Date(ex.date).toLocaleDateString('en-US', { dateStyle: 'medium' })}</span>
                           <div className="flex gap-2 items-center">
-                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${ex.is_closed ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"}`}>
+                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${ex.is_closed ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"}`}>
                               {ex.is_closed ? "Closed" : `Open: ${ex.opening_time} - ${ex.closing_time}`}
                             </span>
                             {ex.reason && <span className="text-xs text-muted-foreground">({ex.reason})</span>}
@@ -1159,16 +1202,16 @@ export default function ClinicSetupWizard() {
 
           {/* STEP 4: Services */}
           {currentStep === 4 && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* AI Bulk Importer Accordion/Card */}
-              <div className="rounded-xl border border-border bg-background p-5 space-y-4">
+              <div className="space-y-3 rounded-xl border border-border/70 bg-background p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <div className="bg-emerald-500/10 p-2 rounded-lg text-emerald-400 border border-emerald-500/20">
+                    <div className="bg-emerald-500/10 p-2 rounded-lg text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                       <Sparkles className="h-4 w-4" />
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-foreground tracking-wide">AI Bulk Services Importer</h4>
+                      <h4 className="text-[13px] font-semibold text-foreground">AI Bulk Services Importer</h4>
                       <p className="text-xs text-muted-foreground">
                         Paste unstructured text (PDF/Word/Excel) or upload .txt/.csv to automatically populate services.
                       </p>
@@ -1178,7 +1221,7 @@ export default function ClinicSetupWizard() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="border-border text-xs text-foreground/90 hover:bg-slate-900"
+                    className="border-border text-xs text-foreground/90 hover:bg-accent"
                     onClick={() => setShowImporter(!showImporter)}
                   >
                     {showImporter ? "Hide AI Importer" : "Use AI Importer"}
@@ -1190,7 +1233,7 @@ export default function ClinicSetupWizard() {
                     {/* Sample Downloads */}
                     <div className="flex flex-wrap items-center justify-between gap-3 bg-background p-3 rounded-lg border border-border">
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <AlertCircle className="h-3.5 w-3.5 text-emerald-400" />
+                        <AlertCircle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                         <span>Not sure what format to use? Guidance templates:</span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -1198,7 +1241,7 @@ export default function ClinicSetupWizard() {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="h-8 text-xs text-foreground/90 hover:text-foreground hover:bg-slate-900 border border-border flex items-center gap-1.5"
+                          className="h-8 gap-1.5 border border-border text-xs text-foreground/90 hover:bg-accent hover:text-foreground"
                           onClick={downloadSampleCSV}
                         >
                           <Download className="h-3 w-3" /> Download Sample CSV
@@ -1207,7 +1250,7 @@ export default function ClinicSetupWizard() {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="h-8 text-xs text-foreground/90 hover:text-foreground hover:bg-slate-900 border border-border flex items-center gap-1.5"
+                          className="h-8 gap-1.5 border border-border text-xs text-foreground/90 hover:bg-accent hover:text-foreground"
                           onClick={downloadSampleTXT}
                         >
                           <Download className="h-3 w-3" /> Download Sample TXT
@@ -1218,14 +1261,14 @@ export default function ClinicSetupWizard() {
                     {/* File Upload / Paste Split */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {/* Left side: Upload card */}
-                      <div className="md:col-span-1 border border-dashed border-border rounded-xl p-4 flex flex-col items-center justify-center bg-background hover:bg-slate-950/40 transition-colors relative group">
+                      <div className="md:col-span-1 border border-dashed border-border rounded-xl p-4 flex flex-col items-center justify-center bg-background hover:bg-accent/50 transition-colors relative group">
                         <input
                           type="file"
                           accept=".txt,.csv"
                           onChange={handleFileUpload}
                           className="absolute inset-0 opacity-0 cursor-pointer"
                         />
-                        <div className="bg-card p-3 rounded-full mb-3 text-muted-foreground group-hover:text-primary transition-colors border border-slate-850">
+                        <div className="bg-card p-3 rounded-full mb-3 text-muted-foreground group-hover:text-primary transition-colors border border-border">
                           <Upload className="h-5 w-5" />
                         </div>
                         <span className="text-xs font-semibold text-foreground/90">Upload Text or CSV</span>
@@ -1250,7 +1293,7 @@ export default function ClinicSetupWizard() {
                         type="button"
                         disabled={importing}
                         onClick={handleAIImport}
-                        className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs h-9 flex items-center gap-1.5 shadow-lg shadow-emerald-950/20 px-4"
+                        className="h-8 gap-1.5 px-3 text-xs"
                       >
                         {importing ? (
                           <>
@@ -1269,7 +1312,7 @@ export default function ClinicSetupWizard() {
                 )}
               </div>
               {services.map((svc, idx) => (
-                <div key={idx} className="relative bg-background p-5 rounded-xl border border-border space-y-4">
+                <div key={idx} className="relative space-y-3 rounded-xl border border-border/70 bg-background p-4">
                   <button
                     type="button"
                     onClick={() => removeService(idx)}
@@ -1277,14 +1320,14 @@ export default function ClinicSetupWizard() {
                   >
                     <Trash2 className="h-5 w-5" />
                   </button>
-                  <h3 className="text-foreground font-bold text-sm tracking-wider uppercase text-primary">Service #{idx + 1}</h3>
+                  <h3 className="text-[11px] font-semibold uppercase tracking-wider text-primary">Service #{idx + 1}</h3>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="md:col-span-2 space-y-1.5">
                       <Label className="text-xs text-muted-foreground">Service Name *</Label>
                       <Input
                         value={svc.service_name}
                         onChange={(e) => handleServiceChange(idx, "service_name", e.target.value)}
-                        className="bg-background border-border text-foreground"
+                        className="h-8 bg-background text-[13px] md:text-[13px]"
                         placeholder="E.g. Teeth Cleaning"
                       />
                     </div>
@@ -1294,7 +1337,7 @@ export default function ClinicSetupWizard() {
                         type="number"
                         value={svc.starting_price}
                         onChange={(e) => handleServiceChange(idx, "starting_price", parseFloat(e.target.value) || 0)}
-                        className="bg-background border-border text-foreground"
+                        className="h-8 bg-background text-[13px] md:text-[13px]"
                       />
                     </div>
                     <div className="space-y-1.5">
@@ -1303,7 +1346,7 @@ export default function ClinicSetupWizard() {
                         type="number"
                         value={svc.duration}
                         onChange={(e) => handleServiceChange(idx, "duration", parseInt(e.target.value) || 30)}
-                        className="bg-background border-border text-foreground"
+                        className="h-8 bg-background text-[13px] md:text-[13px]"
                       />
                     </div>
                     <div className="md:col-span-3 space-y-1.5">
@@ -1311,7 +1354,7 @@ export default function ClinicSetupWizard() {
                       <Input
                         value={svc.description || ""}
                         onChange={(e) => handleServiceChange(idx, "description", e.target.value)}
-                        className="bg-background border-border text-foreground"
+                        className="h-8 bg-background text-[13px] md:text-[13px]"
                         placeholder="Brief summary..."
                       />
                     </div>
@@ -1333,16 +1376,16 @@ export default function ClinicSetupWizard() {
 
           {/* STEP 5: FAQs */}
           {currentStep === 5 && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* AI Bulk FAQs Importer */}
-              <div className="rounded-xl border border-border bg-background p-5 space-y-4">
+              <div className="space-y-3 rounded-xl border border-border/70 bg-background p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <div className="bg-emerald-500/10 p-2 rounded-lg text-emerald-400 border border-emerald-500/20">
+                    <div className="bg-emerald-500/10 p-2 rounded-lg text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                       <Sparkles className="h-4 w-4" />
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-foreground tracking-wide">AI Bulk FAQs Importer</h4>
+                      <h4 className="text-[13px] font-semibold text-foreground">AI Bulk FAQs Importer</h4>
                       <p className="text-xs text-muted-foreground">
                         Paste unstructured text (PDF/Word/Excel) or upload .txt/.csv to automatically populate FAQs.
                       </p>
@@ -1352,7 +1395,7 @@ export default function ClinicSetupWizard() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="border-border text-xs text-foreground/90 hover:bg-slate-900"
+                    className="border-border text-xs text-foreground/90 hover:bg-accent"
                     onClick={() => setShowFaqImporter(!showFaqImporter)}
                   >
                     {showFaqImporter ? "Hide AI Importer" : "Use AI Importer"}
@@ -1364,7 +1407,7 @@ export default function ClinicSetupWizard() {
                     {/* Sample Downloads */}
                     <div className="flex flex-wrap items-center justify-between gap-3 bg-background p-3 rounded-lg border border-border">
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <AlertCircle className="h-3.5 w-3.5 text-emerald-400" />
+                        <AlertCircle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                         <span>Not sure what format to use? Guidance templates:</span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -1372,7 +1415,7 @@ export default function ClinicSetupWizard() {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="h-8 text-xs text-foreground/90 hover:text-foreground hover:bg-slate-900 border border-border flex items-center gap-1.5"
+                          className="h-8 gap-1.5 border border-border text-xs text-foreground/90 hover:bg-accent hover:text-foreground"
                           onClick={downloadSampleFAQCSV}
                         >
                           <Download className="h-3 w-3" /> Download Sample CSV
@@ -1381,7 +1424,7 @@ export default function ClinicSetupWizard() {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="h-8 text-xs text-foreground/90 hover:text-foreground hover:bg-slate-900 border border-border flex items-center gap-1.5"
+                          className="h-8 gap-1.5 border border-border text-xs text-foreground/90 hover:bg-accent hover:text-foreground"
                           onClick={downloadSampleFAQTXT}
                         >
                           <Download className="h-3 w-3" /> Download Sample TXT
@@ -1392,14 +1435,14 @@ export default function ClinicSetupWizard() {
                     {/* File Upload / Paste Split */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {/* Left side: Upload card */}
-                      <div className="md:col-span-1 border border-dashed border-border rounded-xl p-4 flex flex-col items-center justify-center bg-background hover:bg-slate-950/40 transition-colors relative group">
+                      <div className="md:col-span-1 border border-dashed border-border rounded-xl p-4 flex flex-col items-center justify-center bg-background hover:bg-accent/50 transition-colors relative group">
                         <input
                           type="file"
                           accept=".txt,.csv"
                           onChange={handleFaqFileUpload}
                           className="absolute inset-0 opacity-0 cursor-pointer"
                         />
-                        <div className="bg-card p-3 rounded-full mb-3 text-muted-foreground group-hover:text-primary transition-colors border border-slate-850">
+                        <div className="bg-card p-3 rounded-full mb-3 text-muted-foreground group-hover:text-primary transition-colors border border-border">
                           <Upload className="h-5 w-5" />
                         </div>
                         <span className="text-xs font-semibold text-foreground/90">Upload Text or CSV</span>
@@ -1424,7 +1467,7 @@ export default function ClinicSetupWizard() {
                         type="button"
                         disabled={faqImporting}
                         onClick={handleAIFAQImport}
-                        className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs h-9 flex items-center gap-1.5 shadow-lg shadow-emerald-950/20 px-4"
+                        className="h-8 gap-1.5 px-3 text-xs"
                       >
                         {faqImporting ? (
                           <>
@@ -1443,7 +1486,7 @@ export default function ClinicSetupWizard() {
                 )}
               </div>
               {faqs.map((faq, idx) => (
-                <div key={idx} className="relative bg-background p-5 rounded-xl border border-border space-y-4">
+                <div key={idx} className="relative space-y-3 rounded-xl border border-border/70 bg-background p-4">
                   <button
                     type="button"
                     onClick={() => removeFaq(idx)}
@@ -1451,14 +1494,14 @@ export default function ClinicSetupWizard() {
                   >
                     <Trash2 className="h-5 w-5" />
                   </button>
-                  <h3 className="text-foreground font-bold text-sm tracking-wider uppercase text-primary">FAQ #{idx + 1}</h3>
+                  <h3 className="text-[11px] font-semibold uppercase tracking-wider text-primary">FAQ #{idx + 1}</h3>
                   <div className="space-y-3">
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground font-medium">Question *</Label>
                       <Input
                         value={faq.question}
                         onChange={(e) => handleFaqChange(idx, "question", e.target.value)}
-                        className="bg-background border-border text-foreground"
+                        className="h-8 bg-background text-[13px] md:text-[13px]"
                         placeholder="E.g. Is Dr. Patil available today?"
                       />
                     </div>
@@ -1476,7 +1519,7 @@ export default function ClinicSetupWizard() {
                       <Input
                         value={faq.keywords || ""}
                         onChange={(e) => handleFaqChange(idx, "keywords", e.target.value)}
-                        className="bg-background border-border text-foreground"
+                        className="h-8 bg-background text-[13px] md:text-[13px]"
                         placeholder="E.g. doctor, schedule, available, timings"
                       />
                     </div>
@@ -1487,6 +1530,15 @@ export default function ClinicSetupWizard() {
                 <Plus className="h-4 w-4 mr-1" /> Add FAQ
               </Button>
             </div>
+          )}
+
+          {/* STEP 8: AI Training (knowledge text + live test) */}
+          {currentStep === 8 && (
+            <AiTrainingStep
+              value={clinicInfo.ai_knowledge_base}
+              saved={savedKb}
+              onChange={(v) => setClinicInfo({ ...clinicInfo, ai_knowledge_base: v })}
+            />
           )}
 
           {/* STEP 6: AI Settings */}
@@ -1503,29 +1555,29 @@ export default function ClinicSetupWizard() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="ai_tone" className="text-foreground/90">AI Personality / Tone</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="ai_tone" className="text-[12px] font-medium text-foreground/90">AI Personality / Tone</Label>
                 <Input
                   id="ai_tone"
                   value={aiSettings.ai_tone}
                   onChange={(e) => handleAISettingsChange("ai_tone", e.target.value)}
-                  className="bg-background border-border text-foreground"
+                  className="h-8 bg-background text-[13px] md:text-[13px]"
                   placeholder="E.g. polite and professional"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label className="text-foreground/90">Supported Languages</Label>
+              <div className="space-y-1.5">
+                <Label className="text-[12px] font-medium text-foreground/90">Supported Languages</Label>
                 <Input
                   value={aiSettings.supported_languages.join(", ")}
                   onChange={(e) => handleAISettingsChange("supported_languages", e.target.value.split(",").map(lang => lang.trim()).filter(Boolean))}
-                  className="bg-background border-border text-foreground"
+                  className="h-8 bg-background text-[13px] md:text-[13px]"
                   placeholder="E.g. English, Spanish"
                 />
               </div>
 
               <div className="md:col-span-2 space-y-2">
-                <Label htmlFor="greeting_message" className="text-foreground/90">Greeting Message</Label>
+                <Label htmlFor="greeting_message" className="text-[12px] font-medium text-foreground/90">Greeting Message</Label>
                 <Textarea
                   id="greeting_message"
                   value={aiSettings.greeting_message}
@@ -1536,7 +1588,7 @@ export default function ClinicSetupWizard() {
               </div>
 
               <div className="md:col-span-2 space-y-2">
-                <Label htmlFor="after_hours_message" className="text-foreground/90">After Hours / Closed Message</Label>
+                <Label htmlFor="after_hours_message" className="text-[12px] font-medium text-foreground/90">After Hours / Closed Message</Label>
                 <Textarea
                   id="after_hours_message"
                   value={aiSettings.after_hours_message}
@@ -1546,22 +1598,22 @@ export default function ClinicSetupWizard() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label className="text-foreground/90">Human Handover Keywords (Comma Separated)</Label>
+              <div className="space-y-1.5">
+                <Label className="text-[12px] font-medium text-foreground/90">Human Handover Keywords (Comma Separated)</Label>
                 <Input
                   value={aiSettings.escalation_keywords}
                   onChange={(e) => handleAISettingsChange("escalation_keywords", e.target.value)}
-                  className="bg-background border-border text-foreground"
+                  className="h-8 bg-background text-[13px] md:text-[13px]"
                   placeholder="E.g. human, agent, operator"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label className="text-foreground/90">Emergency Stop Keywords (Comma Separated)</Label>
+              <div className="space-y-1.5">
+                <Label className="text-[12px] font-medium text-foreground/90">Emergency Stop Keywords (Comma Separated)</Label>
                 <Input
                   value={aiSettings.emergency_keywords}
                   onChange={(e) => handleAISettingsChange("emergency_keywords", e.target.value)}
-                  className="bg-background border-border text-foreground"
+                  className="h-8 bg-background text-[13px] md:text-[13px]"
                   placeholder="E.g. heart attack, bleeding, emergency"
                 />
               </div>
@@ -1581,38 +1633,41 @@ export default function ClinicSetupWizard() {
         </CardContent>
 
         {/* Action Buttons */}
-        <div className="flex justify-between items-center p-6 border-t border-border bg-muted/40">
+        <div className="sticky bottom-0 z-10 flex items-center justify-between gap-2 rounded-b-2xl border-t border-border/70 bg-card/95 px-5 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/80">
           <Button
             disabled={currentPos === 0 || saving}
             onClick={() => setCurrentStep(stepsList[currentPos - 1].num)}
             variant="outline"
-            className="border-border hover:bg-accent text-foreground"
+            size="sm"
+            className="gap-1"
           >
-            <ChevronLeft className="h-4 w-4 mr-1" /> Back
+            <ChevronLeft className="size-3.5" /> Back
           </Button>
 
-          <Button disabled={saving} onClick={handleSaveStep} className="bg-primary text-primary-foreground hover:bg-primary/90 min-w-[120px]">
+          <Button size="sm" disabled={saving} onClick={handleSaveStep} className="min-w-[110px]">
             {saving ? (
               <span className="flex items-center gap-1.5">
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                <Loader2 className="size-3.5 animate-spin" />
                 Saving...
               </span>
             ) : currentPos === stepsList.length - 1 ? (
               <span className="flex items-center gap-1.5">
-                <Save className="h-4 w-4" /> Complete Setup
+                <Save className="size-3.5" /> Complete setup
               </span>
             ) : currentStep === 7 || currentStep === 3 ? (
               <span className="flex items-center gap-1.5">
-                Next <ChevronRight className="h-4 w-4" />
+                Next <ChevronRight className="size-3.5" />
               </span>
             ) : (
               <span className="flex items-center gap-1.5">
-                Save & Next <ChevronRight className="h-4 w-4" />
+                Save & Next <ChevronRight className="size-3.5" />
               </span>
             )}
           </Button>
         </div>
       </Card>
+        </div>
+      </div>
     </div>
   );
 }

@@ -51,6 +51,8 @@ import {
   type FlowRunRow,
 } from '../repositories/flow.repository';
 import { OutboundMessageService, type SendTarget, type SystemTransport } from './outbound.service';
+import { checkWebhookUrl, readJsonPath } from '@/lib/flows/safe-url';
+import { safeRequest, type SafeRequestInput, type SafeResponse } from './safe-http';
 
 const log = getLogger('flows.engine');
 
@@ -68,6 +70,13 @@ export interface FlowDispatchInput {
   message: ParsedInbound;
   /** Drives the `first_inbound_message` trigger. */
   isFirstInboundMessage: boolean;
+  /**
+   * Which new runs may start. `exact_keyword` is the pre-AI pass (live runs
+   * plus exact keyword triggers); `non_exact` is everything else.
+   */
+  entry?: 'any' | 'exact_keyword' | 'non_exact' | 'none';
+  /** Set on the second pass so a live run is not handed the same message twice. */
+  skipActiveRun?: boolean;
 }
 
 export type FlowOutcome =
@@ -143,6 +152,11 @@ export function matchReplyId(node: { nodeType: string; config: unknown }, replyI
   return null;
 }
 
+/** A keyword flow whose trigger only fires on an exact match. These run before the AI. */
+export function isExactKeywordFlow(flow: { triggerType: string; triggerConfig: unknown }): boolean {
+  return flow.triggerType === 'keyword' && ((flow.triggerConfig ?? {}) as KeywordTrigger).match_type === 'exact';
+}
+
 /** Case-insensitive contains/exact match. Kept so the builder can preview matches. */
 export function matchesKeywordTrigger(text: string, config: KeywordTrigger): boolean {
   if (!text || !config.keywords?.length) return false;
@@ -177,13 +191,65 @@ export function evaluateConditionPredicate(input: {
   }
 }
 
-/** `{{vars.x}}` substitution. Missing keys render empty, matching automations. */
+/**
+ * Variable substitution. `{{vars.x}}` is the canonical form; bare `{{x}}` is
+ * also accepted because AI-generated flows (and people) write it that way, and
+ * the customer used to receive the raw `{{patient_name}}` placeholder. Spaces
+ * inside the braces are allowed. Numeric `{{1}}` is left alone: it is a Meta
+ * template parameter, not a flow variable. Missing keys render empty.
+ */
 export function interpolateVars(template: string, vars: Record<string, unknown>): string {
   if (!template) return '';
-  return template.replace(/\{\{vars\.([a-zA-Z0-9_]+)\}\}/g, (_match, key: string) => {
+  return template.replace(/\{\{\s*(?:vars\.)?([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g, (_match, key: string) => {
     const value = vars[key];
     return value === undefined || value === null ? '' : String(value);
   });
+}
+
+/** Bounds for the `delay` node: one minute to thirty days. */
+export const MIN_DELAY_MS = 60_000;
+export const MAX_DELAY_MS = 30 * 24 * 3_600_000;
+
+export function delayToMs(config: { amount?: unknown; unit?: unknown }): number {
+  const amount = Number(config.amount);
+  const per = config.unit === 'days' ? 86_400_000 : config.unit === 'hours' ? 3_600_000 : 60_000;
+  const ms = Number.isFinite(amount) ? amount * per : MIN_DELAY_MS;
+  return Math.min(MAX_DELAY_MS, Math.max(MIN_DELAY_MS, Math.round(ms)));
+}
+
+/** `{{vars.x}}` into a URL: every value is percent-encoded so it cannot change the URL's shape. */
+export function interpolateUrl(template: string, vars: Record<string, unknown>): string {
+  return template.replace(/\{\{\s*vars\.([a-zA-Z0-9_]+)\s*\}\}/g, (_m, key: string) => {
+    const value = vars[key];
+    return value === undefined || value === null ? '' : encodeURIComponent(String(value));
+  });
+}
+
+const MAX_SAVED_RESPONSE = 1000;
+
+/** What an HTTP step stores in its variable. */
+export function extractHttpValue(text: string, jsonPath?: string): string | undefined {
+  if (!jsonPath) return text.slice(0, MAX_SAVED_RESPONSE);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+  const value = readJsonPath(parsed, jsonPath);
+  if (value === undefined || value === null) return undefined;
+  const asText = typeof value === 'string' ? value : JSON.stringify(value);
+  return asText.slice(0, MAX_SAVED_RESPONSE);
+}
+
+interface HttpRequestConfig {
+  url: string;
+  method: 'GET' | 'POST';
+  auth_header?: string;
+  save_as?: string;
+  json_path?: string;
+  next_node_key: string;
+  on_error_next_key?: string;
 }
 
 export function isSuspending(nodeType: string): boolean {
@@ -198,6 +264,8 @@ export interface FlowEngineDeps {
   contacts: ContactRepository;
   conversations: ConversationRepository;
   outbound: OutboundMessageService;
+  /** Outbound HTTP for `http_request` steps; injectable for tests. */
+  http?: (input: SafeRequestInput) => Promise<SafeResponse>;
 }
 
 /** Mutable per-dispatch run state, so the loop never re-reads the row. */
@@ -236,8 +304,10 @@ export class FlowEngineService {
    */
   async dispatchInbound(input: FlowDispatchInput): Promise<FlowDispatchResult> {
     try {
-      const active = await this.deps.runs.findActiveForContact(input.contactId);
-      if (active) return await this.handleReply(active, input);
+      if (!input.skipActiveRun) {
+        const active = await this.deps.runs.findActiveForContact(input.contactId);
+        if (active) return await this.handleReply(active, input);
+      }
 
       const flow = await this.findEntryFlow(input);
       if (!flow || !flow.entryNodeId) return { consumed: false, outcome: 'no_match' };
@@ -275,6 +345,40 @@ export class FlowEngineService {
     return { scanned: runs.length, timedOut };
   }
 
+  /**
+   * Resumes runs whose `delay` has elapsed. Each run is claimed atomically,
+   * so overlapping ticks never run a step twice.
+   */
+  async resumeDue(now = new Date(), limit = 100): Promise<{ due: number; resumed: number }> {
+    const runs = await this.deps.runs.findDueParked(now, limit);
+    let resumed = 0;
+
+    for (const run of runs) {
+      try {
+        if (!(await this.deps.runs.claimResume(run.id, now))) continue;
+
+        const nodes = indexNodes(await this.deps.flows.listNodes(run.flowId));
+        const delayNode = run.currentNodeKey ? nodes.get(run.currentNodeKey) : undefined;
+        if (!delayNode || delayNode.nodeType !== 'delay' || !run.contactId) {
+          await this.deps.runs.endRun(run.id, 'failed', 'resume_node_missing');
+          continue;
+        }
+
+        const target = await this.deps.outbound.resolveTarget({ contactId: run.contactId, conversationId: run.conversationId });
+        const state: RunState = { row: { ...run, resumeAt: null }, vars: toVars(run.vars), repromptCount: run.repromptCount, target };
+        await this.logEvent(run.id, 'node_entered', delayNode.nodeKey, { resumed: true });
+        await this.advance(state, (delayNode.config as { next_node_key: string }).next_node_key, nodes);
+        resumed += 1;
+      } catch (error) {
+        log.error('flow resume failed', { flowRunId: run.id, err: error });
+        await this.logEvent(run.id, 'error', run.currentNodeKey, { reason: 'resume_failed', detail: errorText(error) });
+        await this.deps.runs.endRun(run.id, 'failed', 'resume_failed').catch(() => undefined);
+      }
+    }
+
+    return { due: runs.length, resumed };
+  }
+
   // ── trigger resolution ────────────────────────────────────────────
 
   /**
@@ -285,8 +389,13 @@ export class FlowEngineService {
   private async findEntryFlow(input: FlowDispatchInput): Promise<(FlowRow & { nodes: FlowNodeRow[] }) | null> {
     if (input.message.kind !== 'text') return null;
 
+    const entry = input.entry ?? 'any';
+    if (entry === 'none') return null;
     const flows = await this.deps.flows.listActiveForTrigger(['keyword', 'first_inbound_message']);
     for (const flow of flows) {
+      const exact = isExactKeywordFlow(flow);
+      if (entry === 'exact_keyword' && !exact) continue;
+      if (entry === 'non_exact' && exact) continue;
       if (flow.triggerType === 'keyword') {
         if (matchesKeywordTrigger(input.message.text, (flow.triggerConfig ?? {}) as KeywordTrigger)) {
           return flow;
@@ -344,6 +453,20 @@ export class FlowEngineService {
   // ── replies into a live run ───────────────────────────────────────
 
   private async handleReply(run: FlowRunRow, input: FlowDispatchInput): Promise<FlowDispatchResult> {
+    // Waiting at a delay node: the customer's message is not an answer to
+    // anything, so the flow does not consume it (automations / AI still see it).
+    if (run.resumeAt) {
+      const node = run.currentNodeKey
+        ? (await this.deps.flows.listNodes(run.flowId)).find((n) => n.nodeKey === run.currentNodeKey)
+        : undefined;
+      if (node?.nodeType === 'delay' && (node.config as { stop_on_reply?: boolean }).stop_on_reply) {
+        await this.logEvent(run.id, 'reply_received', run.currentNodeKey, { metaMessageId: input.message.metaMessageId, endedWait: true });
+        await this.deps.runs.endRun(run.id, 'completed', 'replied_during_delay');
+        return { consumed: false, flowRunId: run.id, outcome: 'completed' };
+      }
+      return { consumed: false, flowRunId: run.id, outcome: 'no_match' };
+    }
+
     // Never persist the customer's raw text. A `collect_input` prompt asking
     // for a card number would otherwise leave the PAN in `flow_run_events`
     // for anyone with access to the runs viewer. Length is enough to debug.
@@ -514,6 +637,63 @@ export class FlowEngineService {
           continue;
         }
 
+        case 'delay': {
+          const config = node.config as { amount: number; unit: string; next_node_key: string };
+          const ms = delayToMs(config);
+          const resumeAt = new Date(Date.now() + ms);
+          const parked = await this.deps.runs.park({ runId: state.row.id, nodeKey: node.nodeKey, resumeAt });
+          if (!parked) return this.failRun(state, node.nodeKey, 'delay_park_failed');
+          await this.logEvent(state.row.id, 'node_entered', node.nodeKey, { waitingMs: ms, resumeAt: resumeAt.toISOString() });
+          return 'advanced';
+        }
+
+        case 'http_request': {
+          const config = node.config as unknown as HttpRequestConfig;
+          const result = await this.callHttp(state, node, config);
+          if (result.ok) {
+            currentKey = config.next_node_key;
+          } else if (config.on_error_next_key) {
+            await this.logEvent(state.row.id, 'error', node.nodeKey, { reason: 'http_request_failed', detail: result.reason, continuedOnError: true });
+            currentKey = config.on_error_next_key;
+          } else {
+            return this.failRun(state, node.nodeKey, 'http_request_failed', new Error(result.reason));
+          }
+          continue;
+        }
+
+        case 'send_media': {
+          const config = node.config as { media_type: 'image' | 'video' | 'document'; url: string; caption?: string; filename?: string; next_node_key: string };
+          try {
+            const sent = await this.deps.outbound.sendMedia(state.target, {
+              type: config.media_type,
+              url: config.url,
+              caption: config.caption ? interpolateVars(config.caption, state.vars) : undefined,
+              filename: config.filename,
+            });
+            await this.logEvent(state.row.id, 'message_sent', node.nodeKey, { nodeType: 'send_media', whatsappMessageId: sent.whatsappMessageId });
+          } catch (error) {
+            return this.failRun(state, node.nodeKey, 'send_media_failed', error);
+          }
+          currentKey = config.next_node_key;
+          continue;
+        }
+
+        case 'send_template': {
+          const config = node.config as { template_name: string; language?: string; params?: string[]; next_node_key: string };
+          try {
+            const sent = await this.deps.outbound.sendTemplate(state.target, {
+              templateName: config.template_name,
+              language: config.language,
+              params: (config.params ?? []).map((p) => interpolateVars(p, state.vars)),
+            });
+            await this.logEvent(state.row.id, 'message_sent', node.nodeKey, { nodeType: 'send_template', whatsappMessageId: sent.whatsappMessageId });
+          } catch (error) {
+            return this.failRun(state, node.nodeKey, 'send_template_failed', error);
+          }
+          currentKey = config.next_node_key;
+          continue;
+        }
+
         case 'condition': {
           const config = node.config as unknown as ConditionConfig;
           let passes: boolean;
@@ -592,6 +772,55 @@ export class FlowEngineService {
     }
 
     return this.failRun(state, currentKey, 'advance_loop_overflow');
+  }
+
+  /** The `http_request` step. Never throws; a failure is a value the caller routes. */
+  private async callHttp(state: RunState, node: FlowNodeRow, config: HttpRequestConfig): Promise<{ ok: true } | { ok: false; reason: string }> {
+    const url = interpolateUrl(config.url ?? '', state.vars);
+    const problem = checkWebhookUrl(url);
+    if (problem) return { ok: false, reason: problem };
+
+    const method = config.method === 'POST' ? 'POST' : 'GET';
+    let body: string | undefined;
+    if (method === 'POST') {
+      const contact = state.row.contactId ? await this.deps.contacts.findDetail(state.row.contactId).catch(() => null) : null;
+      body = JSON.stringify({
+        flowRunId: state.row.id,
+        contact: contact ? { id: contact.id, name: contact.name, phone: contact.phone, email: contact.email } : null,
+        vars: state.vars,
+      });
+    }
+
+    let host = '';
+    try {
+      host = new URL(url).host;
+    } catch {
+      /* checked above */
+    }
+
+    try {
+      const send = this.deps.http ?? safeRequest;
+      const res = await send({
+        url,
+        method,
+        body,
+        headers: config.auth_header ? { Authorization: config.auth_header } : undefined,
+      });
+      if (res.status < 200 || res.status >= 300) {
+        return { ok: false, reason: `The server answered ${res.status}.` };
+      }
+      if (config.save_as) {
+        const value = extractHttpValue(res.text, config.json_path);
+        if (value === undefined) return { ok: false, reason: 'The response did not contain the requested value.' };
+        const vars = { ...state.vars, [config.save_as]: value };
+        await this.deps.runs.setVars(state.row.id, toInputJson(vars) ?? {});
+        state.vars = vars;
+      }
+      await this.logEvent(state.row.id, 'node_entered', node.nodeKey, { nodeType: 'http_request', httpStatus: res.status, host });
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, reason: errorText(error).slice(0, 200) };
+    }
   }
 
   /**

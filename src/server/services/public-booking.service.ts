@@ -109,6 +109,8 @@ export async function publicProfile(ref: string) {
       },
     });
     if (!clinic) throw new NotFoundError('Booking page');
+    // Clinic logo uploaded in Prescription setup (logoMime is cleared when the logo is removed).
+    const brand = await systemDb.prescriptionSettings.findUnique({ where: { clinicId: clinic.id }, select: { logoMime: true, updatedAt: true } });
     const deptById = new Map(clinic.departments.map((d) => [d.id, d.name]));
     const doctors = clinic.doctors.map((d) => ({
       id: d.id,
@@ -133,6 +135,7 @@ export async function publicProfile(ref: string) {
       phone: clinic.phone,
       whatsapp: clinic.whatsappNumber,
       mapLink: clinic.googleMapLink,
+      logoUrl: brand?.logoMime ? `/api/public/booking/${encodeURIComponent(ref)}/logo?v=${brand.updatedAt.getTime()}` : null,
       timings: clinic.timings.map((t) => ({ day: t.dayName, closed: t.isClosed, open: t.openingTime, close: t.closingTime })),
       // Configured departments (Step 2 of setup); older clinics without them
       // fall back to doctor specialisations.
@@ -170,6 +173,17 @@ export async function publicProfile(ref: string) {
     doctors: biz.staff.map((s) => ({ id: s.id, name: s.name, departmentIds: [] as string[], department: s.role || s.specialization || 'Team', specialization: s.specialization, qualification: s.qualification, experience: null, fee: 0, languages: null, photo: null, days: [] as string[] })),
     services: biz.services.map((s) => ({ id: s.id, name: s.name, price: Number(s.price ?? 0), duration: s.durationMinutes ?? 30, category: s.category })),
   };
+}
+
+// ── logo ─────────────────────────────────────────────────────────────
+
+/** Clinic logo for the public booking page (null when none is uploaded). */
+export async function publicLogo(ref: string): Promise<{ data: Uint8Array; mimeType: string } | null> {
+  const target = await resolveTarget(ref);
+  if (target.kind !== 'clinic') return null;
+  const s = await systemDb.prescriptionSettings.findUnique({ where: { clinicId: target.id }, select: { logo: true, logoMime: true } });
+  if (!s?.logo || !s.logoMime) return null;
+  return { data: new Uint8Array(s.logo), mimeType: s.logoMime };
 }
 
 // ── slots ───────────────────────────────────────────────────────────
@@ -364,7 +378,7 @@ export async function publicBook(linkRef: string, body: PublicBookingBody, sourc
     `👤 ${body.name}`,
     `🛎️ ${svc?.name ?? 'Appointment'}`,
     `📅 ${pretty(body.date)} · ⏰ ${prettyTime(body.time)}`,
-    `🎟️ Token No: *${token}*`,
+    `🎟️ Queue No: *${token}*`,
     biz?.address ? `📍 ${[biz.address, biz.city].filter(Boolean).join(', ')}` : null,
     ``,
     `Ref: ${ref}. Reply here if you need to change anything.`,

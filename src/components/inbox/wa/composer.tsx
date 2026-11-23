@@ -264,7 +264,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
 
   if (disabledReason) {
     return (
-      <div className="flex min-h-[62px] shrink-0 items-center justify-center bg-[var(--wa-panel-header)] px-4 text-center text-[14px] text-[var(--wa-text-2)]">
+      <div className="flex min-h-[52px] shrink-0 items-center justify-center bg-[var(--wa-panel-header)] px-4 text-center text-[12.5px] text-[var(--wa-text-2)]">
         {disabledReason}
       </div>
     );
@@ -275,7 +275,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
       {/* Quick reply suggestions */}
       {qrQuery !== null && (
         <div className="absolute bottom-full left-0 right-0 z-20 mx-2 mb-1 overflow-hidden rounded-lg border border-[var(--wa-border)] bg-[var(--wa-panel)] shadow-lg">
-          <div className="flex items-center justify-between border-b border-[var(--wa-border)] px-3 py-1.5 text-[12px] text-[var(--wa-text-2)]">
+          <div className="flex items-center justify-between border-b border-[var(--wa-border)] px-3 py-1.5 text-[11px] text-[var(--wa-text-2)]">
             <span className="flex items-center gap-1">
               <Zap className="h-3.5 w-3.5" /> Quick replies
             </span>
@@ -284,7 +284,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
             </button>
           </div>
           {qrMatches.length === 0 ? (
-            <p className="px-3 py-3 text-[13px] text-[var(--wa-text-2)]">
+            <p className="px-3 py-3 text-[12px] text-[var(--wa-text-2)]">
               No quick reply for “/{qrQuery}”.{" "}
               <button type="button" className="text-[var(--wa-accent-strong)] hover:underline" onClick={onManageQuickReplies}>
                 Create one
@@ -300,8 +300,8 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
                     onClick={() => applyQuickReply(q)}
                     className={cn("flex w-full gap-3 px-3 py-2 text-left", i === qrIndex && "bg-[var(--wa-panel-active)]")}
                   >
-                    <span className="shrink-0 font-mono text-[13px] text-[var(--wa-accent-strong)]">/{q.shortcut}</span>
-                    <span className="truncate text-[13px] text-[var(--wa-text-2)]">{q.text}</span>
+                    <span className="shrink-0 font-mono text-[12px] text-[var(--wa-accent-strong)]">/{q.shortcut}</span>
+                    <span className="truncate text-[12px] text-[var(--wa-text-2)]">{q.text}</span>
                   </button>
                 </li>
               ))}
@@ -324,7 +324,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
                 setSuggestions([]);
                 taRef.current?.focus();
               }}
-              className="max-w-xs truncate rounded-full border border-[var(--wa-border)] bg-[var(--wa-panel)] px-3 py-1 text-[13px] hover:border-[#a78bfa]"
+              className="max-w-xs truncate rounded-full border border-[var(--wa-border)] bg-[var(--wa-panel)] px-3 py-1 text-[12px] hover:border-[#a78bfa]"
             >
               {s}
             </button>
@@ -336,7 +336,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
       )}
 
       {/* Reply / note tabs */}
-      <div className="flex items-center gap-1 px-3 pt-2 text-[13px]">
+      <div className="flex items-center gap-1 px-3 pt-2 text-[12px]">
         <button
           type="button"
           onClick={() => setMode("reply")}
@@ -358,7 +358,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
           <StickyNote className="h-3.5 w-3.5" /> Internal note
         </button>
         {mode === "reply" && (
-          <span className="ml-auto hidden text-[11px] text-[var(--wa-text-2)] sm:inline">
+          <span className="ml-auto hidden text-[10px] text-[var(--wa-text-2)] sm:inline">
             Type <kbd className="font-mono">/</kbd> for quick replies · Enter to send · Shift+Enter new line
           </span>
         )}
@@ -368,8 +368,8 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
         <div className="mx-3 mt-2 flex overflow-hidden rounded-md bg-[var(--wa-panel)]">
           <span className="w-1 shrink-0 bg-[var(--wa-accent-strong)]" />
           <div className="min-w-0 flex-1 px-3 py-1.5">
-            <p className="text-[12.8px] font-medium text-[var(--wa-accent-strong)]">{replyTo.authorLabel}</p>
-            <p className="truncate text-[13px] text-[var(--wa-text-2)]">{replyTo.preview}</p>
+            <p className="text-[11.5px] font-medium text-[var(--wa-accent-strong)]">{replyTo.authorLabel}</p>
+            <p className="truncate text-[12px] text-[var(--wa-text-2)]">{replyTo.preview}</p>
           </div>
           <button type="button" aria-label="Cancel reply" onClick={onClearReply} className="px-3 text-[var(--wa-text-2)]">
             <X className="h-4 w-4" />
@@ -386,8 +386,8 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
             <FileText className="h-8 w-8 text-[var(--wa-text-2)]" />
           )}
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[14px]">{pendingFile.name}</p>
-            <p className="text-[12px] text-[var(--wa-text-2)]">{(pendingFile.size / 1024).toFixed(0)} KB · add a caption below</p>
+            <p className="truncate text-[12.5px]">{pendingFile.name}</p>
+            <p className="text-[11px] text-[var(--wa-text-2)]">{(pendingFile.size / 1024).toFixed(0)} KB · add a caption below</p>
           </div>
           <button type="button" aria-label="Remove attachment" onClick={() => setPendingFile(null)} className="text-[var(--wa-text-2)]">
             <X className="h-4 w-4" />
@@ -397,14 +397,14 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
 
       {locked && !pendingFile ? (
         <div className="flex flex-col items-center gap-2 px-4 py-3 text-center sm:flex-row sm:justify-between sm:text-left">
-          <p className="flex items-center gap-2 text-[13px] text-[var(--wa-text-2)]">
+          <p className="flex items-center gap-2 text-[12px] text-[var(--wa-text-2)]">
             <Lock className="h-4 w-4 shrink-0" />
             The 24-hour customer service window is closed. Only approved templates can be sent.
           </p>
           <button
             type="button"
             onClick={onOpenTemplates}
-            className="flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--wa-accent)] px-4 py-1.5 text-[14px] font-medium text-white hover:opacity-90"
+            className="flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--wa-accent)] px-4 py-1.5 text-[12.5px] font-medium text-white hover:opacity-90"
           >
             <LayoutTemplate className="h-4 w-4" /> Send template
           </button>
@@ -414,7 +414,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
           <Popover open={emojiOpen} onOpenChange={setEmojiOpen}>
             <PopoverTrigger
               aria-label="Emoji"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--wa-text-2)] hover:bg-[var(--wa-panel-active)]"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--wa-text-2)] hover:bg-[var(--wa-panel-active)]"
             >
               <Smile className="h-6 w-6" />
             </PopoverTrigger>
@@ -422,7 +422,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
               <div className="wa-scroll max-h-72 overflow-y-auto">
                 {EMOJI_GROUPS.map((g) => (
                   <div key={g.label} className="mb-2">
-                    <p className="mb-1 px-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{g.label}</p>
+                    <p className="mb-1 px-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{g.label}</p>
                     <div className="grid grid-cols-8 gap-0.5">
                       {g.emojis.map((e) => (
                         <button
@@ -454,7 +454,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
             <DropdownMenu>
               <DropdownMenuTrigger
                 aria-label="Attach"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--wa-text-2)] hover:bg-[var(--wa-panel-active)]"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--wa-text-2)] hover:bg-[var(--wa-panel-active)]"
               >
                 <Plus className="h-6 w-6" />
               </DropdownMenuTrigger>
@@ -483,7 +483,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
 
           <div
             className={cn(
-              "flex min-h-[42px] flex-1 items-end rounded-lg px-3 py-[9px]",
+              "flex min-h-[36px] flex-1 items-end rounded-2xl border border-[var(--wa-border)] px-3 py-[7px] focus-within:border-[var(--wa-accent)]",
               mode === "note" ? "border border-[var(--wa-note-border)] bg-[var(--wa-note)]" : "bg-[var(--wa-input)]",
             )}
           >
@@ -501,7 +501,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
                     ? "Add a caption"
                     : "Type a message"
               }
-              className="wa-scroll max-h-[140px] min-w-0 flex-1 resize-none bg-transparent text-[15px] leading-[22px] text-[var(--wa-text)] outline-none placeholder:text-[var(--wa-text-2)]"
+              className="wa-scroll max-h-[140px] min-w-0 flex-1 resize-none bg-transparent text-[13px] leading-[19px] text-[var(--wa-text)] outline-none placeholder:text-[var(--wa-text-2)]"
             />
           </div>
 
@@ -512,9 +512,9 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
                   <DropdownMenuTrigger
                     aria-label="Polish with AI"
                     disabled={aiLoading}
-                    className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-full text-[#a78bfa] hover:bg-[var(--wa-panel-active)] sm:flex"
+                    className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#a78bfa] hover:bg-[var(--wa-panel-active)] sm:flex"
                   >
-                    {aiLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Wand2 className="h-5 w-5" />}
+                    {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
                   </DropdownMenuTrigger>
                   <DropdownMenuContent side="top" align="end" className="w-52">
                     <DropdownMenuItem onClick={() => polish("professional")}>Professional</DropdownMenuItem>
@@ -530,9 +530,9 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
                   title="AI reply suggestions"
                   onClick={fetchSuggestions}
                   disabled={aiLoading}
-                  className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-full text-[#a78bfa] hover:bg-[var(--wa-panel-active)] disabled:opacity-50 sm:flex"
+                  className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#a78bfa] hover:bg-[var(--wa-panel-active)] disabled:opacity-50 sm:flex"
                 >
-                  {aiLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
+                  {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                 </button>
               )}
             </>
@@ -544,18 +544,18 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
             onClick={() => void submit()}
             disabled={busy || (!text.trim() && !pendingFile)}
             className={cn(
-              "flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-50",
+              "flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-50",
               text.trim() || pendingFile ? "bg-[var(--wa-accent)] text-white" : "text-[var(--wa-text-2)]",
             )}
           >
             {busy ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : mode === "note" ? (
-              <StickyNote className="h-5 w-5" />
+              <StickyNote className="h-4 w-4" />
             ) : pendingFile ? (
-              <Paperclip className="h-5 w-5" />
+              <Paperclip className="h-4 w-4" />
             ) : (
-              <SendHorizontal className="h-5 w-5" />
+              <SendHorizontal className="h-4 w-4" />
             )}
           </button>
         </div>

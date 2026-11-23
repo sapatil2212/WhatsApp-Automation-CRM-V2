@@ -212,15 +212,15 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col">
       {/* Header */}
-      <header className="z-10 flex h-[59px] shrink-0 items-center gap-1 border-l border-[var(--wa-border)] bg-[var(--wa-panel-header)] pl-1 pr-2 sm:gap-2 sm:pl-4">
+      <header className="z-10 flex h-[52px] shrink-0 items-center gap-1 border-l border-[var(--wa-border)] bg-[var(--wa-panel-header)] pl-1 pr-2 sm:gap-2 sm:pl-4">
         <IconButton label="Back to chats" onClick={onBack} className="lg:hidden">
-          <ArrowLeft className="h-5 w-5" />
+          <ArrowLeft className="h-4 w-4" />
         </IconButton>
         <button type="button" onClick={onToggleInfo} aria-expanded={infoOpen} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-          <WaAvatar name={name} seed={c.contact.id} url={c.contact.avatarUrl} size={40} />
+          <WaAvatar name={name} seed={c.contact.id} url={c.contact.avatarUrl} size={32} />
           <div className="min-w-0">
-            <p className="truncate text-[16px] leading-tight">{name}</p>
-            <p className="truncate text-[13px] text-[var(--wa-text-2)]">{subtitle}</p>
+            <p className="truncate text-[13.5px] leading-tight">{name}</p>
+            <p className="truncate text-[12px] text-[var(--wa-text-2)]">{subtitle}</p>
           </div>
         </button>
 
@@ -232,7 +232,7 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
               : "Time left in the 24-hour customer service window"
           }
           className={cn(
-            "hidden shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[12px] md:flex",
+            "hidden shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] md:flex",
             win.expired
               ? "bg-red-500/15 text-red-500"
               : win.ms < 2 * 3_600_000
@@ -250,7 +250,7 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
           onClick={() => onStatus(aiActive ? "open" : "pending")}
           title={aiActive ? "AI is handling — click to take over (human)" : "You are handling — click to hand back to AI"}
           className={cn(
-            "flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[12px] transition-colors",
+            "flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[11px] transition-colors",
             aiActive
               ? "border-[#a78bfa]/40 bg-[#a78bfa]/10 text-[#a78bfa]"
               : "border-[var(--wa-border)] bg-[var(--wa-panel)] text-[var(--wa-text)]",
@@ -265,7 +265,7 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
           <button
             type="button"
             onClick={() => onStatus("open")}
-            className="hidden h-8 shrink-0 items-center gap-1.5 rounded-full border border-[var(--wa-border)] px-3 text-[12px] text-[var(--wa-text-2)] hover:text-[var(--wa-text)] sm:flex"
+            className="hidden h-8 shrink-0 items-center gap-1.5 rounded-full border border-[var(--wa-border)] px-3 text-[11px] text-[var(--wa-text-2)] hover:text-[var(--wa-text)] sm:flex"
           >
             <RotateCcw className="h-4 w-4" /> Reopen
           </button>
@@ -273,22 +273,22 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
           <button
             type="button"
             onClick={() => onStatus("closed")}
-            className="hidden h-8 shrink-0 items-center gap-1.5 rounded-full bg-[var(--wa-accent)] px-3 text-[12px] font-medium text-white hover:opacity-90 sm:flex"
+            className="hidden h-8 shrink-0 items-center gap-1.5 rounded-full bg-[var(--wa-accent)] px-3 text-[11px] font-medium text-white hover:opacity-90 sm:flex"
           >
             <CheckCircle2 className="h-4 w-4" /> Resolve
           </button>
         )}
 
         <IconButton label="Search messages" onClick={() => setFindOpen((v) => !v)} active={findOpen} className="hidden sm:flex">
-          <Search className="h-5 w-5" />
+          <Search className="h-4 w-4" />
         </IconButton>
 
         <DropdownMenu>
           <DropdownMenuTrigger
             aria-label="Chat menu"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--wa-text-2)] hover:bg-[var(--wa-panel-active)]"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--wa-text-2)] hover:bg-[var(--wa-panel-active)]"
           >
-            <EllipsisVertical className="h-5 w-5" />
+            <EllipsisVertical className="h-4 w-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-60">
             <DropdownMenuItem onClick={onToggleInfo}>Contact info</DropdownMenuItem>
@@ -338,9 +338,9 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
             onChange={(e) => setFind(e.target.value)}
             onKeyDown={(e) => e.key === "Escape" && (setFindOpen(false), setFind(""))}
             placeholder="Search in this chat"
-            className="flex-1 bg-transparent text-[14px] outline-none placeholder:text-[var(--wa-text-2)]"
+            className="flex-1 bg-transparent text-[12.5px] outline-none placeholder:text-[var(--wa-text-2)]"
           />
-          {find && <span className="text-[12px] text-[var(--wa-text-2)]">{visible.length} found</span>}
+          {find && <span className="text-[11px] text-[var(--wa-text-2)]">{visible.length} found</span>}
           <button type="button" aria-label="Close search" onClick={() => (setFindOpen(false), setFind(""))} className="text-[var(--wa-text-2)]">
             <X className="h-4 w-4" />
           </button>
@@ -365,9 +365,9 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
             value={simText}
             onChange={(e) => setSimText(e.target.value)}
             placeholder="Simulate an incoming customer message (runs the AI assistant)"
-            className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--wa-text-2)]"
+            className="min-w-0 flex-1 bg-transparent text-[12px] outline-none placeholder:text-[var(--wa-text-2)]"
           />
-          <button type="submit" disabled={simBusy || !simText.trim()} className="shrink-0 rounded-full bg-[#7c3aed] px-3 py-1 text-[12px] text-white disabled:opacity-50">
+          <button type="submit" disabled={simBusy || !simText.trim()} className="shrink-0 rounded-full bg-[#7c3aed] px-3 py-1 text-[11px] text-white disabled:opacity-50">
             {simBusy ? "Sending…" : "Send as customer"}
           </button>
           <button type="button" aria-label="Close simulator" onClick={() => setSimOpen(false)} className="text-[var(--wa-text-2)]">
@@ -404,12 +404,12 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
                 </div>
               )}
               {!hasOlder && (
-                <div className="mx-auto mb-2 mt-2 w-fit max-w-[90%] rounded-lg bg-[var(--wa-system)] px-3 py-1.5 text-center text-[12.5px] text-[var(--wa-text-2)] shadow-[var(--wa-shadow)]">
+                <div className="mx-auto mb-2 mt-2 w-fit max-w-[90%] rounded-lg bg-[var(--wa-system)] px-3 py-1.5 text-center text-[11.5px] text-[var(--wa-text-2)] shadow-[var(--wa-shadow)]">
                   🔒 Messages are delivered through the WhatsApp Business Platform. Internal notes stay inside your team.
                 </div>
               )}
               {visible.length === 0 && (
-                <div className="mx-auto mt-6 w-fit rounded-lg bg-[var(--wa-system)] px-4 py-2 text-[13px] text-[var(--wa-text-2)] shadow-[var(--wa-shadow)]">
+                <div className="mx-auto mt-6 w-fit rounded-lg bg-[var(--wa-system)] px-4 py-2 text-[12px] text-[var(--wa-text-2)] shadow-[var(--wa-shadow)]">
                   {find ? "No messages match your search" : "No messages yet — send a template to start the conversation"}
                 </div>
               )}
@@ -422,7 +422,7 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
                   <div key={m.id}>
                     {newDay && (
                       <div className="sticky top-1 z-[3] my-2 flex justify-center">
-                        <span className="rounded-lg bg-[var(--wa-date)] px-3 py-1.5 text-[12.5px] uppercase text-[var(--wa-text-2)] shadow-[var(--wa-shadow)]">
+                        <span className="rounded-lg bg-[var(--wa-date)] px-3 py-1.5 text-[11.5px] uppercase text-[var(--wa-text-2)] shadow-[var(--wa-shadow)]">
                           {dateSeparator(m.createdAt)}
                         </span>
                       </div>
@@ -454,9 +454,9 @@ export const ChatPane = forwardRef<ChatPaneHandle, ChatPaneProps>(function ChatP
             onClick={scrollToBottom}
             className="absolute bottom-4 right-5 z-[4] flex h-10 w-10 items-center justify-center rounded-full bg-[var(--wa-panel-header)] text-[var(--wa-text-2)] shadow-lg"
           >
-            <ArrowDown className="h-5 w-5" />
+            <ArrowDown className="h-4 w-4" />
             {unseen > 0 && (
-              <span className="absolute -top-1.5 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--wa-badge)] px-1 text-[11px] font-semibold text-[var(--wa-badge-text)]">
+              <span className="absolute -top-1.5 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--wa-badge)] px-1 text-[10px] font-semibold text-[var(--wa-badge-text)]">
                 {unseen}
               </span>
             )}

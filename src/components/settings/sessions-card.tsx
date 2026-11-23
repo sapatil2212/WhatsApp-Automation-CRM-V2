@@ -2,110 +2,51 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Loader2, LogOut } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from '@/components/ui/card';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 export function SessionsCard() {
   const [open, setOpen] = useState(false);
-  const [signingOut, setSigningOut] = useState(false);
 
-  const onConfirm = async () => {
-    setSigningOut(true);
+  const signOutEverywhere = async () => {
     try {
       const res = await fetch('/api/auth/logout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ global: true }),
       });
-
       if (!res.ok) {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         toast.error(`Sign-out failed: ${err.error || 'Unknown error'}`);
         return;
       }
-
       window.location.href = '/login';
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      toast.error(msg);
-    } finally {
-      setSigningOut(false);
+      toast.error(err instanceof Error ? err.message : 'Unknown error');
     }
   };
 
   return (
-    <>
-      <Card className="bg-muted/40 border-border">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-foreground">
-            <LogOut className="size-4 text-primary" />
-            Active sessions
-          </CardTitle>
-          <CardDescription className="text-muted-foreground">
-            Sign out of every device where you&apos;re logged in — including
-            this one. Useful if you lost a laptop or shared your password.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setOpen(true)}
-          >
-            <LogOut className="size-4" />
-            Sign out of all devices
-          </Button>
-        </CardContent>
-      </Card>
+    <section className="rounded-xl border border-border/70 bg-card p-4">
+      <h3 className="flex items-center gap-1.5 text-sm font-semibold"><LogOut className="size-3.5 text-primary" /> Active sessions</h3>
+      <p className="mb-3 text-xs text-muted-foreground">Sign out on every device, including this one. Useful if you lost a device or shared your password.</p>
+      <Button type="button" size="sm" variant="outline" className="gap-1.5" onClick={() => setOpen(true)}>
+        <LogOut className="size-3.5" /> Sign out of all devices
+      </Button>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Sign out everywhere?</DialogTitle>
-            <DialogDescription>
-              Every device logged into this account will be signed out and
-              will need to log in again. You will be redirected to the login
-              page.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setOpen(false)}
-              disabled={signingOut}
-            >
-              Cancel
-            </Button>
-            <Button type="button" onClick={onConfirm} disabled={signingOut}>
-              {signingOut ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" />
-                  Signing out…
-                </>
-              ) : (
-                'Sign out everywhere'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+      <ConfirmationDialog
+        isOpen={open}
+        onOpenChange={setOpen}
+        title="Sign out everywhere?"
+        description="Every device logged into this account is signed out and must log in again."
+        notes={['You will be taken to the login page.']}
+        confirmText="Sign out everywhere"
+        variant="destructive"
+        icon="warning"
+        onConfirm={signOutEverywhere}
+      />
+    </section>
   );
 }

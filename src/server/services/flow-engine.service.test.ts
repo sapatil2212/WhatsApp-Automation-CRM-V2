@@ -6,6 +6,11 @@ import {
   decideFallbackAction,
   evaluateConditionPredicate,
   interpolateVars,
+  interpolateUrl,
+  delayToMs,
+  extractHttpValue,
+  MIN_DELAY_MS,
+  MAX_DELAY_MS,
   matchReplyId,
   matchesKeywordTrigger,
   type FlowEngineDeps,
@@ -92,6 +97,9 @@ function makeDeps(nodes: FlowNodeRow[]) {
     ),
     findStaleActive: vi.fn(async (): Promise<unknown[]> => []),
     timeOut: vi.fn(async () => true),
+    park: vi.fn(async () => true),
+    findDueParked: vi.fn(async (): Promise<FlowRunRow[]> => []),
+    claimResume: vi.fn(async () => true),
   };
   const contacts = {
     addTags: vi.fn(async () => undefined),
@@ -105,6 +113,8 @@ function makeDeps(nodes: FlowNodeRow[]) {
     sendText: vi.fn(async () => ({ messageId: 'm1', whatsappMessageId: 'wamid.1', conversationId: 'conv-1' })),
     sendButtons: vi.fn(async () => ({ messageId: 'm2', whatsappMessageId: 'wamid.2', conversationId: 'conv-1' })),
     sendList: vi.fn(async () => ({ messageId: 'm3', whatsappMessageId: 'wamid.3', conversationId: 'conv-1' })),
+    sendMedia: vi.fn(async () => ({ messageId: 'm4', whatsappMessageId: 'wamid.4', conversationId: 'conv-1' })),
+    sendTemplate: vi.fn(async () => ({ messageId: 'm5', whatsappMessageId: 'wamid.5', conversationId: 'conv-1' })),
   };
 
   return { flows, runs, contacts, conversations, outbound } as unknown as FlowEngineDeps & {
@@ -241,6 +251,11 @@ describe('interpolateVars', () => {
   it('substitutes captured values', () => {
     expect(interpolateVars('Thanks {{vars.name}}', { name: 'Ada' })).toBe('Thanks Ada');
     expect(interpolateVars('Thanks {{vars.name}}', {})).toBe('Thanks ');
+    // AI-generated flows write bare keys; customers used to see the raw placeholder.
+    expect(interpolateVars('Patient: {{patient_name}}, Age: {{ patient_age }}', { patient_name: 'Swapnil', patient_age: '26' })).toBe('Patient: Swapnil, Age: 26');
+    expect(interpolateVars('Hi {{missing}}', {})).toBe('Hi ');
+    // Meta template parameters are not flow variables.
+    expect(interpolateVars('Code {{1}}', { '1': 'x' })).toBe('Code {{1}}');
   });
 });
 
@@ -487,6 +502,49 @@ describe('condition and set_tag nodes', () => {
   });
 });
 
+describe('send_media and send_template nodes', () => {
+  it('sends media with an interpolated caption, then keeps walking', async () => {
+    const { deps, service } = engine([
+      node('start', 'start', { next_node_key: 'pic' }),
+      node('pic', 'send_media', { media_type: 'document', url: 'https://x.test/a.pdf', caption: 'Hi {{vars.name}}', filename: 'a.pdf', next_node_key: 'done' }),
+      node('done', 'end', {}),
+    ]);
+    deps.runs.startRun.mockResolvedValueOnce(run({ currentNodeKey: 'start', vars: { name: 'Asha' } }));
+
+    const result = await service.dispatchInbound(inbound());
+
+    expect(deps.outbound.sendMedia).toHaveBeenCalledWith(TARGET, { type: 'document', url: 'https://x.test/a.pdf', caption: expect.stringContaining('Hi'), filename: 'a.pdf' });
+    expect(result.outcome).toBe('completed');
+  });
+
+  it('sends a template (usable outside the 24h window) with interpolated variables', async () => {
+    const { deps, service } = engine([
+      node('start', 'start', { next_node_key: 'tpl' }),
+      node('tpl', 'send_template', { template_name: 'offer', language: 'en_US', params: ['{{vars.name}}', '20%'], next_node_key: 'done' }),
+      node('done', 'end', {}),
+    ]);
+
+    const result = await service.dispatchInbound(inbound());
+
+    expect(deps.outbound.sendTemplate).toHaveBeenCalledWith(TARGET, { templateName: 'offer', language: 'en_US', params: expect.any(Array) });
+    expect(result.outcome).toBe('completed');
+  });
+
+  it('fails the run with a named reason when the media send is rejected', async () => {
+    const { deps, service } = engine([
+      node('start', 'start', { next_node_key: 'pic' }),
+      node('pic', 'send_media', { media_type: 'image', url: 'https://x.test/a.png', next_node_key: 'done' }),
+      node('done', 'end', {}),
+    ]);
+    deps.outbound.sendMedia.mockRejectedValueOnce(new Error('Meta rejected the media'));
+
+    const result = await service.dispatchInbound(inbound());
+
+    expect(result.outcome).toBe('failed');
+    expect(deps.runs.endRun).toHaveBeenCalledWith('run-1', 'failed', 'send_media_failed');
+  });
+});
+
 describe('sweepStale', () => {
   it('uses each flow own timeout rather than a global default', async () => {
     const { deps, service } = engine([]);
@@ -519,5 +577,177 @@ describe('resilience', () => {
     deps.runs.findActiveForContact.mockRejectedValueOnce(new Error('connection lost'));
 
     expect(await service.dispatchInbound(inbound())).toEqual({ consumed: false, outcome: 'failed' });
+  });
+});
+
+
+describe('delay node', () => {
+  it('parks the run at the delay node instead of advancing', async () => {
+    const { deps, service } = engine([
+      node('start', 'start', { next_node_key: 'wait' }),
+      node('wait', 'delay', { amount: 2, unit: 'hours', next_node_key: 'after' }),
+      node('after', 'send_message', { text: 'Still there?', next_node_key: 'done' }),
+      node('done', 'end', {}),
+    ]);
+
+    const result = await service.dispatchInbound(inbound());
+
+    expect(deps.runs.park).toHaveBeenCalledWith(expect.objectContaining({ runId: 'run-1', nodeKey: 'wait' }));
+    const resumeAt = (deps.runs.park.mock.calls[0] as unknown as [{ resumeAt: Date }])[0].resumeAt;
+    expect(resumeAt.getTime() - Date.now()).toBeGreaterThan(2 * 3_600_000 - 5_000);
+    expect(deps.outbound.sendText).not.toHaveBeenCalled();
+    expect(result.outcome).toBe('started');
+  });
+
+  it('clamps the wait between one minute and thirty days', () => {
+    expect(delayToMs({ amount: 0, unit: 'minutes' })).toBe(MIN_DELAY_MS);
+    expect(delayToMs({ amount: 5, unit: 'minutes' })).toBe(300_000);
+    expect(delayToMs({ amount: 1, unit: 'days' })).toBe(86_400_000);
+    expect(delayToMs({ amount: 999, unit: 'days' })).toBe(MAX_DELAY_MS);
+    expect(delayToMs({ amount: 'x', unit: 'hours' })).toBe(MIN_DELAY_MS);
+  });
+
+  it('does not consume a customer message while waiting', async () => {
+    const { deps, service } = engine([node('wait', 'delay', { amount: 1, unit: 'hours', next_node_key: 'x' })]);
+    deps.runs.findActiveForContact.mockResolvedValueOnce(run({ currentNodeKey: 'wait', resumeAt: new Date(Date.now() + 60_000) } as Partial<FlowRunRow>));
+
+    const result = await service.dispatchInbound(inbound());
+
+    expect(result).toMatchObject({ consumed: false, outcome: 'no_match' });
+    expect(deps.runs.endRun).not.toHaveBeenCalled();
+  });
+
+  it('ends the run when stop_on_reply is set, still leaving the message to others', async () => {
+    const { deps, service } = engine([node('wait', 'delay', { amount: 1, unit: 'hours', stop_on_reply: true, next_node_key: 'x' })]);
+    deps.runs.findActiveForContact.mockResolvedValueOnce(run({ currentNodeKey: 'wait', resumeAt: new Date(Date.now() + 60_000) } as Partial<FlowRunRow>));
+
+    const result = await service.dispatchInbound(inbound());
+
+    expect(result.consumed).toBe(false);
+    expect(deps.runs.endRun).toHaveBeenCalledWith('run-1', 'completed', 'replied_during_delay');
+  });
+
+  it('resumes due runs once, continuing after the delay node', async () => {
+    const { deps, service } = engine([
+      node('wait', 'delay', { amount: 1, unit: 'hours', next_node_key: 'after' }),
+      node('after', 'send_message', { text: 'Back again', next_node_key: 'done' }),
+      node('done', 'end', {}),
+    ]);
+    deps.runs.findDueParked.mockResolvedValueOnce([run({ currentNodeKey: 'wait', resumeAt: new Date(now.getTime() - 1000) } as Partial<FlowRunRow>)]);
+
+    const result = await service.resumeDue(now);
+
+    expect(result).toEqual({ due: 1, resumed: 1 });
+    expect(deps.runs.claimResume).toHaveBeenCalledWith('run-1', now);
+    expect(deps.outbound.sendText).toHaveBeenCalledWith(TARGET, 'Back again');
+    expect(deps.runs.endRun).toHaveBeenCalledWith('run-1', 'completed', 'end_node');
+  });
+
+  it('skips a run another worker already claimed', async () => {
+    const { deps, service } = engine([node('wait', 'delay', { amount: 1, unit: 'hours', next_node_key: 'after' })]);
+    deps.runs.findDueParked.mockResolvedValueOnce([run({ currentNodeKey: 'wait' })]);
+    deps.runs.claimResume.mockResolvedValueOnce(false);
+
+    expect(await service.resumeDue(now)).toEqual({ due: 1, resumed: 0 });
+    expect(deps.outbound.sendText).not.toHaveBeenCalled();
+  });
+
+  it('fails a due run whose delay node was deleted in the meantime', async () => {
+    const { deps, service } = engine([node('other', 'end', {})]);
+    deps.runs.findDueParked.mockResolvedValueOnce([run({ currentNodeKey: 'wait' })]);
+
+    await service.resumeDue(now);
+
+    expect(deps.runs.endRun).toHaveBeenCalledWith('run-1', 'failed', 'resume_node_missing');
+  });
+});
+
+describe('http_request node', () => {
+  const flowNodes = (config: Record<string, unknown>) => [
+    node('start', 'start', { next_node_key: 'call' }),
+    node('call', 'http_request', { url: 'https://api.example.com/order?phone={{vars.phone}}', method: 'GET', next_node_key: 'ok', ...config }),
+    node('ok', 'send_message', { text: 'Status: {{vars.status}}', next_node_key: 'done' }),
+    node('bad', 'send_message', { text: 'Sorry, try later', next_node_key: 'done' }),
+    node('done', 'end', {}),
+  ];
+
+  it('calls the API, stores the JSON field and uses it in the next message', async () => {
+    const { deps, service } = engine(flowNodes({ save_as: 'status', json_path: 'data.status', auth_header: 'Bearer t0k' }));
+    const http = vi.fn(async () => ({ status: 200, text: JSON.stringify({ data: { status: 'shipped' } }), truncated: false }));
+    deps.http = http;
+
+    const result = await service.dispatchInbound(inbound());
+
+    expect(http).toHaveBeenCalledWith(expect.objectContaining({ url: 'https://api.example.com/order?phone=', method: 'GET', headers: { Authorization: 'Bearer t0k' } }));
+    expect(deps.runs.setVars).toHaveBeenCalledWith('run-1', expect.objectContaining({ status: 'shipped' }));
+    expect(deps.outbound.sendText).toHaveBeenCalledWith(TARGET, 'Status: shipped');
+    expect(result.outcome).toBe('completed');
+  });
+
+  it('sends contact and variables as JSON on POST', async () => {
+    const { deps, service } = engine(flowNodes({ method: 'POST', url: 'https://api.example.com/lead' }));
+    const http = vi.fn(async (_input: { body?: string }) => ({ status: 201, text: '{}', truncated: false }));
+    deps.http = http;
+
+    await service.dispatchInbound(inbound());
+
+    const body = JSON.parse(http.mock.calls[0][0].body ?? '{}');
+    expect(body.contact).toMatchObject({ name: 'Ada' });
+    expect(body.flowRunId).toBe('run-1');
+  });
+
+  it('takes the error path on a non-2xx answer', async () => {
+    const { deps, service } = engine(flowNodes({ on_error_next_key: 'bad' }));
+    deps.http = vi.fn(async () => ({ status: 500, text: 'boom', truncated: false }));
+
+    const result = await service.dispatchInbound(inbound());
+
+    expect(deps.outbound.sendText).toHaveBeenCalledWith(TARGET, 'Sorry, try later');
+    expect(result.outcome).toBe('completed');
+    expect(events(deps.runs.logEvent)).toContain('error');
+  });
+
+  it('fails the run when there is no error path', async () => {
+    const { deps, service } = engine(flowNodes({}));
+    deps.http = vi.fn(async () => {
+      throw new Error('socket hang up');
+    });
+
+    const result = await service.dispatchInbound(inbound());
+
+    expect(result.outcome).toBe('failed');
+    expect(deps.runs.endRun).toHaveBeenCalledWith('run-1', 'failed', 'http_request_failed');
+  });
+
+  it('never calls an internal address, even if a variable points at one', async () => {
+    const { deps, service } = engine(flowNodes({ url: 'https://169.254.169.254/latest/meta-data', on_error_next_key: 'bad' }));
+    const http = vi.fn(async () => ({ status: 200, text: 'secret', truncated: false }));
+    deps.http = http;
+
+    await service.dispatchInbound(inbound());
+
+    expect(http).not.toHaveBeenCalled();
+    expect(deps.outbound.sendText).toHaveBeenCalledWith(TARGET, 'Sorry, try later');
+  });
+
+  it('treats a missing JSON field as a failure', async () => {
+    const { deps, service } = engine(flowNodes({ save_as: 'status', json_path: 'data.missing', on_error_next_key: 'bad' }));
+    deps.http = vi.fn(async () => ({ status: 200, text: '{"data":{}}', truncated: false }));
+
+    await service.dispatchInbound(inbound());
+
+    expect(deps.outbound.sendText).toHaveBeenCalledWith(TARGET, 'Sorry, try later');
+  });
+
+  it('percent-encodes variable values so they cannot rewrite the URL', () => {
+    expect(interpolateUrl('https://a.com/?q={{vars.q}}', { q: 'x&admin=1#' })).toBe('https://a.com/?q=x%26admin%3D1%23');
+    expect(interpolateUrl('https://a.com/{{vars.none}}', {})).toBe('https://a.com/');
+  });
+
+  it('extracts and bounds the stored value', () => {
+    expect(extractHttpValue('plain text')).toBe('plain text');
+    expect(extractHttpValue('x'.repeat(5000))).toHaveLength(1000);
+    expect(extractHttpValue('{"a":{"b":[1,2]}}', 'a.b')).toBe('[1,2]');
+    expect(extractHttpValue('not json', 'a')).toBeUndefined();
   });
 });

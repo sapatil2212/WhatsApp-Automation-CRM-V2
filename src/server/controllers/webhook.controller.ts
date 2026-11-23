@@ -36,9 +36,12 @@ import { processHealthcareAIMessage } from '@/services/ai-healthcare.service';
 import { processBusinessAIMessage } from '@/services/ai-business.service';
 import { adNoteText, META_AD_NOTE_PREFIX, resolveReplyContext, type AdReferral } from '@/lib/ai/reply-context';
 import { notifyTenant, pushToGoogleSheet } from '../services/booking-notify';
-import { AutomationEngineService } from '../services/automation-engine.service';
+import { AutomationEngineService, type AutomationScope, type KeywordFilter } from '../services/automation-engine.service';
 import { BroadcastService } from '../services/broadcast.service';
 import { FlowEngineService } from '../services/flow-engine.service';
+import { routeInbound, type FlowPass } from '../services/inbound-router';
+import { sendAiFallback } from '../services/ai-fallback';
+import { AiUnavailableError, type AiOutcome } from '@/lib/ai/outcome';
 import { InboundService, type InboundMessage } from '../services/inbound.service';
 import { TemplateService } from '../services/template.service';
 import { WhatsappTransport } from '../services/whatsapp-transport';
@@ -414,8 +417,12 @@ async function route(input: {
   const segment = getBusinessSegment(profile?.businessType ?? null);
   const routingMode = await getInboundRoutingMode(account.userId, segment);
 
-  const runAi = async (): Promise<boolean> => {
-    // Layer 1 Meta ad / layer 2 campaign / layer 3 general.
+  // AI attempt. A model failure before anything was sent (`AiUnavailableError`)
+  // is safe to retry; any other error may have happened after a reply went
+  // out, so it is never retried.
+  let aiRetrySafe = true;
+  const runAi = async (): Promise<AiOutcome> => {
+    if (!aiRetrySafe) return 'failed';
     const replyContext = await resolveReplyContext({
       tenantId: account.tenantId,
       contactId: stored.contactId,
@@ -441,17 +448,20 @@ async function route(input: {
       isFirstInboundMessage: stored.isFirstInboundMessage,
     };
     try {
-      return segment === 'healthcare'
+      const replied = segment === 'healthcare'
         ? await processHealthcareAIMessage(args)
         : await processBusinessAIMessage(args);
+      return replied ? 'handled' : 'declined';
     } catch (error) {
-      log.error('AI handler failed', { segment, err: error });
-      return false;
+      if (!(error instanceof AiUnavailableError)) aiRetrySafe = false;
+      log.error('AI handler failed', { segment, retrySafe: aiRetrySafe, err: error });
+      return 'failed';
     }
   };
 
-  const runFlows = async (): Promise<boolean> => {
-    const transport = await WhatsappTransport.forTenant(account.db);
+  const transport = await WhatsappTransport.forTenant(account.db);
+
+  const runFlows = async (pass: FlowPass): Promise<boolean> => {
     if (!transport) return false;
     const result = await FlowEngineService.create(account.db, account.userId, transport).dispatchInbound({
       contactId: stored.contactId,
@@ -465,30 +475,24 @@ async function route(input: {
           }
         : { kind: 'text', text: stored.text, metaMessageId: message.whatsappMessageId },
       isFirstInboundMessage: stored.isFirstInboundMessage,
+      entry: pass === 'live_only' ? 'none' : pass,
+      // The exact pass already offered the message to a live run.
+      skipActiveRun: pass === 'non_exact',
     });
     return result.consumed;
   };
 
-  let handled = false;
-  switch (routingMode) {
-    case 'ai_only':
-      handled = await runAi();
-      break;
-    case 'flows_only':
-      handled = await runFlows();
-      break;
-    case 'flows_first':
-      handled = (await runFlows()) || (await runAi());
-      break;
-    default:
-      handled = (await runAi()) || (await runFlows());
-  }
-
-  if (handled) return;
-
-  const transport = await WhatsappTransport.forTenant(account.db);
-  if (!transport) return;
-  const engine = AutomationEngineService.create(account.db, account.userId, transport);
+  const engine = transport ? AutomationEngineService.create(account.db, account.userId, transport) : null;
+  const runAutomations = async (triggerType: AutomationTriggerType, scope: AutomationScope, keyword: KeywordFilter) => {
+    if (!engine) return 0;
+    // Awaited, never fired and forgotten: a frozen serverless function would
+    // otherwise drop the remaining steps.
+    const r = await engine.dispatch(
+      { triggerType, contactId: stored.contactId, context: { messageText: stored.text, conversationId: stored.conversationId } },
+      { scope, keyword },
+    );
+    return r.executed;
+  };
 
   // Most specific trigger first, so a "welcome" automation on
   // `first_inbound_message` runs before a generic `new_message_received` one.
@@ -496,18 +500,25 @@ async function route(input: {
   if (stored.contactWasCreated) triggers.unshift('new_contact_created');
   if (stored.isFirstInboundMessage) triggers.unshift('first_inbound_message');
 
-  for (const triggerType of triggers) {
-    // Awaited in sequence, not fired and forgotten. The previous handler used
-    // `.catch()` without awaiting, so the serverless function could be frozen
-    // mid-automation and the remaining steps never ran.
-    await engine.dispatch({
-      triggerType,
-      contactId: stored.contactId,
-      context: { messageText: stored.text, conversationId: stored.conversationId },
-    });
-  }
+  const outcome = await routeInbound({
+    mode: routingMode,
+    triggers,
+    runAi,
+    runFlows,
+    runAutomations,
+    sendAiFallback: () =>
+      sendAiFallback({
+        db: account.db,
+        userId: account.userId,
+        tenantId: account.tenantId,
+        transport,
+        contactId: stored.contactId,
+        conversationId: stored.conversationId,
+        customerLabel: message.profileName || `+${message.from}`,
+      }),
+  });
+  log.info('inbound routed', { mode: routingMode, repliedBy: outcome.repliedBy, ai: outcome.aiOutcome ?? 'not_run' });
 }
-
 // ── processing ──────────────────────────────────────────────────────
 
 function campaignFeedback(db: TenantDb, userId: string): BroadcastService {

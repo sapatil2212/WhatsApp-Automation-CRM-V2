@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { verifyAccessToken, rotateRefreshToken } from '@/lib/auth'
-import { invalidateClinicCache } from '@/lib/healthcare/clinic-cache'
+import { invalidateClinicCacheForTenant } from '@/lib/healthcare/clinic-cache'
 
 async function getAuthContext() {
   const cookieStore = await cookies()
@@ -62,7 +62,7 @@ export async function PUT(
       },
     })
 
-    invalidateClinicCache(ctx.userId)
+    invalidateClinicCacheForTenant(ctx.tenantId)
 
     return NextResponse.json({ success: true, faq: updated })
   } catch (error: any) {
@@ -94,7 +94,7 @@ export async function DELETE(
       where: { id },
     })
 
-    invalidateClinicCache(ctx.userId)
+    invalidateClinicCacheForTenant(ctx.tenantId)
 
     return NextResponse.json({ success: true, message: 'FAQ deleted successfully' })
   } catch (error: any) {

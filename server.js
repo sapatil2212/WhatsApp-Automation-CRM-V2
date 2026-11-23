@@ -163,24 +163,34 @@ app.prepare().then(() => {
       running = true;
       try {
         const headers = { "x-cron-secret": process.env.AUTOMATION_CRON_SECRET };
-        const res = await fetch(`http://127.0.0.1:${port}/api/broadcasts/cron`, { method: "POST", headers });
+        const res = await fetch(`http://127.0.0.1:${port}/api/broadcasts/cron`, { method: "POST", headers }).catch(() => ({ ok: false, status: 0 }));
         if (!res.ok && res.status !== 404) {
           console.warn(`[Campaign Ticker] cron returned ${res.status}`);
         }
         // Drip sequences — every tick.
-        const drip = await fetch(`http://127.0.0.1:${port}/api/sequences/cron`, { method: "POST", headers });
+        const drip = await fetch(`http://127.0.0.1:${port}/api/sequences/cron`, { method: "POST", headers }).catch(() => ({ ok: false, status: 0 }));
         if (!drip.ok && drip.status !== 404) console.warn(`[Drip Ticker] returned ${drip.status}`);
+        // Flow runs: resume finished delay steps and time out abandoned runs — every minute.
+        if (tick % Math.max(1, Math.round(60_000 / intervalMs)) === 0) {
+          const flows = await fetch(`http://127.0.0.1:${port}/api/flows/cron`, { method: "POST", headers }).catch(() => ({ ok: false, status: 0 }));
+          if (!flows.ok && flows.status !== 404) console.warn(`[Flow Ticker] returned ${flows.status}`);
+        }
         // Delayed automation steps ("wait" nodes) — every tick. Without this
         // a parked wait step never resumed.
-        const auto = await fetch(`http://127.0.0.1:${port}/api/automations/cron`, { method: "GET", headers });
+        const auto = await fetch(`http://127.0.0.1:${port}/api/automations/cron`, { method: "GET", headers }).catch(() => ({ ok: false, status: 0 }));
         if (!auto.ok && auto.status !== 404) console.warn(`[Automation Ticker] cron returned ${auto.status}`);
         // Appointment confirmations / reminders / follow-ups — once a minute.
         tick += 1;
         if (tick % Math.max(1, Math.round(60_000 / intervalMs)) === 0) {
-          const life = await fetch(`http://127.0.0.1:${port}/api/appointments/lifecycle`, { method: "POST", headers });
-          if (!life.ok && life.status !== 404) console.warn(`[Appointment Ticker] lifecycle returned ${life.status}`);
-        }
-        // Sales follow-ups for customers who went quiet — every 5 minutes.
+          // Isolated: a failure in any other job must never skip patient
+          // reminders (1 day / 2 hours / 1 hour before) for this minute.
+          try {
+            const life = await fetch(`http://127.0.0.1:${port}/api/appointments/lifecycle`, { method: "POST", headers });
+            if (!life.ok && life.status !== 404) console.warn(`[Appointment Ticker] lifecycle returned ${life.status}`);
+          } catch (err) {
+            console.warn("[Appointment Ticker] lifecycle failed:", err.message || err);
+          }
+        }        // Sales follow-ups for customers who went quiet — every 5 minutes.
         if (tick % Math.max(1, Math.round(300_000 / intervalMs)) === 0) {
           const nurture = await fetch(`http://127.0.0.1:${port}/api/leads/nurture`, { method: "POST", headers });
           if (!nurture.ok && nurture.status !== 404) console.warn(`[Lead Nurture Ticker] returned ${nurture.status}`);

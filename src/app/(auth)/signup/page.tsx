@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
@@ -19,6 +19,7 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import { AuthField, authInputClass } from "@/components/auth/auth-field";
 import { OtpInput } from "@/components/auth/otp-input";
 import { cn } from "@/lib/utils";
+import { planById, SELF_SERVE_PLANS } from "@/lib/billing/plans";
 
 const WHATSAPP_CONTACT = "917745868073";
 
@@ -36,77 +37,10 @@ const BUSINESS_CATEGORIES = [
   "Other",
 ];
 
-// ─── Pricing Plans ────────────────────────────────────────────────────────────
-type Plan = {
-  id: string;
-  name: string;
-  tagline: string;
-  price: string;
-  period: string;
-  renewal: string | null;
-  icon: typeof Sparkles;
-  color: string;
-  popular: boolean;
-  features: string[];
-};
-
-const PLANS: Plan[] = [
-  {
-    id: "starter",
-    name: "Starter",
-    tagline: "Self-Managed Setup",
-    price: "₹799",
-    period: "/month",
-    renewal: null,
-    icon: Sparkles,
-    color: "emerald",
-    popular: false,
-    features: [
-      "Official WhatsApp Business API",
-      "Visual Flow & Chatbot Builder",
-      "Shared Collaborative Inbox",
-      "27+ Native Integrations",
-      "0% Markup on Meta API fees",
-    ],
-  },
-  {
-    id: "growth",
-    name: "Growth",
-    tagline: "Done-With-You Setup",
-    price: "₹1,499",
-    period: " first month",
-    renewal: "₹799/month after",
-    icon: ArrowRight,
-    color: "violet",
-    popular: true,
-    features: [
-      "Everything in Starter plan",
-      "Meta Business Verification Assistance",
-      "WhatsApp Co-existence Configuration",
-      "Custom Integrations Wired In",
-      "Dedicated Account Setup Session",
-    ],
-  },
-  {
-    id: "managed",
-    name: "Managed",
-    tagline: "Done-For-You Strategy",
-    price: "₹2,999",
-    period: " pilot month",
-    renewal: "₹799/month after",
-    icon: CheckCircle,
-    color: "amber",
-    popular: false,
-    features: [
-      "Everything in Growth plan",
-      "2–3 Custom Automations built for you",
-      "Message Templates written & approved",
-      "Dedicated Account Manager",
-      "Monthly 1-on-1 Strategy Calls",
-    ],
-  },
-];
-
+// ─── Pricing Plans (shared with the marketing site) ───────────────────────────
+const PLAN_ICONS = { starter: Sparkles, managed: CheckCircle, custom: ArrowRight } as const;
+const PLANS = SELF_SERVE_PLANS.map((p) => ({ ...p, icon: PLAN_ICONS[p.id] }));
+const DEFAULT_PLAN = PLANS.find((p) => p.popular) ?? PLANS[0];
 type Step = "form" | "otp" | "payment" | "done";
 
 const STEP_TABS = [
@@ -135,7 +69,13 @@ export default function SignupPage() {
   const [verifyLoading, setVerifyLoading]           = useState(false);
   const [registeredUserId, setRegisteredUserId]     = useState<string | null>(null);
 
-  const [selectedPlan, setSelectedPlan]             = useState<(typeof PLANS)[0]>(PLANS[1]); // Default Growth
+  const [selectedPlan, setSelectedPlan]             = useState<(typeof PLANS)[0]>(DEFAULT_PLAN);
+  // Pricing-page buttons link to /signup?plan=<id>; pre-select that plan.
+  useEffect(() => {
+    const wanted = planById(new URLSearchParams(window.location.search).get("plan"));
+    const match = wanted && PLANS.find((p) => p.id === wanted.id);
+    if (match) setSelectedPlan(match);
+  }, []);
   const [proofFile, setProofFile]                   = useState<File | null>(null);
   const [sending, setSending]                       = useState(false);
 
@@ -238,8 +178,8 @@ export default function SignupPage() {
       await new Promise((r) => setTimeout(r, 600));
       window.open(`https://wa.me/${WHATSAPP_CONTACT}?text=${message}`, "_blank");
       setStep("done");
-    } catch (err: any) {
-      setError(err.message || "Something went wrong. Please try again.");
+    } catch (err) {
+      setError((err instanceof Error && err.message) || "Something went wrong. Please try again.");
     } finally {
       setSending(false);
     }
@@ -479,7 +419,7 @@ export default function SignupPage() {
                 <span className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-[var(--m-text-tertiary)]">
                   Select plan
                 </span>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {PLANS.map((plan) => {
                     const active = selectedPlan.id === plan.id;
                     const PlanIcon = plan.icon;
@@ -522,12 +462,16 @@ export default function SignupPage() {
                           </span>
                         </p>
                         <p className="mt-0.5 truncate text-[9px] text-[var(--m-text-muted)]">
-                          {plan.popular ? "Most popular" : plan.tagline}
+                          {plan.tagline}
                         </p>
                       </button>
                     );
                   })}
                 </div>
+                <p className="text-[10.5px] text-[var(--m-text-muted)]">
+                  Need multiple numbers or something special?{" "}
+                  <Link href="/book-demo" className="font-semibold text-emerald-500 hover:underline">Ask for a custom plan</Link>
+                </p>
               </div>
 
               <button

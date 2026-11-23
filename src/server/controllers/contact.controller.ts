@@ -11,6 +11,7 @@
  *   POST   /api/contacts/import          import reviewed rows
  *   POST   /api/contacts/ai-extract      AI: read a document/image → candidate contacts
  *   GET    /api/tags, POST /api/tags     tag list / create
+ *   PATCH  /api/tags/[id], DELETE        rename / recolour / delete a tag
  */
 
 import { z } from 'zod';
@@ -27,6 +28,7 @@ import {
   importContactsBodySchema,
   listContactsQuerySchema,
   updateContactBodySchema,
+  updateTagBodySchema,
 } from '../validators/contact.validator';
 import { paged } from './controller-kit';
 
@@ -215,5 +217,25 @@ export const contactController = {
     response: loose,
     status: 201,
     handle: async ({ ctx, db, body }) => TagService.create(db, ctx.userId).create(body),
+  }),
+
+  updateTag: createHandler({
+    operation: 'tags.update',
+    auth: 'tenant',
+    params: paramsSchema,
+    body: updateTagBodySchema,
+    response: loose,
+    handle: async ({ ctx, db, params, body }) => TagService.create(db, ctx.userId).update(params.id, body),
+  }),
+
+  deleteTag: createHandler({
+    operation: 'tags.delete',
+    auth: 'tenant',
+    params: paramsSchema,
+    response: loose,
+    async handle({ ctx, db, params }) {
+      await TagService.create(db, ctx.userId).delete(params.id);
+      return { deleted: true };
+    },
   }),
 };

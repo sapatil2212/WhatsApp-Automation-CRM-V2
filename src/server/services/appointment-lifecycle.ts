@@ -14,6 +14,7 @@
  * Times are interpreted in APP_TIMEZONE (default Asia/Kolkata).
  */
 
+import { publicSiteUrl } from '../site-origin';
 import type { Prisma } from '@prisma/client';
 
 import { getLogger, systemDb } from '../kernel';
@@ -26,6 +27,7 @@ import { readReminderSettings } from './utility-template.service';
 export function eventForStep(step: LifecycleStep): NotifyEvent {
   if (step === 'confirmation') return 'confirmation';
   if (step === 'completed') return 'completed';
+  if (step === 'no_show') return 'no_show';
   if (step === 'r_1d' || step === 'r_2h' || step === 'r_1h' || step === 'r_30m') return 'reminder';
   return 'followup';
 }
@@ -57,7 +59,7 @@ export function appointmentInstant(date: Date, time: string): Date {
 }
 
 /** Which step is due now for an appointment (pure — unit tested). */
-export function dueStep(input: { status: string; at: Date; createdAt: Date; updatedAt: Date; sent: Record<string, unknown>; now: Date; reminders?: ReminderToggles }): LifecycleStep | null {
+export function dueStep(input: { status: string; at: Date; createdAt: Date; updatedAt: Date; sent: Record<string, unknown>; now: Date; reminders?: ReminderToggles; consultationStarted?: boolean }): LifecycleStep | null {
   const { status, at, sent, now } = input;
   const until = at.getTime() - now.getTime();
   const has = (k: LifecycleStep) => Boolean(sent[k]);
@@ -65,6 +67,8 @@ export function dueStep(input: { status: string; at: Date; createdAt: Date; upda
 
   if (status === 'scheduled') {
     if (until <= 0) return null;
+    // The patient is already with the doctor (called in early from the queue).
+    if (input.consultationStarted) return null;
     if (!has('confirmation') && now.getTime() - input.createdAt.getTime() < 6 * HOUR) return 'confirmation';
     // Closest reminder first; a later one makes the earlier ones obsolete.
     if (on.r_30m && until <= 0.6 * HOUR) return has('r_30m') ? null : 'r_30m';
@@ -89,10 +93,11 @@ export function dueStep(input: { status: string; at: Date; createdAt: Date; upda
   return null;
 }
 
-function messageFor(step: LifecycleStep, a: { patient: string; clinic: string; doctor: string | null; date: Date; time: string; token?: number; link: string }): string {
+/** Patient-facing text for a lifecycle step. Exported so staff actions send the same wording. */
+export function messageFor(step: LifecycleStep, a: { patient: string; clinic: string; doctor: string | null; date: Date; time: string; token?: number; link: string }): string {
   const who = a.patient ? `${a.patient.split(/\s+/)[0]} ji` : 'there';
   const when = `${pretty(a.date)} at ${prettyTime(a.time)}`;
-  const tok = a.token ? `\n🎟️ Token No: *${a.token}*` : '';
+  const tok = a.token ? `\n🎟️ Clinic Queue No: *${a.token}*` : '';
   switch (step) {
     case 'confirmation':
       return `✅ Hello ${who}, your appointment with ${doctorTitle(a.doctor)} at ${a.clinic} is confirmed for ${when}.${tok}\n\nReply *CANCEL* to cancel or *RESCHEDULE* to change.`;
@@ -116,24 +121,46 @@ function messageFor(step: LifecycleStep, a: { patient: string; clinic: string; d
 }
 
 /** One pass over due appointments across all tenants. */
-export async function runAppointmentLifecycle(now = new Date()): Promise<{ checked: number; sent: number }> {
-  const from = new Date(now.getTime() - 6 * 24 * HOUR);
-  const to = new Date(now.getTime() + 2 * 24 * HOUR);
-  const rows = await systemDb.appointment.findMany({
-    where: {
-      status: { in: ['scheduled', 'completed', 'no_show'] },
-      appointmentDate: { gte: new Date(from.toISOString().slice(0, 10) + 'T00:00:00Z'), lte: new Date(to.toISOString().slice(0, 10) + 'T00:00:00Z') },
-    },
-    include: {
-      contact: { select: { phone: true, name: true } },
-      doctor: { select: { doctorName: true, specialization: true } },
-      clinic: { select: { id: true, tenantId: true, clinicName: true } },
-      detail: { select: { whatsappConsent: true, appointmentRef: true, department: { select: { name: true } } } },
-    },
-    take: 1000,
-  });
-
-  const site = (process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '');
+/**
+ * `appointmentId` runs one appointment right away (e.g. the thank-you just after
+ * staff mark a visit completed) instead of waiting for the next tick. The claim
+ * below keeps it from double-sending with the scheduled pass.
+ */
+export async function runAppointmentLifecycle(now = new Date(), opts: { appointmentId?: string } = {}): Promise<{ checked: number; sent: number }> {
+  const day = (d: Date) => new Date(d.toISOString().slice(0, 10) + 'T00:00:00Z');
+  const include = {
+    contact: { select: { phone: true, name: true } },
+    doctor: { select: { doctorName: true, specialization: true } },
+    clinic: { select: { id: true, tenantId: true, clinicName: true } },
+    detail: { select: { whatsappConsent: true, appointmentRef: true, department: { select: { name: true } } } },
+    consultation: { select: { status: true } },
+  } as const;
+  // Two passes, so a busy week of past visits can never crowd upcoming
+  // reminders out of the batch: upcoming scheduled (today .. +2 days, soonest
+  // first) and recent visits (last 6 days) for thank-you / follow-ups.
+  const [upcoming, recent] = await Promise.all([
+    systemDb.appointment.findMany({
+      where: {
+        ...(opts.appointmentId ? { id: opts.appointmentId } : {}),
+        status: 'scheduled',
+        appointmentDate: { gte: day(new Date(now.getTime() - 24 * HOUR)), lte: day(new Date(now.getTime() + 2 * 24 * HOUR)) },
+      },
+      include,
+      orderBy: [{ appointmentDate: 'asc' }, { appointmentTime: 'asc' }],
+      take: 2000,
+    }),
+    systemDb.appointment.findMany({
+      where: {
+        ...(opts.appointmentId ? { id: opts.appointmentId } : {}),
+        status: { in: ['completed', 'no_show'] },
+        appointmentDate: { gte: day(new Date(now.getTime() - 6 * 24 * HOUR)), lte: day(new Date(now.getTime() + 24 * HOUR)) },
+      },
+      include,
+      orderBy: [{ updatedAt: 'desc' }],
+      take: 1000,
+    }),
+  ]);
+  const rows = [...upcoming, ...recent];  const site = publicSiteUrl();
   let sent = 0;
   // Per-tenant reminder intervals (Tenant is global → read by explicit id).
   const tenantIds = [...new Set(rows.map((r) => r.clinic.tenantId))];
@@ -145,7 +172,7 @@ export async function runAppointmentLifecycle(now = new Date()): Promise<{ check
     if (a.detail && !a.detail.whatsappConsent) continue;
     const record = (a.remindersSent as Record<string, unknown> | null) ?? {};
     const at = appointmentInstant(a.appointmentDate, a.appointmentTime);
-    const step = dueStep({ status: a.status, at, createdAt: a.createdAt, updatedAt: a.updatedAt, sent: record, now, reminders: reminderSettings.get(a.clinic.tenantId) });
+    const step = dueStep({ status: a.status, at, createdAt: a.createdAt, updatedAt: a.updatedAt, sent: record, now, reminders: reminderSettings.get(a.clinic.tenantId), consultationStarted: Boolean(a.consultation && a.consultation.status !== 'cancelled') });
     if (!step) continue;
 
     // Claim first so two ticks can never double-send.

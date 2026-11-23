@@ -27,6 +27,24 @@ describe('dueStep', () => {
     expect(dueStep({ ...base, sent, status: 'scheduled', at, now: new Date(at.getTime() - 50 * 60_000) })).toBe('r_1h');
     expect(dueStep({ ...base, sent: { ...sent, r_1h: 'x' }, status: 'scheduled', at, now: new Date(at.getTime() - 50 * 60_000) })).toBeNull();
   });
+  it('fires each reminder in its window: 1 day (25h–3h), 2 hours (2h15–1h15), 1 hour (1h15–0)', () => {
+    const sent = { confirmation: 'x' };
+    const at2 = (h: number) => dueStep({ ...base, sent, status: 'scheduled', at, now: new Date(at.getTime() - h * H) });
+    expect(at2(26)).toBeNull();
+    expect(at2(24.9)).toBe('r_1d');
+    expect(at2(4)).toBe('r_1d'); // caught up if the 24h tick was missed
+    expect(at2(2.2)).toBe('r_2h');
+    expect(at2(1.2)).toBe('r_1h');
+    expect(at2(0.1)).toBe('r_1h');
+  });
+  it('sends no reminder once the patient is already with the doctor', () => {
+    const sent = { confirmation: 'x' };
+    expect(dueStep({ ...base, sent, status: 'scheduled', at, now: new Date(at.getTime() - 50 * 60_000), consultationStarted: true })).toBeNull();
+  });
+  it('respects a clinic that switched a reminder off', () => {
+    const sent = { confirmation: 'x' };
+    expect(dueStep({ ...base, sent, status: 'scheduled', at, now: new Date(at.getTime() - 2 * H), reminders: { r_2h: false } })).toBeNull();
+  });
   it('skips the day-before reminder for same-day bookings', () => {
     const createdAt = new Date(at.getTime() - 10 * H);
     expect(dueStep({ ...base, sent: { confirmation: 'x' }, status: 'scheduled', at, createdAt, now: new Date(at.getTime() - 5 * H) })).toBeNull();

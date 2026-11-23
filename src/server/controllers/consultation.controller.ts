@@ -17,6 +17,8 @@ import {
   extractFromTranscript,
   suggestFromComplaint,
   finalizeConsultation,
+  reopenConsultation,
+  discardConsultation,
   previewPdf,
   queueQuerySchema,
   searchMedicines,
@@ -48,6 +50,8 @@ import {
   settingsSchema,
 } from '../services/prescription-settings.service';
 import { deliverPrescription } from '../services/prescription-delivery';
+import { queueStatusSchema, setQueueStatus } from '../services/appointment-board.service';
+import { requestOrigin } from '../site-origin';
 
 const idParams = z.object({ id: z.string().uuid() });
 const loose = z.any();
@@ -76,6 +80,17 @@ export const consultationController = {
     body: z.object({ appointmentId: z.string().uuid() }),
     response: loose,
     handle: ({ ctx, db, body }) => startConsultation(db, ctx as AuthContext, body.appointmentId),
+  }),
+
+  /** Manual status change from the consultation queue; tells the patient on WhatsApp. */
+  queueStatus: createHandler({
+    operation: 'consultations.queueStatus',
+    auth: 'tenant',
+    params: z.object({ appointmentId: z.string().uuid() }),
+    body: queueStatusSchema,
+    response: loose,
+    rateLimit: { limit: 60, windowMs: 60_000 },
+    handle: ({ ctx, db, params, body }) => setQueueStatus(db, ctx as AuthContext, params.appointmentId, body),
   }),
 
   workspace: createHandler({ operation: 'consultations.workspace', auth: 'tenant', params: idParams, response: loose, handle: ({ db, params }) => consultationWorkspace(db, params.id) }),
@@ -130,11 +145,31 @@ export const consultationController = {
     response: loose,
     message: 'Consultation completed and prescription finalized.',
     async handle({ ctx, db, params, body, request }) {
-      const result = await finalizeConsultation(db, ctx as AuthContext, params.id, body, { origin: new URL(request.url).origin });
+      const result = await finalizeConsultation(db, ctx as AuthContext, params.id, body, { origin: requestOrigin(request) });
       // Clinical record is final at this point; delivery problems never undo it.
       const delivery = await deliverPrescription((ctx as AuthContext).tenantId, result.prescriptionId).catch((e) => ({ status: 'failed' as const, message: e instanceof Error ? e.message : 'Delivery error' }));
       return { ...result, delivery };
     },
+  }),
+
+  discard: createHandler({
+    operation: 'consultations.discard',
+    auth: 'tenant',
+    params: idParams,
+    response: loose,
+    message: 'Consultation discarded.',
+    rateLimit: { limit: 20, windowMs: 60_000 },
+    handle: ({ ctx, db, params }) => discardConsultation(db, ctx as AuthContext, params.id),
+  }),
+
+  reopen: createHandler({
+    operation: 'consultations.reopen',
+    auth: 'tenant',
+    params: idParams,
+    response: loose,
+    message: 'Prescription re-opened for editing.',
+    rateLimit: { limit: 10, windowMs: 60_000 },
+    handle: ({ ctx, db, params }) => reopenConsultation(db, ctx as AuthContext, params.id),
   }),
 
   send: createHandler({

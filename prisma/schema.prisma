@@ -736,6 +736,8 @@ model FlowRun {
   repromptCount       Int           @default(0)
   startedAt           DateTime      @default(now())
   lastAdvancedAt      DateTime      @default(now())
+  /// Set while the run waits at a `delay` node; the ticker resumes it when due.
+  resumeAt            DateTime?
   endedAt             DateTime?
   endReason           String?
 
@@ -743,6 +745,7 @@ model FlowRun {
 
   @@index([tenantId])
   @@index([lastAdvancedAt])
+  @@index([status, resumeAt])
   @@index([flowId, startedAt(sort: Desc)])
 }
 

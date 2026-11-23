@@ -23,7 +23,7 @@ const categoryColors: Record<string, string> = {
 };
 
 const statusConfig: Record<string, { color: string; icon: React.ElementType; label: string }> = {
-  Draft: { color: 'bg-slate-500/10 text-muted-foreground dark:text-slate-400 border-slate-500/20', icon: AlertCircle, label: 'Draft' },
+  Draft: { color: 'bg-muted text-muted-foreground border-border', icon: AlertCircle, label: 'Draft' },
   Pending: { color: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20', icon: Clock, label: 'In review' },
   Approved: { color: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20', icon: CheckCircle2, label: 'Approved' },
   Rejected: { color: 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20', icon: XCircle, label: 'Rejected' },
@@ -68,11 +68,11 @@ export function TemplateCard({ template, detail, onDelete, onEdit, onDuplicate }
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -6 }}
       transition={{ duration: 0.18 }}
-      className="group relative flex flex-col rounded-xl border border-slate-200/70 bg-white p-4 transition-all hover:border-slate-300 hover:shadow-sm dark:border-slate-800 dark:bg-slate-900/40 dark:hover:border-slate-700"
+      className="group relative flex flex-col rounded-xl border border-border/70 bg-card p-3.5 transition-colors hover:border-primary/40"
     >
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <p className="truncate font-mono text-[13px] font-semibold text-slate-800 dark:text-slate-100" title={template.name}>
+          <p className="truncate font-mono text-[12.5px] font-semibold text-foreground" title={template.name}>
             {template.name}
           </p>
           <p className="mt-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -99,9 +99,9 @@ export function TemplateCard({ template, detail, onDelete, onEdit, onDuplicate }
       </div>
 
       {template.header_content && (
-        <p className="truncate text-[11px] font-semibold text-muted-foreground dark:text-slate-300">{template.header_content}</p>
+        <p className="truncate text-[11px] font-semibold text-foreground/80">{template.header_content}</p>
       )}
-      <p className="line-clamp-3 whitespace-pre-line text-xs leading-relaxed text-muted-foreground dark:text-slate-400">
+      <p className="line-clamp-3 whitespace-pre-line text-[12px] leading-relaxed text-muted-foreground">
         {template.body_text || 'No body text'}
       </p>
 
@@ -110,7 +110,7 @@ export function TemplateCard({ template, detail, onDelete, onEdit, onDuplicate }
           {buttons.slice(0, 3).map((b, i) => (
             <span
               key={i}
-              className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] text-muted-foreground dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300"
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] text-muted-foreground"
             >
               {b.type === 'URL' ? <Link2 className="size-2.5" /> : b.type === 'PHONE_NUMBER' ? <Phone className="size-2.5" /> : b.type === 'OTP' ? <Copy className="size-2.5" /> : <MessageSquareReply className="size-2.5" />}
               {String(b.text ?? '')}
@@ -136,12 +136,12 @@ export function TemplateCard({ template, detail, onDelete, onEdit, onDuplicate }
 
       <div className="mt-auto flex items-center gap-1 pt-3">
         {onEdit && (status === 'Rejected' || status === 'Draft') && (
-          <Button size="sm" onClick={() => onEdit(template)} className="h-7 gap-1 bg-emerald-600 px-2.5 text-[11px] text-white hover:bg-emerald-700">
+          <Button size="sm" onClick={() => onEdit(template)} className="gap-1 text-[11px]">
             <PencilLine className="size-3" /> Edit & resubmit
           </Button>
         )}
         {onDuplicate && (
-          <Button size="sm" variant="ghost" onClick={() => onDuplicate(template)} className="h-7 gap-1 px-2 text-[11px] text-muted-foreground">
+          <Button size="sm" variant="ghost" onClick={() => onDuplicate(template)} className="gap-1 text-[11px] text-muted-foreground">
             <Copy className="size-3" /> Duplicate
           </Button>
         )}

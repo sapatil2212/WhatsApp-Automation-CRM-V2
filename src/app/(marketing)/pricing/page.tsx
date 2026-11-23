@@ -2,90 +2,49 @@
 
 import React from "react";
 import Link from "next/link";
-import { Check, HelpCircle, Sparkles, X } from "lucide-react";
+import { Check, Sparkles } from "lucide-react";
 import { SpotlightCard } from "@/components/marketing/spotlight-card";
-import { MagneticButton } from "@/components/marketing/magnetic-button";
 import { BookDemoTrigger } from "@/components/marketing/book-demo-trigger";
+import { PLANS } from "@/lib/billing/plans";
 
 export default function PricingPage() {
-  const plans = [
-    {
-      name: "Starter",
-      tagline: "Full control. You run it.",
-      price: "₹799",
-      subtext: "/WABA/month",
-      setupFee: "No setup fee",
-      ctaText: "Get Started",
-      ctaLink: "/signup",
-      ctaType: "link",
-      popular: false,
-      footerText: "Access provisioned within 24 hours of payment."
-    },
-    {
-      name: "Growth",
-      tagline: "We launch you. You own it.",
-      price: "₹1,499",
-      subtext: "for first month",
-      setupFee: "₹799 /WABA/month after",
-      ctaText: "Get Started",
-      ctaLink: "/signup",
-      ctaType: "link",
-      popular: true,
-      badge: "Recommended • Done For You",
-      footerText: "Onboarding begins within 48 hours. Setup complete within 7 days."
-    },
-    {
-      name: "Managed",
-      tagline: "We run it. You check results.",
-      price: "₹2,999",
-      subtext: "for first month",
-      setupFee: "₹799 /WABA/month after",
-      ctaText: "Get Started",
-      ctaLink: "/signup",
-      ctaType: "link",
-      popular: false,
-      badge: "Done For You",
-      footerText: "Application required. Pilot month available — ask us."
-    }
-  ];
+  const plans = PLANS;
 
   const features = {
     platform: {
       title: "The Platform",
       rows: [
-        { name: "No-Code Automation Builder", starter: "check", growth: "check", managed: "check" },
-        { name: "AI Assistant (trained on your docs)", starter: "DIY", growth: "DIY", managed: "We configure it" },
-        { name: "Shared Team Inbox", starter: "check", growth: "check", managed: "check" },
-        { name: "27+ Integrations", starter: "check", growth: "check", managed: "check" },
-        { name: "0% Message Markup", starter: "check", growth: "check", managed: "check" },
-        { name: "Click-to-WhatsApp Ads (CTWA)", starter: "check", growth: "check", managed: "check" }
+        { name: "Official WhatsApp Business API", self: "check", managed: "check", custom: "check" },
+        { name: "Shared Team Inbox", self: "check", managed: "check", custom: "check" },
+        { name: "No-Code Flow & Automation Builder", self: "check", managed: "check", custom: "check" },
+        { name: "AI Assistant (trained on your docs)", self: "You set it up", managed: "We configure it", custom: "We configure it" },
+        { name: "27+ Integrations", self: "check", managed: "check", custom: "check" },
+        { name: "0% Message Markup", self: "check", managed: "check", custom: "check" },
+        { name: "Click-to-WhatsApp Ads (CTWA)", self: "check", managed: "check", custom: "check" },
+        { name: "Multiple WhatsApp numbers / branches", self: "Per number", managed: "Per number", custom: "check" }
       ]
     },
     setup: {
-      title: "Setup & Onboarding",
+      title: "Setup & Management",
       rows: [
-        { name: "Meta Business Verification", starter: "DIY", growth: "DIY", managed: "check" },
-        { name: "WhatsApp Number Connection", starter: "DIY", growth: "check", managed: "check" },
-        { name: "WhatsApp Co-existence Setup", starter: "DIY", growth: "check", managed: "check" },
-        { name: "Platform Configuration & Team Access", starter: "DIY", growth: "check", managed: "check" },
-        { name: "Kickoff Meeting", starter: "DIY", growth: "check", managed: "check" },
-        { name: "Automations Built For You", starter: "DIY", growth: "DIY", managed: "2–3 core automations" },
-        { name: "Message Templates Written & Submitted", starter: "DIY", growth: "DIY", managed: "check" },
-        { name: "Integrations Wired In", starter: "DIY", growth: "DIY", managed: "check" }
+        { name: "Meta Business Verification", self: "DIY", managed: "check", custom: "check" },
+        { name: "WhatsApp Number & Co-existence Setup", self: "DIY", managed: "check", custom: "check" },
+        { name: "Message Templates Written & Approved", self: "DIY", managed: "check", custom: "check" },
+        { name: "Automations Built For You", self: "DIY", managed: "check", custom: "check" },
+        { name: "Integrations Wired In", self: "DIY", managed: "check", custom: "check" },
+        { name: "Custom Development", self: "—", managed: "—", custom: "check" }
       ]
     },
     support: {
-      title: "Support & Strategy",
+      title: "Support",
       rows: [
-        { name: "Priority Support Group", starter: "check", growth: "check", managed: "check" },
-        { name: "Monthly Product Strategy & Feature Q&A", starter: "check", growth: "check", managed: "check" },
-        { name: "1-on-1 Strategy Call", starter: "DIY", growth: "Onboarding call included", managed: "Monthly deep-dive (60 min)" },
-        { name: "Meta Template Formatting & Compliance Review", starter: "DIY", growth: "DIY", managed: "check" },
-        { name: "Dedicated Account Manager", starter: "DIY", growth: "DIY", managed: "check" }
+        { name: "Setup Guides & Support Group", self: "check", managed: "check", custom: "check" },
+        { name: "Dedicated Account Manager", self: "—", managed: "check", custom: "check" },
+        { name: "Strategy Call", self: "—", managed: "Monthly", custom: "Monthly" },
+        { name: "Priority Support & SLA", self: "—", managed: "—", custom: "check" }
       ]
     }
   };
-
   const renderValue = (val: string) => {
     if (val === "check") {
       return (
@@ -95,7 +54,10 @@ export default function PricingPage() {
       );
     }
     if (val === "DIY") {
-      return <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-[var(--m-text-tertiary)]">DIY</span>;
+      return <span className="text-xs font-semibold px-2 py-0.5 rounded bg-[var(--m-bg-secondary)] border border-[var(--m-border-primary)] text-[var(--m-text-tertiary)]">DIY</span>;
+    }
+    if (val === "—") {
+      return <span className="text-xs text-[var(--m-text-muted)]">—</span>;
     }
     return <span className="text-xs font-semibold px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">{val}</span>;
   };
@@ -110,11 +72,11 @@ export default function PricingPage() {
         <h1 className="text-4xl sm:text-6xl font-extrabold text-[var(--m-text-heading)] tracking-tight leading-[1.1]">
           Pricing <br />
           <span className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
-            One platform. Three ways to get started.
+            You manage it, or we do.
           </span>
         </h1>
         <p className="text-sm text-[var(--m-text-tertiary)] max-w-xl mx-auto">
-          After setup, every plan is ₹799/WABA/month — flat. The difference is how much help you get on day one. You choose your level of support.
+          Same platform on every plan. Pick ₹999/month to run it yourself, ₹1,999/month and our team runs it for you, or a custom plan for bigger setups.
         </p>
       </div>
 
@@ -122,7 +84,7 @@ export default function PricingPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {plans.map((plan) => (
           <SpotlightCard
-            key={plan.name}
+            key={plan.id}
             interactive={true}
             className={plan.popular ? "border-emerald-500/50 shadow-lg shadow-emerald-950/5 relative" : "border-[var(--m-border-primary)]/85"}
             glowColor={plan.popular ? "rgba(16, 185, 129, 0.15)" : "rgba(148, 163, 184, 0.08)"}
@@ -135,29 +97,38 @@ export default function PricingPage() {
             <div className="space-y-6 flex flex-col justify-between h-full">
               <div className="space-y-4">
                 <span className="text-xs font-bold text-[var(--m-text-tertiary)] uppercase tracking-widest">{plan.name}</span>
-                <h4 className="text-sm text-[var(--m-text-secondary)] font-semibold min-h-[20px]">{plan.tagline}</h4>
-                
+                <h4 className="text-base text-[var(--m-text-heading)] font-semibold min-h-[24px]">{plan.tagline}</h4>
+
                 <div className="flex items-baseline gap-1 py-2 border-y border-[var(--m-border-primary)]/50">
                   <span className="text-3xl sm:text-4xl font-extrabold text-[var(--m-text-heading)]">{plan.price}</span>
-                  <span className="text-xs text-[var(--m-text-muted)]">{plan.subtext}</span>
+                  {plan.period && <span className="text-xs text-[var(--m-text-muted)]">{plan.period} per WhatsApp number</span>}
+                  {!plan.period && <span className="text-xs text-[var(--m-text-muted)]">pricing for your needs</span>}
                 </div>
-                <div className="text-xs font-medium text-emerald-400/90">{plan.setupFee}</div>
+                <p className="text-xs leading-relaxed text-[var(--m-text-tertiary)]">{plan.description}</p>
+                <ul className="space-y-2 pt-1 text-xs text-[var(--m-text-secondary)]">
+                  {plan.features.map((f) => (
+                    <li key={f} className="flex items-start gap-2">
+                      <Check className="mt-0.5 size-3.5 shrink-0 text-emerald-500" />
+                      <span>{f}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
 
               <div className="space-y-4 pt-4">
-                {plan.ctaType === "link" ? (
+                {plan.selfServe ? (
                   <Link
-                    href={plan.ctaLink || "#"}
-                    className="w-full py-3 rounded-xl text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.2)]"
+                    href={`/signup?plan=${plan.id}`}
+                    className={`w-full py-3 rounded-xl text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 ${plan.popular ? "bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.2)]" : "bg-[var(--m-bg-secondary)] border border-[var(--m-border-primary)] hover:bg-[var(--m-bg-tertiary)] text-[var(--m-text-secondary)]"}`}
                   >
-                    {plan.ctaText}
+                    {plan.cta}
                   </Link>
                 ) : (
                   <BookDemoTrigger className="w-full py-3 rounded-xl text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 bg-[var(--m-bg-secondary)] border border-[var(--m-border-primary)] hover:bg-[var(--m-bg-tertiary)] text-[var(--m-text-secondary)]">
-                    {plan.ctaText}
+                    {plan.cta}
                   </BookDemoTrigger>
                 )}
-                <div className="text-[10px] text-[var(--m-text-muted)] text-center leading-relaxed">{plan.footerText}</div>
+                <div className="text-[10px] text-[var(--m-text-muted)] text-center leading-relaxed">{plan.footnote}</div>
               </div>
             </div>
           </SpotlightCard>
@@ -172,17 +143,17 @@ export default function PricingPage() {
       <div className="space-y-8 pt-8">
         <div className="text-center space-y-2">
           <h2 className="text-2xl sm:text-3xl font-bold text-[var(--m-text-heading)]">Compare Plan Features</h2>
-          <p className="text-xs text-[var(--m-text-tertiary)]">Detailed capability matrix across all setup tiers</p>
+          <p className="text-xs text-[var(--m-text-tertiary)]">What you get on each plan</p>
         </div>
 
         <div className="overflow-x-auto rounded-2xl border border-[var(--m-border-primary)] bg-[var(--m-bg-secondary)]/10 backdrop-blur-md">
           <table className="w-full min-w-[600px] border-collapse text-left">
             <thead>
               <tr className="border-b border-[var(--m-border-primary)] bg-[var(--m-bg-secondary)]/40 text-[var(--m-text-secondary)] font-bold text-xs">
-                <th className="p-4 w-[40%]">All plans · per WABA/month</th>
-                <th className="p-4 text-center w-[20%]">Starter</th>
-                <th className="p-4 text-center w-[20%]">Growth</th>
-                <th className="p-4 text-center w-[20%]">Managed</th>
+                <th className="p-4 w-[40%]">Features</th>
+                <th className="p-4 text-center w-[20%]">Self-Managed<div className="text-[10px] font-medium text-[var(--m-text-muted)]">₹999/mo</div></th>
+                <th className="p-4 text-center w-[20%]">Fully Managed<div className="text-[10px] font-medium text-[var(--m-text-muted)]">₹1,999/mo</div></th>
+                <th className="p-4 text-center w-[20%]">Custom<div className="text-[10px] font-medium text-[var(--m-text-muted)]">Quoted</div></th>
               </tr>
             </thead>
             <tbody>
@@ -199,9 +170,9 @@ export default function PricingPage() {
                       className="border-b border-[var(--m-border-primary)]/50 hover:bg-[var(--m-bg-secondary)]/15 transition-colors duration-150"
                     >
                       <td className="p-4 text-xs font-semibold text-[var(--m-text-secondary)]">{row.name}</td>
-                      <td className="p-4 text-center">{renderValue(row.starter)}</td>
-                      <td className="p-4 text-center">{renderValue(row.growth)}</td>
+                      <td className="p-4 text-center">{renderValue(row.self)}</td>
                       <td className="p-4 text-center">{renderValue(row.managed)}</td>
+                      <td className="p-4 text-center">{renderValue(row.custom)}</td>
                     </tr>
                   ))}
                 </React.Fragment>

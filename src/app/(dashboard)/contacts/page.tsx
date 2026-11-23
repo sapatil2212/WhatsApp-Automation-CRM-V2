@@ -5,14 +5,14 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
   ArrowDownAZ, ArrowUpDown, ChevronLeft, ChevronRight, Download, Eye, Filter, Loader2, Mail, Megaphone,
-  MoreHorizontal, Pencil, Plus, Search, Sparkles, Tag as TagIcon, Trash2, UserPlus, Users, X,
+  Pencil, Plus, Search, Sparkles, Tag as TagIcon, Trash2, UserPlus, Users, X,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ContactDetailView } from '@/components/contacts/contact-detail-view';
@@ -158,30 +158,30 @@ export default function ContactsPage() {
       {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><Users className="size-6 text-primary" /> Contacts</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Contacts</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">Your audience for conversations, campaigns and pipelines.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => { window.open('/api/contacts/export', '_blank'); }} className="gap-1.5"><Download className="size-4" /> Export</Button>
-          <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-1.5"><Sparkles className="size-4 text-primary" /> AI import</Button>
-          <Button onClick={() => { setEditing(null); setEditorOpen(true); }} className="gap-1.5"><Plus className="size-4" /> Add contact</Button>
+          <Button variant="outline" size="sm" onClick={() => { window.open('/api/contacts/export', '_blank'); }} className="gap-1.5"><Download className="size-3.5" /> Export</Button>
+          <Button variant="outline" size="sm" onClick={() => setImportOpen(true)} className="gap-1.5"><Sparkles className="size-3.5 text-primary" /> AI import</Button>
+          <Button size="sm" onClick={() => { setEditing(null); setEditorOpen(true); }} className="gap-1.5"><Plus className="size-3.5" /> Add contact</Button>
         </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
         {[
           { label: 'Total contacts', value: stats?.total, icon: Users },
           { label: 'Added this week', value: stats?.newThisWeek, icon: UserPlus },
           { label: 'Without tags', value: stats?.untagged, icon: TagIcon, action: () => {} },
           { label: 'With email', value: stats?.withEmail, icon: Mail },
         ].map((s) => (
-          <div key={s.label} className="rounded-2xl border border-border/70 bg-card p-4">
+          <div key={s.label} className="rounded-xl border border-border/70 bg-card px-3 py-2.5">
             <div className="flex items-center justify-between">
-              <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{s.label}</p>
-              <s.icon className="size-4 text-primary" />
+              <p className="truncate text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{s.label}</p>
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary"><s.icon className="size-3.5" /></span>
             </div>
-            <p className="mt-2 text-2xl font-bold tabular-nums">{s.value === undefined ? '—' : s.value.toLocaleString()}</p>
+            <p className="mt-1 text-xl font-bold leading-tight tabular-nums">{s.value === undefined ? '—' : s.value.toLocaleString()}</p>
           </div>
         ))}
       </div>
@@ -190,13 +190,13 @@ export default function ContactsPage() {
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[220px] flex-1 sm:max-w-sm">
           <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, phone, email, company…" className="h-9 pl-8 pr-8" aria-label="Search contacts" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, phone, email, company…" className="h-8 pl-8 pr-8 text-[13px]" aria-label="Search contacts" />
           {search && <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label="Clear search"><X className="size-4" /></button>}
         </div>
 
         <DropdownMenu>
-          <DropdownMenuTrigger render={<Button variant="outline" className="h-9 gap-1.5" />}>
-            <Filter className="size-4" /> Tags{tagFilter.length ? ` (${tagFilter.length})` : ''}
+          <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="gap-1.5" />}>
+            <Filter className="size-3.5" /> Tags{tagFilter.length ? ` (${tagFilter.length})` : ''}
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="max-h-72 w-56 overflow-y-auto">
             {tags.length === 0 && <p className="px-2 py-1.5 text-xs text-muted-foreground">No tags yet</p>}
@@ -215,12 +215,12 @@ export default function ContactsPage() {
         </DropdownMenu>
 
         <Select value={sort} onValueChange={(v) => { setSort((v ?? 'createdAt:desc') as Sort); setPage(1); }}>
-          <SelectTrigger className="h-9 w-[170px] gap-1.5"><ArrowUpDown className="size-3.5 text-muted-foreground" /><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-8 w-[190px] gap-1.5 text-[13px]"><ArrowUpDown className="size-3.5 text-muted-foreground" /><span className="text-muted-foreground">Sort:</span><SelectValue>{SORT_LABEL[sort]}</SelectValue></SelectTrigger>
           <SelectContent>{(Object.keys(SORT_LABEL) as Sort[]).map((s) => <SelectItem key={s} value={s}>{SORT_LABEL[s]}</SelectItem>)}</SelectContent>
         </Select>
 
         {filtersActive && (
-          <Button variant="ghost" size="sm" onClick={() => { setSearch(''); setTagFilter([]); }} className="h-9 text-muted-foreground">Clear filters</Button>
+          <Button variant="ghost" size="sm" onClick={() => { setSearch(''); setTagFilter([]); }} className="text-muted-foreground">Clear filters</Button>
         )}
         <p className="ml-auto text-xs text-muted-foreground">{total.toLocaleString()} {filtersActive ? 'matching' : 'total'}</p>
       </div>
@@ -268,39 +268,37 @@ export default function ContactsPage() {
       {/* Table */}
       <div className="overflow-hidden rounded-2xl border border-border/70 bg-card">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[860px] table-fixed text-sm">
+          <table className="w-full min-w-[860px] table-fixed text-[13px]">
             <colgroup>
               <col className="w-12" />
+              <col className="w-[30%]" />
+              <col className="w-[20%]" />
               <col className="w-[28%]" />
-              <col className="w-[17%]" />
-              <col className="w-[17%]" />
-              <col className="w-[22%]" />
-              <col className="w-[11%]" />
-              <col className="w-14" />
+              <col className="w-[14%]" />
+              <col className="w-28" />
             </colgroup>
-            <thead className="border-b border-border bg-muted/50 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <thead className="border-b border-border bg-muted/50 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
               <tr>
-                <th className="px-4 py-3">
-                  <input type="checkbox" className="size-4 cursor-pointer accent-[var(--primary)] align-middle" checked={allOnPage} onChange={toggleAll} aria-label="Select all on this page" />
+                <th className="px-4 py-2">
+                  <input type="checkbox" className="size-4 cursor-pointer rx-check align-middle" checked={allOnPage} onChange={toggleAll} aria-label="Select all on this page" />
                 </th>
-                <th className="px-3 py-3"><button onClick={() => setSort(sort === 'name:asc' ? 'name:desc' : 'name:asc')} className="inline-flex items-center gap-1 hover:text-foreground">Contact <ArrowDownAZ className="size-3" /></button></th>
-                <th className="px-3 py-3">Phone</th>
-                <th className="px-3 py-3">Company</th>
-                <th className="px-3 py-3">Tags</th>
-                <th className="px-3 py-3"><button onClick={() => setSort(sort === 'createdAt:desc' ? 'createdAt:asc' : 'createdAt:desc')} className="inline-flex items-center gap-1 hover:text-foreground">Added <ArrowUpDown className="size-3" /></button></th>
-                <th className="px-3 py-3"><span className="sr-only">Actions</span></th>
+                <th className="px-3 py-2"><button onClick={() => setSort(sort === 'name:asc' ? 'name:desc' : 'name:asc')} className="inline-flex items-center gap-1 hover:text-foreground">Contact <ArrowDownAZ className="size-3" /></button></th>
+                <th className="px-3 py-2">Phone</th>
+                <th className="px-3 py-2">Tags</th>
+                <th className="px-3 py-2"><button onClick={() => setSort(sort === 'createdAt:desc' ? 'createdAt:asc' : 'createdAt:desc')} className="inline-flex items-center gap-1 hover:text-foreground">Added <ArrowUpDown className="size-3" /></button></th>
+                <th className="px-3 py-2 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/70">
               {loading && rows.length === 0 ? (
                 Array.from({ length: 6 }).map((_, i) => (
                   <tr key={i}>
-                    <td colSpan={7} className="px-4 py-3"><div className="h-8 animate-pulse rounded-lg bg-muted/70" /></td>
+                    <td colSpan={6} className="px-4 py-3"><div className="h-8 animate-pulse rounded-lg bg-muted/70" /></td>
                   </tr>
                 ))
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-16 text-center">
+                  <td colSpan={6} className="px-4 py-16 text-center">
                     <Users className="mx-auto size-9 text-muted-foreground/60" />
                     <p className="mt-3 text-sm font-medium">{filtersActive ? 'No contacts match these filters' : 'No contacts yet'}</p>
                     <p className="mt-1 text-xs text-muted-foreground">{filtersActive ? 'Try a different search or tag.' : 'Add one manually or import a file — AI will find the contacts for you.'}</p>
@@ -321,42 +319,35 @@ export default function ContactsPage() {
                       onClick={() => setDetailId(c.id)}
                       className={`group cursor-pointer transition-colors ${isSel ? 'bg-primary/5' : 'hover:bg-muted/50'} ${loading ? 'opacity-60' : ''}`}
                     >
-                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                        <input type="checkbox" className="size-4 cursor-pointer accent-[var(--primary)] align-middle" checked={isSel} onChange={() => toggle(c.id)} aria-label={`Select ${c.name || c.phone}`} />
+                      <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
+                        <input type="checkbox" className="size-4 cursor-pointer rx-check align-middle" checked={isSel} onChange={() => toggle(c.id)} aria-label={`Select ${c.name || c.phone}`} />
                       </td>
-                      <td className="px-3 py-3">
+                      <td className="px-3 py-2">
                         <div className="flex min-w-0 items-center gap-3">
-                          <span className={`flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-foreground ${avatarColor(c.id)}`}>{initials(c)}</span>
+                          <span className={`flex size-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-foreground ${avatarColor(c.id)}`}>{initials(c)}</span>
                           <div className="min-w-0">
-                            <p className="truncate font-medium">{c.name || <span className="italic text-muted-foreground">Unnamed</span>}</p>
-                            <p className="truncate text-xs text-muted-foreground">{c.email || '—'}</p>
+                            <p className="truncate text-[13px] font-medium">{c.name || <span className="italic text-muted-foreground">Unnamed</span>}</p>
+                            <p className="truncate text-[11px] text-muted-foreground">{c.email || '—'}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="truncate px-3 py-3 font-mono text-xs tabular-nums text-foreground/80">{formatPhone(c.phone)}</td>
-                      <td className="truncate px-3 py-3 text-foreground/80">{c.company || <span className="text-muted-foreground">—</span>}</td>
-                      <td className="px-3 py-3">
+                      <td className="truncate px-3 py-2 font-mono text-xs tabular-nums text-foreground/80">{formatPhone(c.phone)}</td>
+                      <td className="px-3 py-2">
                         <div className="flex flex-wrap gap-1">
                           {c.tags.slice(0, 3).map((t) => (
-                            <span key={t.id} className="inline-flex max-w-[120px] items-center truncate rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ backgroundColor: `${t.color}1f`, color: t.color }}>{t.name}</span>
+                            <span key={t.id} className="inline-flex max-w-[120px] items-center truncate rounded-full px-2 py-px text-[10px] font-medium" style={{ backgroundColor: `${t.color}1f`, color: t.color }}>{t.name}</span>
                           ))}
                           {c.tags.length > 3 && <span className="text-[11px] text-muted-foreground">+{c.tags.length - 3}</span>}
                           {c.tags.length === 0 && <span className="text-xs text-muted-foreground">—</span>}
                         </div>
                       </td>
-                      <td className="px-3 py-3 text-xs text-muted-foreground">{new Date(c.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</td>
-                      <td className="px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" className="text-muted-foreground" aria-label="Contact actions" />}>
-                            <MoreHorizontal className="size-4" />
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => setDetailId(c.id)}><Eye className="size-4" /> View details</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => { setEditing(c); setEditorOpen(true); }}><Pencil className="size-4" /> Edit</DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem variant="destructive" onClick={() => setConfirm({ ids: [c.id], label: c.name || formatPhone(c.phone) })}><Trash2 className="size-4" /> Delete</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                      <td className="px-3 py-2 text-[11px] text-muted-foreground">{new Date(c.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                      <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="inline-flex items-center gap-0.5">
+                          <Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-primary" title="View details" aria-label={`View ${c.name || c.phone}`} onClick={() => setDetailId(c.id)}><Eye className="size-3.5" /></Button>
+                          <Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-primary" title="Edit" aria-label={`Edit ${c.name || c.phone}`} onClick={() => { setEditing(c); setEditorOpen(true); }}><Pencil className="size-3.5" /></Button>
+                          <Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive" title="Delete" aria-label={`Delete ${c.name || c.phone}`} onClick={() => setConfirm({ ids: [c.id], label: c.name || formatPhone(c.phone) })}><Trash2 className="size-3.5" /></Button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -367,7 +358,7 @@ export default function ContactsPage() {
         </div>
 
         {/* Pagination */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/70 px-4 py-3 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/70 px-4 py-2 text-[11px] text-muted-foreground">
           <div className="flex items-center gap-2">
             <span>Rows per page</span>
             <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v) || 25); setPage(1); }}>

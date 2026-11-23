@@ -23,7 +23,7 @@ import {
   WEEKDAYS,
   type WeeklySchedule,
 } from '@/lib/healthcare/schedule';
-import { invalidateClinicCache } from '@/lib/healthcare/clinic-cache';
+import { invalidateClinicCacheForTenant } from '@/lib/healthcare/clinic-cache';
 import { blockingExceptions } from '@/lib/healthcare/exceptions';
 import { notifyAffectedAppointments } from '@/server/services/closure-notify';
 import { ConflictError, createHandler, logger, NotFoundError, result, serializeError, ValidationError, type TenantDb } from '../kernel';
@@ -207,7 +207,7 @@ export const clinicDirectoryController = {
         data: { clinicId: clinic.id, name: body.name, description: body.description || null, isActive: body.isActive, sortOrder: count },
         include: { _count: { select: { doctors: true } } },
       });
-      invalidateClinicCache(ctx.userId);
+      invalidateClinicCacheForTenant(ctx.tenantId);
       return toDepartment(row);
     },
   }),
@@ -229,7 +229,7 @@ export const clinicDirectoryController = {
         data: { ...(body.name ? { name: body.name } : {}), ...(body.description !== undefined ? { description: body.description || null } : {}), ...(body.isActive !== undefined ? { isActive: body.isActive } : {}) },
       });
       if (!updated.count) throw new NotFoundError('Department');
-      invalidateClinicCache(ctx.userId);
+      invalidateClinicCacheForTenant(ctx.tenantId);
       const row = await db.clinicDepartment.findFirstOrThrow({ where: { id: params.id }, include: { _count: { select: { doctors: true } } } });
       return toDepartment(row);
     },
@@ -244,7 +244,7 @@ export const clinicDirectoryController = {
       const clinic = await requireClinic(db);
       const deleted = await db.clinicDepartment.deleteMany({ where: { id: params.id, clinicId: clinic.id } });
       if (!deleted.count) throw new NotFoundError('Department');
-      invalidateClinicCache(ctx.userId);
+      invalidateClinicCacheForTenant(ctx.tenantId);
       return result({ deleted: true }, { message: 'Department deleted. Doctors were unassigned from it.' });
     },
   }),
@@ -282,7 +282,7 @@ export const clinicDirectoryController = {
     async handle({ ctx, db, body }) {
       const clinic = await requireClinic(db);
       const id = await saveDoctor(db, clinic.id, body);
-      invalidateClinicCache(ctx.userId);
+      invalidateClinicCacheForTenant(ctx.tenantId);
       void notifyAffectedAppointments({ clinicId: clinic.id, doctorId: id }).catch((e) => logger.warn('clinic.doctors.leave_notify_failed', { error: serializeError(e) }));
       return toDoctor((await db.doctor.findFirst({ where: { id }, include: doctorInclude })) as never);
     },
@@ -297,7 +297,7 @@ export const clinicDirectoryController = {
     async handle({ ctx, db, params, body }) {
       const clinic = await requireClinic(db);
       await saveDoctor(db, clinic.id, body, params.id);
-      invalidateClinicCache(ctx.userId);
+      invalidateClinicCacheForTenant(ctx.tenantId);
       if (body.leaves) void notifyAffectedAppointments({ clinicId: clinic.id, doctorId: params.id }).catch((e) => logger.warn('clinic.doctors.leave_notify_failed', { error: serializeError(e) }));
       return toDoctor((await db.doctor.findFirst({ where: { id: params.id }, include: doctorInclude })) as never);
     },
@@ -314,7 +314,7 @@ export const clinicDirectoryController = {
       if (upcoming) throw new ConflictError(`This doctor has ${upcoming} upcoming appointment(s). Reschedule or cancel them first.`);
       const deleted = await db.doctor.deleteMany({ where: { id: params.id, clinicId: clinic.id } });
       if (!deleted.count) throw new NotFoundError('Doctor');
-      invalidateClinicCache(ctx.userId);
+      invalidateClinicCacheForTenant(ctx.tenantId);
       return result({ deleted: true }, { message: 'Doctor removed.' });
     },
   }),

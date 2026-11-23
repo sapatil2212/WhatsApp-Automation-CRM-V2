@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { verifyAccessToken, rotateRefreshToken } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
-import { invalidateClinicCache } from '@/lib/healthcare/clinic-cache'
+import { invalidateClinicCacheForTenant } from '@/lib/healthcare/clinic-cache'
 
 async function getAuthContext() {
   const cookieStore = await cookies()
@@ -54,11 +54,14 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}))
-    const { knowledgeBaseText, faqs, replaceFaqs = false, businessDetails } = body
+    const { knowledgeBaseText, faqs, replaceFaqs = false, appendKnowledge = false, businessDetails } = body
 
-    if (typeof knowledgeBaseText !== 'string') {
-      return NextResponse.json({ error: 'knowledgeBaseText is required and must be a string' }, { status: 400 })
+    // knowledgeBaseText omitted → leave the stored knowledge base untouched
+    // (e.g. adding a single FAQ must not overwrite unsaved editor text).
+    if (knowledgeBaseText !== undefined && typeof knowledgeBaseText !== 'string') {
+      return NextResponse.json({ error: 'knowledgeBaseText must be a string' }, { status: 400 })
     }
+    const incomingKb = typeof knowledgeBaseText === 'string' ? knowledgeBaseText.trim() : undefined
 
     // Find or create clinic
     let clinic = await prisma.clinic.findUnique({ where: { userId: ctx.userId } })
@@ -72,7 +75,7 @@ export async function POST(req: NextRequest) {
           userId: ctx.userId,
           tenantId: ctx.tenantId,
           clinicName: businessDetails?.clinicName || (profile?.fullName ? `${profile.fullName}'s Clinic` : 'My Clinic'),
-          aiKnowledgeBase: knowledgeBaseText.trim(),
+          aiKnowledgeBase: incomingKb ?? '',
         },
       })
     }
@@ -80,8 +83,15 @@ export async function POST(req: NextRequest) {
     const clinicId = clinic.id
 
     // Update clinic ground-truth text and optional business details
+    const existingKb = (clinic.aiKnowledgeBase || '').trim()
+    const nextKb =
+      incomingKb === undefined
+        ? existingKb
+        : appendKnowledge && existingKb && incomingKb
+          ? `${existingKb}\n\n${incomingKb}`
+          : incomingKb
     const clinicUpdateData: any = {
-      aiKnowledgeBase: knowledgeBaseText.trim(),
+      aiKnowledgeBase: nextKb,
     }
 
     if (businessDetails?.clinicName && (!clinic.clinicName || clinic.clinicName === 'My Clinic')) {
@@ -131,7 +141,7 @@ export async function POST(req: NextRequest) {
     })
 
     // Invalidate clinic cache so WhatsApp AI assistant immediately learns the new knowledge
-    invalidateClinicCache(ctx.userId)
+    invalidateClinicCacheForTenant(ctx.tenantId)
 
     const updatedFaqs = await prisma.clinicFAQ.findMany({
       where: { clinicId },
@@ -144,7 +154,7 @@ export async function POST(req: NextRequest) {
       clinicId,
       faqCount: updatedFaqs.length,
       faqs: updatedFaqs,
-      aiKnowledgeBase: knowledgeBaseText.trim(),
+      aiKnowledgeBase: nextKb,
     })
   } catch (error: any) {
     console.error('[KnowledgeBase Save Error]:', error)
