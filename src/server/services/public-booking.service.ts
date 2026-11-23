@@ -13,6 +13,7 @@ import { exceptionsToRecord } from '@/lib/healthcare/exceptions';
 import { isValidE164, sanitizePhoneForMeta } from '@/lib/whatsapp/phone-utils';
 import { ConflictError, NotFoundError, systemDb, tenantDb, ValidationError } from '../kernel';
 import { bookingSlugFor, isUuid, resolveBookingRef } from './booking-slug';
+import { bookableDepartments } from './public-booking-departments';
 import { appointmentValues, deliverAppointmentMessage } from './appointment-notify';
 import { triggerRealtimeEvent } from '@/lib/realtime';
 import { AppointmentService, CLINIC_TIME_ZONE } from './appointment.service';
@@ -137,11 +138,7 @@ export async function publicProfile(ref: string) {
       mapLink: clinic.googleMapLink,
       logoUrl: brand?.logoMime ? `/api/public/booking/${encodeURIComponent(ref)}/logo?v=${brand.updatedAt.getTime()}` : null,
       timings: clinic.timings.map((t) => ({ day: t.dayName, closed: t.isClosed, open: t.openingTime, close: t.closingTime })),
-      // Configured departments (Step 2 of setup); older clinics without them
-      // fall back to doctor specialisations.
-      departmentList: clinic.departments.length
-        ? clinic.departments.map((d) => ({ id: d.id, name: d.name, description: d.description, doctorCount: doctors.filter((doc) => doc.departmentIds.includes(d.id)).length }))
-        : [...new Set(doctors.map((d) => d.department))].sort().map((name) => ({ id: `spec:${name}`, name, description: null, doctorCount: doctors.filter((doc) => doc.department === name).length })),
+      departmentList: bookableDepartments(clinic.departments, doctors),
       departments: [...new Set(doctors.map((d) => d.department))].sort(),
       doctors,
       timeZone: CLINIC_TIME_ZONE,

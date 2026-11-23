@@ -37,7 +37,9 @@ export async function POST(req: NextRequest) {
     if (!user.isVerified) {
       if (user.subscriptionExpiresAt && user.subscriptionExpiresAt < new Date()) {
         return NextResponse.json(
-          { error: 'subscription_expired', message: 'Your subscription has ended. Please renew to continue.' },
+          // Password is already verified here, so it is safe to tell the user
+          // which plan to renew (the login page builds the renewal message).
+          { error: 'subscription_expired', message: 'Your subscription has ended. Please renew to continue.', plan: user.selectedPlan ?? null, name: user.profile?.fullName ?? null },
           { status: 403 }
         )
       }

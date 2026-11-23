@@ -9,14 +9,10 @@ import {
   Combobox, ComboboxClear, ComboboxContent, ComboboxEmpty,
   ComboboxInput, ComboboxInputGroup, ComboboxItem, ComboboxList, ComboboxTrigger,
 } from "@/components/ui/combobox";
-import {
-  ArrowLeft, ArrowRight, Briefcase, Check, CheckCircle,
-  Eye, EyeOff, Loader2, Lock, Mail, Paperclip, PartyPopper, Phone,
-  QrCode, Sparkles, User,
-} from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, CheckCircle, Eye, EyeOff, Loader2, Paperclip, PartyPopper, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AuthShell } from "@/components/auth/auth-shell";
-import { AuthField, authInputClass } from "@/components/auth/auth-field";
+import { AuthField, AuthNotice, authInputClass, authPrimaryButton, authSecondaryButton } from "@/components/auth/auth-field";
 import { OtpInput } from "@/components/auth/otp-input";
 import { cn } from "@/lib/utils";
 import { planById, SELF_SERVE_PLANS } from "@/lib/billing/plans";
@@ -50,6 +46,7 @@ const STEP_TABS = [
 ] as const;
 
 const STEP_INDEX: Record<Step, number> = { form: 0, otp: 1, payment: 2, done: 3 };
+const MIN_PASSWORD = 8;
 
 export default function SignupPage() {
   const [fullName, setFullName]                     = useState("");
@@ -87,7 +84,8 @@ export default function SignupPage() {
     setError(null);
 
     if (password !== confirmPassword) { setError("Passwords do not match"); return; }
-    if (password.length < 6)          { setError("Password must be at least 6 characters"); return; }
+    if (!businessCategory) { setError("Choose your business category"); return; }
+    if (password.length < MIN_PASSWORD) { setError(`Password must be at least ${MIN_PASSWORD} characters`); return; }
 
     setLoading(true);
 
@@ -186,185 +184,98 @@ export default function SignupPage() {
   };
 
   const currentIndex = STEP_INDEX[step];
+  const passwordsMismatch = confirmPassword.length > 0 && password !== confirmPassword;
+  const strength = password.length >= 12 ? 3 : password.length >= MIN_PASSWORD ? 2 : password.length > 0 ? 1 : 0;
 
   return (
     <AuthShell
       variant="signup"
+      maxWidth={step === "form" ? "wide" : "narrow"}
       topRight={
         <p className="text-[var(--m-text-tertiary)]">
-          Already a member?{" "}
-          <Link href="/login" className="font-semibold text-emerald-500 hover:text-emerald-400">
-            Sign in
-          </Link>
+          Already have an account?{" "}
+          <Link href="/login" className="font-semibold text-emerald-500 hover:text-emerald-400">Log in</Link>
         </p>
       }
     >
-      {/* Progress stepper */}
+      {/* Steps */}
       {step !== "done" && (
-        <div className="mb-6 flex items-center gap-1.5">
+        <ol className="mb-5 flex items-center gap-1.5" aria-label="Sign-up steps">
           {STEP_TABS.map((tab, i) => {
             const isDone = i < currentIndex;
             const isCurrent = i === currentIndex;
             return (
-              <div key={tab.id} className="flex flex-1 items-center gap-1.5">
-                <div className="flex items-center gap-1.5">
-                  <div
-                    className={cn(
-                      "flex size-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold transition-all duration-300",
-                      isDone && "bg-emerald-500 text-white",
-                      isCurrent &&
-                        "border border-emerald-500/60 bg-emerald-500/15 text-emerald-400 shadow-[0_0_0_3px_rgba(16,185,129,0.1)]",
-                      !isDone && !isCurrent &&
-                        "border border-[var(--m-border-glass)] text-[var(--m-text-muted)]"
-                    )}
-                  >
-                    {isDone ? <Check className="size-3" /> : i + 1}
-                  </div>
-                  <span
-                    className={cn(
-                      "text-[10px] font-bold uppercase tracking-[0.08em] transition-colors",
-                      isCurrent
-                        ? "text-emerald-400"
-                        : isDone
-                          ? "text-[var(--m-text-secondary)]"
-                          : "text-[var(--m-text-muted)]"
-                    )}
-                  >
-                    {tab.label}
-                  </span>
-                </div>
-                {i < STEP_TABS.length - 1 && (
-                  <div
-                    className={cn(
-                      "h-px flex-1 transition-colors duration-300",
-                      i < currentIndex ? "bg-emerald-500/50" : "bg-[var(--m-border-glass)]"
-                    )}
-                  />
-                )}
-              </div>
+              <li key={tab.id} className="flex flex-1 items-center gap-1.5" aria-current={isCurrent ? "step" : undefined}>
+                <span
+                  className={cn(
+                    "flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold",
+                    isDone && "bg-emerald-500 text-white",
+                    isCurrent && "bg-emerald-500/15 text-emerald-500 ring-1 ring-emerald-500/50",
+                    !isDone && !isCurrent && "border border-[var(--m-border-secondary)] text-[var(--m-text-muted)]"
+                  )}
+                >
+                  {isDone ? <Check className="size-3" /> : i + 1}
+                </span>
+                <span className={cn("text-[11px] font-semibold", isCurrent ? "text-emerald-500" : isDone ? "text-[var(--m-text-secondary)]" : "text-[var(--m-text-muted)]")}>{tab.label}</span>
+                {i < STEP_TABS.length - 1 && <span className={cn("h-px flex-1", i < currentIndex ? "bg-emerald-500/50" : "bg-[var(--m-border-secondary)]")} />}
+              </li>
             );
           })}
-        </div>
+        </ol>
       )}
 
       <AnimatePresence mode="wait">
-        {/* ─── STEP 1: Signup Form ────────────────────────────────────────── */}
+        {/* ─── STEP 1: details ─────────────────────────────────────────────── */}
         {step === "form" && (
-          <motion.div
-            key="form"
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -14 }}
-            transition={{ duration: 0.25 }}
-          >
-            <div className="mb-6">
-              <p className="text-xs uppercase tracking-wide text-[var(--m-text-tertiary)]">Get started</p>
-              <h1 className="mt-1 text-2xl font-bold text-[var(--m-text-heading)]">Create your ChatNexGen account</h1>
+          <motion.div key="form" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
+            <div className="mb-5">
+              <h1 className="text-2xl font-bold tracking-tight text-[var(--m-text-heading)]">Create your account</h1>
+              <p className="text-sm text-[var(--m-text-tertiary)]">Set up ChatNexGen for your business in a few minutes.</p>
             </div>
 
-            <form onSubmit={handleSignupSubmit} className="flex flex-col gap-4">
-              {error && (
-                <motion.div
-                  initial={{ opacity: 0, y: -6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2.5 text-[11px] text-red-400"
-                >
-                  {error}
-                </motion.div>
-              )}
+            <form onSubmit={handleSignupSubmit} className="flex flex-col gap-3.5">
+              {error && <AuthNotice tone="error">{error}</AuthNotice>}
 
-              <div className="grid grid-cols-1 gap-3.5">
-                <AuthField label="Full name" htmlFor="fullName" icon={<User className="size-4" />}>
-                  <Input
-                    id="fullName"
-                    type="text"
-                    placeholder="Enter your name"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    required
-                    className={authInputClass}
-                  />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <AuthField label="Full name" htmlFor="fullName">
+                  <Input id="fullName" type="text" placeholder="Your name" value={fullName} onChange={(e) => setFullName(e.target.value)} required autoComplete="name" autoFocus className={authInputClass} />
                 </AuthField>
-
-                <AuthField label="Email address" htmlFor="email" icon={<Mail className="size-4" />}>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="you@company.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    className={authInputClass}
-                  />
+                <AuthField label="Work email" htmlFor="email">
+                  <Input id="email" type="email" placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" className={authInputClass} />
                 </AuthField>
-
-                <AuthField label="Mobile number" htmlFor="mobileNumber" icon={<Phone className="size-4" />}>
-                  <Input
-                    id="mobileNumber"
-                    type="tel"
-                    placeholder="+91 00000 00000"
-                    value={mobileNumber}
-                    onChange={(e) => setMobileNumber(e.target.value)}
-                    required
-                    className={authInputClass}
-                  />
+                <AuthField label="Mobile number" htmlFor="mobileNumber">
+                  <Input id="mobileNumber" type="tel" inputMode="tel" placeholder="+91 98765 43210" value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value)} required autoComplete="tel" className={authInputClass} />
                 </AuthField>
-
-                <AuthField
-                  label="Business category"
-                  htmlFor="businessCategory"
-                  icon={<Briefcase className="size-4" />}
-                >
-                  <Combobox
-                    items={BUSINESS_CATEGORIES}
-                    value={businessCategory || null}
-                    onValueChange={(value) => setBusinessCategory((value as string) ?? "")}
-                  >
+                <AuthField label="Business category" htmlFor="businessCategory">
+                  <Combobox items={BUSINESS_CATEGORIES} value={businessCategory || null} onValueChange={(value) => setBusinessCategory((value as string) ?? "")}>
                     <ComboboxInputGroup>
-                      <ComboboxInput
-                        id="businessCategory"
-                        placeholder="Search business category"
-                        required
-                        className={cn(authInputClass, "cursor-text pr-14")}
-                      />
+                      <ComboboxInput id="businessCategory" placeholder="Search category" required className={cn(authInputClass, "cursor-text pr-14")} />
                       {businessCategory && <ComboboxClear />}
                       <ComboboxTrigger />
                     </ComboboxInputGroup>
-                    <ComboboxContent className="border border-[var(--m-border-glass)] bg-[var(--m-bg-secondary)] text-[11px]">
+                    <ComboboxContent className="border border-[var(--m-border-secondary)] bg-[var(--m-bg-secondary)] text-[12px]">
                       <ComboboxEmpty>No category found.</ComboboxEmpty>
                       <ComboboxList>
                         {(item: string) => (
-                          <ComboboxItem key={item} value={item} className="text-[11px] text-[var(--m-text-primary)]">
-                            {item}
-                          </ComboboxItem>
+                          <ComboboxItem key={item} value={item} className="text-[12px] text-[var(--m-text-primary)]">{item}</ComboboxItem>
                         )}
                       </ComboboxList>
                     </ComboboxContent>
                   </Combobox>
                 </AuthField>
-
                 <AuthField
                   label="Password"
                   htmlFor="password"
-                  icon={<Lock className="size-4" />}
                   hint={
-                    password.length > 0 ? (
+                    strength > 0 ? (
                       <div className="flex items-center gap-1.5">
                         <div className="flex flex-1 gap-1">
-                          {[0, 1, 2].map((i) => (
-                            <span
-                              key={i}
-                              className={cn(
-                                "h-1 flex-1 rounded-full transition-colors duration-300",
-                                password.length >= [1, 8, 12][i]
-                                  ? ["bg-red-400", "bg-amber-400", "bg-emerald-400"][i]
-                                  : "bg-[var(--m-bg-tertiary)]"
-                              )}
-                            />
+                          {[1, 2, 3].map((n) => (
+                            <span key={n} className={cn("h-1 flex-1 rounded-full", strength >= n ? ["bg-rose-500", "bg-amber-500", "bg-emerald-500"][strength - 1] : "bg-[var(--m-bg-tertiary)]")} />
                           ))}
                         </div>
-                        <span className="text-[9px] font-semibold text-[var(--m-text-muted)]">
-                          {password.length >= 12 ? "Strong" : password.length >= 8 ? "Good" : "Weak"}
+                        <span className="text-[10px] font-medium text-[var(--m-text-muted)]">
+                          {strength === 3 ? "Strong" : strength === 2 ? "Good" : `${MIN_PASSWORD - password.length} more`}
                         </span>
                       </div>
                     ) : undefined
@@ -373,26 +284,21 @@ export default function SignupPage() {
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
-                    placeholder="Min. 6 characters"
+                    placeholder={`At least ${MIN_PASSWORD} characters`}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
+                    autoComplete="new-password"
                     className={`${authInputClass} pr-10`}
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    aria-label="Toggle password"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--m-text-muted)] transition-colors hover:text-[var(--m-text-primary)]"
-                  >
+                  <button type="button" onClick={() => setShowPassword((s) => !s)} aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--m-text-muted)] hover:text-[var(--m-text-primary)]">
                     {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                   </button>
                 </AuthField>
-
                 <AuthField
                   label="Confirm password"
                   htmlFor="confirmPassword"
-                  icon={<Lock className="size-4" />}
+                  hint={passwordsMismatch ? <span className="text-[10px] font-medium text-rose-500">Passwords don&apos;t match</span> : undefined}
                 >
                   <Input
                     id="confirmPassword"
@@ -401,28 +307,22 @@ export default function SignupPage() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
+                    autoComplete="new-password"
+                    aria-invalid={passwordsMismatch}
                     className={`${authInputClass} pr-10`}
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    aria-label="Toggle confirm password"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--m-text-muted)] transition-colors hover:text-[var(--m-text-primary)]"
-                  >
+                  <button type="button" onClick={() => setShowConfirmPassword((s) => !s)} aria-label={showConfirmPassword ? "Hide password" : "Show password"} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--m-text-muted)] hover:text-[var(--m-text-primary)]">
                     {showConfirmPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                   </button>
                 </AuthField>
               </div>
 
-              {/* Plan picker */}
-              <div className="flex flex-col gap-2">
-                <span className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-[var(--m-text-tertiary)]">
-                  Select plan
-                </span>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {/* Plan */}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-medium text-[var(--m-text-secondary)]">Plan</span>
+                <div className="grid grid-cols-2 gap-2">
                   {PLANS.map((plan) => {
                     const active = selectedPlan.id === plan.id;
-                    const PlanIcon = plan.icon;
                     return (
                       <button
                         key={plan.id}
@@ -430,266 +330,111 @@ export default function SignupPage() {
                         onClick={() => setSelectedPlan(plan)}
                         aria-pressed={active}
                         className={cn(
-                          "group relative overflow-hidden rounded-xl border px-3 py-2.5 text-left transition-all duration-200",
-                          active
-                            ? "border-emerald-500/60 bg-emerald-500/10 shadow-[0_0_0_3px_rgba(16,185,129,0.08)]"
-                            : "border-[var(--m-border-glass)] bg-[var(--m-bg-secondary)]/40 hover:border-emerald-500/30 hover:bg-[var(--m-bg-secondary)]/70"
+                          "relative rounded-lg border px-3 py-2.5 text-left transition-colors",
+                          active ? "border-emerald-500/60 bg-emerald-500/10 ring-1 ring-emerald-500/30" : "border-[var(--m-border-secondary)] hover:border-emerald-500/40 hover:bg-[var(--m-bg-secondary)]/60"
                         )}
                       >
-                        <div className="flex items-center justify-between">
-                          <span
-                            className={cn(
-                              "flex items-center gap-1.5 text-[11px] font-bold",
-                              active ? "text-emerald-400" : "text-[var(--m-text-secondary)]"
-                            )}
-                          >
-                            <PlanIcon className="size-3" />
-                            {plan.name}
+                        <span className="flex items-center justify-between gap-2">
+                          <span className={cn("truncate text-[12px] font-semibold", active ? "text-emerald-500" : "text-[var(--m-text-secondary)]")}>{plan.name}</span>
+                          <span className={cn("flex size-4 shrink-0 items-center justify-center rounded-full border", active ? "border-emerald-500 bg-emerald-500 text-white" : "border-[var(--m-border-secondary)]")}>
+                            {active && <Check className="size-2.5" />}
                           </span>
-                          {active && (
-                            <motion.span
-                              layoutId="plan-check"
-                              className="flex size-3.5 items-center justify-center rounded-full bg-emerald-500 text-white"
-                            >
-                              <Check className="size-2.5" />
-                            </motion.span>
-                          )}
-                        </div>
-                        <p className="mt-1 text-[13px] font-extrabold text-[var(--m-text-heading)]">
-                          {plan.price}
-                          <span className="text-[9px] font-semibold text-[var(--m-text-muted)]">
-                            {plan.period}
-                          </span>
-                        </p>
-                        <p className="mt-0.5 truncate text-[9px] text-[var(--m-text-muted)]">
-                          {plan.tagline}
-                        </p>
+                        </span>
+                        <span className="mt-0.5 block text-[15px] font-bold text-[var(--m-text-heading)]">
+                          {plan.price}<span className="text-[10px] font-medium text-[var(--m-text-muted)]">{plan.period}</span>
+                        </span>
+                        <span className="block truncate text-[11px] text-[var(--m-text-muted)]">{plan.tagline}</span>
                       </button>
                     );
                   })}
                 </div>
-                <p className="text-[10.5px] text-[var(--m-text-muted)]">
-                  Need multiple numbers or something special?{" "}
-                  <Link href="/book-demo" className="font-semibold text-emerald-500 hover:underline">Ask for a custom plan</Link>
+                <p className="text-[11px] text-[var(--m-text-muted)]">
+                  Need multiple numbers or something special? <Link href="/book-demo" className="font-semibold text-emerald-500 hover:underline">Ask for a custom plan</Link>
                 </p>
               </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="mt-1 flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#00DF82] text-[13px] font-semibold text-slate-950 transition-colors hover:bg-[#00c673] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" />
-                    Creating account…
-                  </>
-                ) : (
-                  "Continue"
-                )}
+              <button type="submit" disabled={loading || passwordsMismatch} className={`mt-1 ${authPrimaryButton}`}>
+                {loading ? <><Loader2 className="size-4 animate-spin" /> Creating account…</> : <>Create account <ArrowRight className="size-4" /></>}
               </button>
+              <p className="text-center text-[11px] text-[var(--m-text-muted)]">
+                By creating an account you agree to our <Link href="/terms-and-conditions" className="underline hover:text-[var(--m-text-secondary)]">Terms</Link> and{" "}
+                <Link href="/privacy-policy" className="underline hover:text-[var(--m-text-secondary)]">Privacy Policy</Link>.
+              </p>
             </form>
           </motion.div>
         )}
 
-        {/* ─── STEP 2: OTP Verification ───────────────────────────────────── */}
+        {/* ─── STEP 2: email code ───────────────────────────────────────────── */}
         {step === "otp" && (
-          <motion.div
-            key="otp"
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -14 }}
-            transition={{ duration: 0.25 }}
-            className="rounded-2xl border border-[var(--m-border-glass)] bg-[var(--m-bg-glass)]/70 p-6 backdrop-blur-xl sm:p-7"
-          >
-            <button
-              type="button"
-              onClick={() => setStep("form")}
-              className="mb-5 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--m-text-muted)] transition-colors hover:text-[var(--m-text-primary)]"
-            >
-              <ArrowLeft className="size-3" /> Back
+          <motion.div key="otp" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
+            <button type="button" onClick={() => { setError(null); setStep("form"); }} className="mb-4 inline-flex items-center gap-1 text-[12px] font-medium text-[var(--m-text-muted)] hover:text-[var(--m-text-primary)]">
+              <ArrowLeft className="size-3.5" /> Back
             </button>
-
-            <div className="mb-5 text-center">
-              <div className="mx-auto flex size-11 items-center justify-center rounded-xl border border-emerald-500/25 bg-emerald-500/10">
-                <Mail className="size-5 text-emerald-400" />
-              </div>
-              <h2 className="mt-3 text-[19px] font-extrabold tracking-tight text-[var(--m-text-heading)]">
-                Enter OTP code
-              </h2>
-              <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--m-text-tertiary)]">
-                We&apos;ve sent a 6-digit code to{" "}
-                <span className="font-semibold text-[var(--m-text-primary)]">{email}</span>
+            <div className="mb-5">
+              <h1 className="text-2xl font-bold tracking-tight text-[var(--m-text-heading)]">Check your email</h1>
+              <p className="text-sm text-[var(--m-text-tertiary)]">
+                Enter the 6-digit code we sent to <span className="font-semibold text-[var(--m-text-primary)]">{email}</span>.
               </p>
             </div>
-
             <form onSubmit={handleVerifyOtp} className="flex flex-col gap-4">
-              {error && (
-                <div className="rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2.5 text-[11px] text-red-400">
-                  {error}
-                </div>
-              )}
-
-              <OtpInput
-                value={otp}
-                onChange={(next) => setOtp(next.replace(/\D/g, "").slice(0, 6))}
-                length={6}
-                autoFocus
-                disabled={verifyLoading}
-              />
-
-              <button
-                type="submit"
-                disabled={verifyLoading || otp.length < 6}
-                className="mt-1 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-[12.5px] font-bold text-white shadow-[0_12px_30px_-12px_rgba(16,185,129,0.9)] transition-all duration-200 hover:from-emerald-400 hover:to-teal-400 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {verifyLoading ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" />
-                    Verifying…
-                  </>
-                ) : (
-                  <>
-                    Verify &amp; Proceed to Payment
-                    <ArrowRight className="size-4" />
-                  </>
-                )}
+              {error && <AuthNotice tone="error">{error}</AuthNotice>}
+              <OtpInput value={otp} onChange={(next) => setOtp(next.replace(/\D/g, "").slice(0, 6))} length={6} autoFocus disabled={verifyLoading} />
+              <button type="submit" disabled={verifyLoading || otp.length < 6} className={authPrimaryButton}>
+                {verifyLoading ? <><Loader2 className="size-4 animate-spin" /> Verifying…</> : <>Verify email <ArrowRight className="size-4" /></>}
               </button>
+              <p className="text-center text-[11px] text-[var(--m-text-muted)]">The code expires in 5 minutes. Didn&apos;t get it? Check spam, or go back and sign up again.</p>
             </form>
           </motion.div>
         )}
 
-        {/* ─── STEP 3: Payment QR & Proof ──────────────────────────────────── */}
+        {/* ─── STEP 3: payment ──────────────────────────────────────────────── */}
         {step === "payment" && (
-          <motion.div
-            key="payment"
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -14 }}
-            transition={{ duration: 0.25 }}
-            className="rounded-2xl border border-[var(--m-border-glass)] bg-[var(--m-bg-glass)]/70 p-6 backdrop-blur-xl sm:p-7"
-          >
-            <div className="mb-5 flex flex-col items-center gap-2 text-center">
-              <div className="flex size-11 items-center justify-center rounded-xl border border-emerald-500/25 bg-emerald-500/10">
-                <QrCode className="size-5 text-emerald-400" />
-              </div>
-              <h2 className="text-[19px] font-extrabold tracking-tight text-[var(--m-text-heading)]">
-                Scan &amp; pay
-              </h2>
-              <p className="text-[11px] leading-relaxed text-[var(--m-text-tertiary)]">
-                Scan the QR below to pay. Then upload proof and send it to activate.
-              </p>
+          <motion.div key="payment" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
+            <div className="mb-4">
+              <h1 className="text-2xl font-bold tracking-tight text-[var(--m-text-heading)]">Scan &amp; pay</h1>
+              <p className="text-sm text-[var(--m-text-tertiary)]">Pay by UPI, then send us the payment screenshot to activate your account.</p>
             </div>
 
-            {/* plan badge */}
-            <div className="mx-auto mb-4 flex w-fit items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-[10px] font-bold text-emerald-400">
-              <selectedPlan.icon className="size-3" />
-              {selectedPlan.name} Plan — {selectedPlan.price}{selectedPlan.period}
+            <div className="mb-3 flex items-center justify-between gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
+              <span className="text-[12px] font-semibold text-emerald-500">{selectedPlan.name}</span>
+              <span className="text-[13px] font-bold text-[var(--m-text-heading)]">{selectedPlan.price}<span className="text-[10px] font-medium text-[var(--m-text-muted)]">{selectedPlan.period}</span></span>
             </div>
 
-            {/* QR Image */}
-            <div className="relative mx-auto size-52 overflow-hidden rounded-2xl border-2 border-white/20 bg-white p-1.5 shadow-lg">
-              <Image
-                src="/images/payment-qr.png"
-                alt="Payment QR Code"
-                fill
-                className="object-contain"
-                priority
-                unoptimized
-              />
+            <div className="relative mx-auto size-48 overflow-hidden rounded-lg border border-[var(--m-border-secondary)] bg-white p-1.5">
+              <Image src="/images/payment-qr.png" alt="UPI payment QR code" fill className="object-contain" priority unoptimized />
             </div>
 
-            <div className="mt-4 w-full space-y-2">
-              {error && (
-                <div className="rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2.5 text-[11px] text-red-400">
-                  {error}
-                </div>
-              )}
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*,application/pdf"
-                className="hidden"
-                onChange={handleFileChange}
-              />
+            <div className="mt-4 space-y-2">
+              {error && <AuthNotice tone="error">{error}</AuthNotice>}
+              <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleFileChange} />
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
-                className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/5 px-4 py-2.5 text-[11px] font-semibold text-emerald-400 transition-all duration-200 hover:border-emerald-500/70 hover:bg-emerald-500/10"
+                className="flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-emerald-500/40 bg-emerald-500/5 text-[12px] font-medium text-emerald-500 hover:border-emerald-500/70 hover:bg-emerald-500/10"
               >
-                <Paperclip className="size-3.5" />
-                {proofFile ? proofFile.name : "Attach Payment Proof (Screenshot)"}
+                <Paperclip className="size-3.5" /> <span className="truncate">{proofFile ? proofFile.name : "Attach payment screenshot"}</span>
               </button>
-              {proofFile && (
-                <p className="text-center text-[10px] text-emerald-400/80">
-                  ✓ {proofFile.name} ready
-                </p>
-              )}
+              <button type="button" disabled={!proofFile || sending} onClick={handleSendProof} className={authPrimaryButton}>
+                {sending ? <><Loader2 className="size-4 animate-spin" /> Sending…</> : <><CheckCircle className="size-4" /> I&apos;ve paid, send proof on WhatsApp</>}
+              </button>
+              <p className="text-center text-[11px] text-[var(--m-text-muted)]">WhatsApp opens with your details filled in. Attach the screenshot there and send.</p>
             </div>
-
-            <button
-              type="button"
-              disabled={!proofFile || sending}
-              onClick={handleSendProof}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 py-3 text-[12px] font-bold text-white shadow-[0_12px_30px_-12px_rgba(16,185,129,0.9)] transition-all duration-200 hover:from-emerald-400 hover:to-teal-400 hover:scale-[1.01] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {sending ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" />
-                  Submitting Proof…
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="size-4" />
-                  Payment Done — Send Proof on WhatsApp
-                </>
-              )}
-            </button>
           </motion.div>
         )}
 
-        {/* ─── STEP 4: Success Screen ────────────────────────────────────────── */}
+        {/* ─── Done ─────────────────────────────────────────────────────────── */}
         {step === "done" && (
-          <motion.div
-            key="done"
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -14 }}
-            transition={{ duration: 0.25 }}
-            className="rounded-2xl border border-[var(--m-border-glass)] bg-[var(--m-bg-glass)]/70 p-7 backdrop-blur-xl flex flex-col items-center gap-4 text-center"
-          >
-            <motion.div
-              initial={{ scale: 0.6, rotate: -12 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{ type: "spring", stiffness: 260, damping: 16 }}
-              className="flex size-16 items-center justify-center rounded-2xl border border-emerald-500/25 bg-emerald-500/10"
-            >
-              <PartyPopper className="size-8 text-emerald-400" />
-            </motion.div>
-
+          <motion.div key="done" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="flex flex-col items-center gap-4 text-center">
+            <span className="flex size-12 items-center justify-center rounded-full bg-emerald-500/15">
+              <PartyPopper className="size-6 text-emerald-500" />
+            </span>
             <div>
-              <h2 className="text-[20px] font-extrabold tracking-tight text-[var(--m-text-heading)]">
-                Registration complete! 🎉
-              </h2>
-              <p className="mt-2 text-[11px] leading-relaxed text-[var(--m-text-tertiary)]">
-                <span className="font-semibold text-[var(--m-text-primary)]">
-                  Payment confirmation is under process.
-                </span>{" "}
-                You will get notified on your email/WhatsApp when your account gets activated.
-              </p>
+              <h1 className="text-2xl font-bold tracking-tight text-[var(--m-text-heading)]">You&apos;re all set</h1>
+              <p className="mt-1 text-sm text-[var(--m-text-tertiary)]">We&apos;re confirming your payment. You&apos;ll get a WhatsApp/email message when your account is active.</p>
             </div>
-
-            <div className="w-full rounded-xl border border-emerald-500/20 bg-emerald-500/8 px-4 py-3 text-[10px] leading-relaxed text-emerald-300/80">
-              Our team reviews payments within{" "}
-              <span className="font-bold text-emerald-400">24–48 hours</span>.<br />
-              You will not be able to log in until activated by the Super Admin.
-            </div>
-
-            <Link href="/login" className="w-full">
-              <span className="flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--m-border-glass)]/40 bg-[var(--m-bg-secondary)] py-2.5 text-[11px] font-bold text-[var(--m-text-secondary)] transition-all hover:bg-[var(--m-bg-tertiary)]">
-                <ArrowLeft className="size-3.5" />
-                Back to Sign In
-              </span>
+            <AuthNotice tone="info">Payments are usually checked within <span className="font-semibold text-[var(--m-text-primary)]">24–48 hours</span>. You can log in once your account is activated.</AuthNotice>
+            <Link href="/login" className={authSecondaryButton}>
+              <ArrowLeft className="size-3.5" /> Back to log in
             </Link>
           </motion.div>
         )}

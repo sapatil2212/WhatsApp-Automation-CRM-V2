@@ -556,7 +556,9 @@ export default function ClinicSetupWizard() {
         const p = data.profile;
         const info = {
           ...clinicInfo,
-          clinic_name: keep(sections.has('profile') ? p.name : '', clinicInfo.clinic_name) || 'My Clinic',
+          // Never rename an existing clinic from a document: the name drives the
+          // booking link (/book/<name>) and every printed QR code.
+          clinic_name: (clinicInfo.clinic_name?.trim() && clinicInfo.clinic_name.trim() !== 'My Clinic' ? clinicInfo.clinic_name : keep(sections.has('profile') ? p.name : '', clinicInfo.clinic_name)) || 'My Clinic',
           clinic_type: keep(sections.has('profile') ? p.type : '', clinicInfo.clinic_type),
           clinic_description: keep(sections.has('profile') ? p.description : '', clinicInfo.clinic_description),
           phone: keep(sections.has('profile') ? p.phone : '', clinicInfo.phone),
