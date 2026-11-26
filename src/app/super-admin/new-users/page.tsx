@@ -8,7 +8,6 @@ import {
   ExternalLink, MailCheck, ShieldAlert
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { SuperAdminShell } from "../super-admin-shell";
 
 interface User {
   id: string;
@@ -104,7 +103,7 @@ export default function NewUsersPage() {
   };
 
   return (
-    <SuperAdminShell>
+    <>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -284,6 +283,6 @@ export default function NewUsersPage() {
           </div>
         )}
       </div>
-    </SuperAdminShell>
+    </>
   );
 }

@@ -6,6 +6,7 @@ import { qrPng, qrSvg, reviewUrl, safeColor } from '@/lib/reviews/qr';
 import { buildDraftPrompt, cleanDrafts } from './review-ai.service';
 import { TENANT_SCOPES } from '../kernel/tenant-scope';
 import { approveBodySchema, eventBodySchema, feedbackBodySchema } from './review-public.service';
+import { businessBodySchema } from './review.service';
 
 const business = { name: 'Sunrise Dental', category: 'Dentist', description: 'Family dental clinic', services: ['Cleaning', 'Braces'] };
 
@@ -66,6 +67,17 @@ describe('public review input validation', () => {
     expect(eventBodySchema.safeParse({ visitorId, eventType: 'page_view' }).success).toBe(true);
     expect(eventBodySchema.safeParse({ visitorId, eventType: 'ai_generated' }).success).toBe(false);
     expect(eventBodySchema.safeParse({ visitorId, eventType: 'draft_approved' }).success).toBe(false);
+  });
+
+  it('records social clicks only for known platforms', () => {
+    expect(eventBodySchema.safeParse({ visitorId, eventType: 'social_opened', platform: 'instagram' }).success).toBe(true);
+    expect(eventBodySchema.safeParse({ visitorId, eventType: 'social_opened', platform: 'myspace' }).success).toBe(false);
+  });
+
+  it('validates social links on the business and reports the platform', () => {
+    expect(businessBodySchema.parse({ name: 'Get Fit Gym' }).socialLinks).toEqual([]);
+    expect(businessBodySchema.safeParse({ name: 'Get Fit Gym', socialLinks: [{ platform: 'snapchat', url: '@getfit' }] }).success).toBe(true);
+    expect(businessBodySchema.safeParse({ name: 'Get Fit Gym', socialLinks: [{ platform: 'myspace', url: 'x' }] }).success).toBe(false);
   });
 
   it('rejects malformed visitor ids', () => {

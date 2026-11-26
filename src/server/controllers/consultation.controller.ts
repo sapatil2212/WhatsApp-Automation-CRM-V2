@@ -28,6 +28,8 @@ import {
 } from '../services/consultation.service';
 import {
   deletePatientDocument,
+  deletePatients,
+  patientBulkDeleteSchema,
   documentSchema,
   listPatients,
   patientListSchema,
@@ -157,7 +159,7 @@ export const consultationController = {
     auth: 'tenant',
     params: idParams,
     response: loose,
-    message: 'Consultation discarded.',
+    message: 'Consultation deleted.',
     rateLimit: { limit: 20, windowMs: 60_000 },
     handle: ({ ctx, db, params }) => discardConsultation(db, ctx as AuthContext, params.id),
   }),
@@ -246,6 +248,18 @@ export const consultationController = {
   patients: createHandler({ operation: 'patients.list', auth: 'tenant', query: patientListSchema, response: loose, handle: ({ db, query }) => listPatients(db, query) }),
   patient: createHandler({ operation: 'patients.get', auth: 'tenant', params: idParams, response: loose, handle: ({ db, params }) => patientRecord(db, params.id) }),
   updatePatient: createHandler({ operation: 'patients.update', auth: 'tenant', params: idParams, body: profileSchema, response: loose, handle: ({ ctx, db, params, body }) => updatePatientProfile(db, ctx as AuthContext, params.id, body) }),
+  deletePatient: createHandler({
+    operation: 'patients.delete',
+    auth: 'tenant',
+    params: idParams,
+    response: loose,
+    async handle({ ctx, db, params }) {
+      const res = await deletePatients(db, ctx as AuthContext, [params.id]);
+      if (!res.deleted.length) throw new NotFoundError('Patient');
+      return res;
+    },
+  }),
+  bulkDeletePatients: createHandler({ operation: 'patients.bulkDelete', auth: 'tenant', body: patientBulkDeleteSchema, response: loose, handle: ({ ctx, db, body }) => deletePatients(db, ctx as AuthContext, body.ids) }),
   uploadDocument: createHandler({ operation: 'patients.documents.upload', auth: 'tenant', params: idParams, body: documentSchema, response: loose, status: 201, handle: ({ ctx, db, params, body }) => uploadPatientDocument(db, ctx as AuthContext, params.id, body) }),
   deleteDocument: createHandler({
     operation: 'patients.documents.delete',

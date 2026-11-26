@@ -39,7 +39,14 @@ const pageTitles: Record<string, string> = {
   "/healthcare/logs": "AI Chat Logs",
 };
 
+const SEGMENT_PAGE_TITLES: Array<[RegExp, string]> = [
+  [/^\/[a-z-]+\/members(\/|$)/, "Members"],
+  [/^\/[a-z-]+\/packages(\/|$)/, "Packages"],
+];
+
 function getPageTitle(pathname: string): string {
+  const seg = SEGMENT_PAGE_TITLES.find(([re]) => re.test(pathname));
+  if (seg) return seg[1];
   if (pageTitles[pathname]) return pageTitles[pathname];
   const match = Object.entries(pageTitles).find(([path]) =>
     pathname.startsWith(path),

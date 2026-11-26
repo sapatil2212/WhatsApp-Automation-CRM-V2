@@ -10,10 +10,10 @@ export async function POST(req: NextRequest) {
     const { email, password, fullName, businessName, businessType, phoneNumber, selectedPlan } = await req.json()
 
     if (!email || !password || !fullName) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+      return NextResponse.json({ error: !email ? 'Enter your email.' : !password ? 'Create a password.' : 'Enter your name.', field: !email ? 'email' : !password ? 'password' : 'fullName' }, { status: 400 })
     }
     if (typeof password !== 'string' || password.length < 8) {
-      return NextResponse.json({ error: 'Password must be at least 8 characters.' }, { status: 400 })
+      return NextResponse.json({ error: 'Password must be at least 8 characters.', field: 'password' }, { status: 400 })
     }
 
     // 1. Check if user already exists
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
           where: { id: existingUser.id }
         })
       } else {
-        return NextResponse.json({ error: 'User with this email already exists' }, { status: 400 })
+        return NextResponse.json({ error: 'An account with this email already exists.', field: 'email', code: 'email_taken' }, { status: 409 })
       }
     }
 

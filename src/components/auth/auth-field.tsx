@@ -26,12 +26,14 @@ interface AuthFieldProps {
   /** Right-aligned element on the label row (e.g. "Forgot password?"). */
   action?: ReactNode;
   hint?: ReactNode;
+  /** Field-level error shown under the input (replaces the hint). */
+  error?: ReactNode;
   optional?: boolean;
   children: ReactNode;
   className?: string;
 }
 
-export function AuthField({ label, htmlFor, action, hint, optional, children, className }: AuthFieldProps) {
+export function AuthField({ label, htmlFor, action, hint, error, optional, children, className }: AuthFieldProps) {
   return (
     <div className={cn("flex min-w-0 flex-col gap-1", className)}>
       <div className="flex items-center justify-between gap-2">
@@ -40,8 +42,14 @@ export function AuthField({ label, htmlFor, action, hint, optional, children, cl
         </label>
         {action}
       </div>
-      <div className="relative">{children}</div>
-      {hint}
+      <div className={cn("relative", error && "[&_button[aria-haspopup]]:!border-rose-500 [&_input]:!border-rose-500 [&_input]:focus-visible:!ring-rose-500/20")}>{children}</div>
+      {error ? (
+        <p id={htmlFor ? `${htmlFor}-error` : undefined} role="alert" className="text-[11px] font-medium leading-snug text-rose-500">
+          {error}
+        </p>
+      ) : (
+        hint
+      )}
     </div>
   );
 }

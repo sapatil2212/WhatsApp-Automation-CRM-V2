@@ -299,7 +299,7 @@ export function createClient() {
             return { data: { user: data.user, session: null }, error: null }
           }
           const err = await res.json()
-          return { data: { user: null, session: null }, error: { message: err.error || 'Signup failed' } }
+          return { data: { user: null, session: null }, error: { message: err.error || 'Signup failed', field: err.field as string | undefined, code: err.code as string | undefined } }
         } catch (err: any) {
           return { data: { user: null, session: null }, error: err }
         }

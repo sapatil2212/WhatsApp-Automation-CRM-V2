@@ -53,3 +53,6 @@ scratch/
 # Google Review worker runtime files (screenshots, heartbeat, PM2 logs)
 /.runtime/
 /logs/
+
+# local DB snapshots
+backups/

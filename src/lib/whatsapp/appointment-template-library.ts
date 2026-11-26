@@ -30,14 +30,14 @@ export function libraryVersionFor(event: string): number {
   return EVENT_VERSION[event as TemplateEvent] ?? 1;
 }
 
-export const TEMPLATE_EVENTS = ['confirmation', 'token_confirmation', 'reminder', 'doctor_ready', 'reinstated', 'cancelled', 'rescheduled', 'no_show', 'completed', 'prescription'] as const;
+export const TEMPLATE_EVENTS = ['confirmation', 'token_confirmation', 'reminder', 'doctor_ready', 'reinstated', 'cancelled', 'rescheduled', 'no_show', 'completed', 'prescription', 'member_welcome'] as const;
 export type TemplateEvent = (typeof TEMPLATE_EVENTS)[number];
 
 export const VERTICALS = ['clinic', 'dental', 'hospital', 'gym', 'salon', 'hotel', 'other'] as const;
 export type Vertical = (typeof VERTICALS)[number];
 
 /** Where each `{{n}}` gets its value when a message is sent. */
-export const VARIABLE_SOURCES = ['customer_name', 'business_name', 'appointment_date', 'appointment_time', 'service_name', 'appointment_ref', 'token_number', 'doctor_name'] as const;
+export const VARIABLE_SOURCES = ['customer_name', 'business_name', 'appointment_date', 'appointment_time', 'service_name', 'appointment_ref', 'token_number', 'doctor_name', 'member_code', 'package_name', 'membership_start', 'membership_end'] as const;
 export type VariableSource = (typeof VARIABLE_SOURCES)[number];
 
 export interface TemplateVariable {
@@ -75,6 +75,7 @@ export const TEMPLATE_KEYS: Record<TemplateEvent, string> = {
   doctor_ready: 'appointment_ready_now',
   reinstated: 'appointment_reinstated',
   no_show: 'appointment_missed',
+  member_welcome: 'gym_membership_activated',
 };
 
 export const EVENT_LABEL: Record<TemplateEvent, string> = {
@@ -88,6 +89,7 @@ export const EVENT_LABEL: Record<TemplateEvent, string> = {
   doctor_ready: 'Ready to see you now',
   reinstated: 'Appointment reinstated',
   no_show: 'Missed appointment (no-show)',
+  member_welcome: 'Membership activated (welcome)',
 };
 
 interface Terms {
@@ -122,6 +124,10 @@ function vars(t: Terms, which: VariableSource[]): TemplateVariable[] {
     appointment_ref: { name: 'Booking ID', fallback: '-', example: 'APT-261125-K7Q2M' },
     token_number: { name: 'Clinic queue no.', fallback: '-', example: '12' },
     doctor_name: { name: 'Doctor name', fallback: 'your doctor', example: 'Dr. Mehta' },
+    member_code: { name: 'Member ID', fallback: '-', example: 'GF-0042' },
+    package_name: { name: 'Package', fallback: 'your membership', example: 'Quarterly Membership' },
+    membership_start: { name: 'Valid from', fallback: 'today', example: '1 Dec 2026' },
+    membership_end: { name: 'Valid until', fallback: 'the end date', example: '28 Feb 2027' },
   };
   return which.map((source, i) => ({ position: i + 1, source, ...meta[source] }));
 }
@@ -214,6 +220,14 @@ ${t.serviceLabel}: {{7}}
 Please show your queue number at the reception when you arrive. Reply to this message if you need to make any changes.`,
         variables: vars(t, ['customer_name', 'business_name', 'token_number', 'appointment_ref', 'appointment_date', 'appointment_time', 'service_name']),
       };
+    case 'member_welcome':
+      return {
+        ...base,
+        title: 'Membership activated',
+        description: 'Health & fitness: sent when a member is onboarded and their package starts.',
+        bodyText: `Hello {{1}},\n\nWelcome to {{2}}. Your membership has been activated.\n\nMember ID: {{3}}\nPackage: {{4}}\nValid from: {{5}}\nValid until: {{6}}\n\nPlease show your member ID at the front desk on your first visit. Reply to this message if you have any questions.`,
+        variables: vars(t, ['customer_name', 'business_name', 'member_code', 'package_name', 'membership_start', 'membership_end']),
+      };
     case 'prescription':
       return {
         ...base,
@@ -229,10 +243,14 @@ Please show your queue number at the reception when you arrive. Reply to this me
 /** Healthcare verticals issue token numbers at the front desk. */
 export const TOKEN_VERTICALS: readonly Vertical[] = ['clinic', 'dental', 'hospital'];
 
+/** Health & fitness verticals have members and packages. */
+export const FITNESS_VERTICALS: readonly Vertical[] = ['gym'];
+
 /** The predefined collection for a vertical (one template per lifecycle event). */
 export function libraryFor(vertical: Vertical): LibraryTemplate[] {
   const healthcareOnly: TemplateEvent[] = ['token_confirmation', 'prescription'];
-  return TEMPLATE_EVENTS.filter((e) => !healthcareOnly.includes(e) || TOKEN_VERTICALS.includes(vertical)).map((e) => build(vertical, e));
+  const fitnessOnly: TemplateEvent[] = ['member_welcome'];
+  return TEMPLATE_EVENTS.filter((e) => (!healthcareOnly.includes(e) || TOKEN_VERTICALS.includes(vertical)) && (!fitnessOnly.includes(e) || FITNESS_VERTICALS.includes(vertical))).map((e) => build(vertical, e));
 }
 
 /** Maps free-text business / clinic types to a vertical. */
@@ -245,8 +263,10 @@ export function detectVertical(input: { hasClinic: boolean; clinicType?: string 
 function classify(text: string, hasClinic: boolean): Vertical {
   if (/dent/.test(text)) return 'dental';
   if (/hospital|multi.?speciality|multispecialty/.test(text)) return 'hospital';
-  if (hasClinic || /clinic|health|doctor|medical|physio|diagnos|pathology|ayurved|homeo/.test(text)) return 'clinic';
-  if (/gym|fitness|yoga|crossfit|pilates|zumba|martial|sport/.test(text)) return 'gym';
+  if (hasClinic || /clinic|doctor|medical|physio|diagnos|pathology|ayurved|homeo/.test(text)) return 'clinic';
+  // "Health & Wellness" is the fitness category at signup; check it before the generic "health".
+  if (/gym|fitness|yoga|crossfit|pilates|zumba|martial|sport|wellness/.test(text)) return 'gym';
+  if (/health/.test(text)) return 'clinic';
   if (/salon|beauty|spa|parlou?r|barber|grooming|nail|makeup|skin/.test(text)) return 'salon';
   if (/hotel|resort|hostel|homestay|lodge|stay|hospitality|guest ?house/.test(text)) return 'hotel';
   return 'other';

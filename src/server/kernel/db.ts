@@ -127,8 +127,11 @@ async function assertParentsOwned(input: {
     throw new InternalError(`Cannot verify tenant ownership: unknown parent model "${input.parentModel}".`);
   }
 
+  // ownerFilter follows the parent's own scope: `{ tenantId }` for direct
+  // models, `{ clinic: { tenantId } }` for Doctor (which has no tenantId
+  // column), and so on.
   const owned = await delegate.count({
-    where: { id: { in: unique }, tenantId: input.tenantId },
+    where: { id: { in: unique }, ...parentOwnerWhere(input.parentModel, input.tenantId) },
   });
 
   if (owned !== unique.length) {
@@ -141,6 +144,16 @@ async function assertParentsOwned(input: {
     });
     throw new NotFoundError(input.parentModel);
   }
+}
+
+/**
+ * Ownership filter for a parent row referenced by a child insert. Parents
+ * scoped through a relation (Doctor has no tenantId column; it belongs to a
+ * Clinic) are checked through that relation; everything else by tenantId.
+ */
+export function parentOwnerWhere(parentModel: string, tenantId: string): AnyArgs {
+  const scope = getTenantScope(parentModel as Parameters<typeof getTenantScope>[0]);
+  return scope?.kind === 'parent' ? ownerFilter(parentModel, tenantId) : { tenantId };
 }
 
 function lowerFirst(value: string): string {

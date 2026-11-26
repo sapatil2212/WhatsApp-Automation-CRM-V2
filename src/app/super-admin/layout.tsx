@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { SuperAdminShell } from "./super-admin-shell";
+
 export const metadata: Metadata = {
   title: "Super Admin — ChatNexGen",
   description: "Super Admin Portal for ChatNexGen",
@@ -7,5 +9,5 @@ export const metadata: Metadata = {
 };
 
 export default function SuperAdminLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+  return <SuperAdminShell>{children}</SuperAdminShell>;
 }

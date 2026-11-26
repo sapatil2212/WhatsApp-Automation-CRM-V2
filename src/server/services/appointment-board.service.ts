@@ -430,19 +430,27 @@ export async function actOnBoard(db: TenantDb, tenantId: string, id: string, bod
 }
 
 
-/** Appointments with a consultation hold medical records and are never deleted from the board. */
-export async function deleteFromBoard(db: TenantDb, tenantId: string, ids: string[]): Promise<{ deleted: string[]; blocked: Array<{ id: string; reason: string }> }> {
+/**
+ * Permanently deletes appointments and everything recorded for those visits.
+ * The database cascades from Appointment to its consultation, prescription,
+ * transcripts, details and notification logs; intakes and feedback keep their
+ * rows but lose the link (they belong to the patient, see deletePatients).
+ */
+export async function deleteFromBoard(
+  db: TenantDb,
+  tenantId: string,
+  ids: string[],
+): Promise<{ deleted: string[]; blocked: Array<{ id: string; reason: string }>; consultationsDeleted: number }> {
   const clinic = await requireClinic(db);
   const rows = await db.appointment.findMany({ where: { id: { in: ids }, clinicId: clinic.id }, select: { id: true, consultation: { select: { id: true } } } });
   const found = new Set(rows.map((r) => r.id));
   const blocked: Array<{ id: string; reason: string }> = ids.filter((i) => !found.has(i)).map((id) => ({ id, reason: 'Appointment not found.' }));
-  const deletable = rows.filter((r) => !r.consultation).map((r) => r.id);
-  for (const r of rows) if (r.consultation) blocked.push({ id: r.id, reason: 'It has a consultation record. Cancel it instead.' });
+  const deletable = rows.map((r) => r.id);
   if (deletable.length) {
     await db.appointment.deleteMany({ where: { id: { in: deletable }, clinicId: clinic.id } });
     appointmentsChanged(tenantId, { kind: 'deleted' });
   }
-  return { deleted: deletable, blocked };
+  return { deleted: deletable, blocked, consultationsDeleted: rows.filter((r) => r.consultation).length };
 }
 
 // ── consultation queue: manual status ───────────────────────────────

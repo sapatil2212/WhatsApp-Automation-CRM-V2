@@ -91,6 +91,10 @@ const SOURCE_LABEL: Record<VariableSource, string> = {
   appointment_ref: 'Booking ID',
   token_number: 'Clinic queue no.',
   doctor_name: 'Doctor name',
+  member_code: 'Member ID',
+  package_name: 'Package',
+  membership_start: 'Membership start',
+  membership_end: 'Membership end',
 };
 const SUBMITTABLE = ['Draft', 'Rejected', 'Paused', 'Disabled'];
 const canSubmit = (t: { status: string; issues: string[] }) => SUBMITTABLE.includes(t.status) && t.issues.length === 0;

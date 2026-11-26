@@ -23,6 +23,7 @@ describe('template library', () => {
       ...(healthcare ? ['appointment_token_confirmation'] : []),
       'appointment_reminder', 'appointment_ready_now', 'appointment_reinstated', 'appointment_cancelled', 'appointment_rescheduled', 'appointment_missed', 'appointment_completed',
       ...(healthcare ? ['patient_prescription_delivery'] : []),
+      ...(v === 'gym' ? ['gym_membership_activated'] : []),
     ]);
     for (const t of lib) {
       expect(t.category).toBe('Utility');
@@ -48,6 +49,11 @@ describe('template library', () => {
     [{ hasClinic: false, businessType: 'hotel' }, 'hotel'],
     [{ hasClinic: false, businessType: 'law firm' }, 'other'],
     [{ hasClinic: false, businessType: 'wellness', name: 'Get Fit Gym & Wellness Center' }, 'gym'],
+    [{ hasClinic: false, businessType: 'Health & Wellness', name: 'Daily Fitness Gym' }, 'gym'],
+    [{ hasClinic: false, businessType: 'Health & Wellness', name: 'Anshuman Gupta' }, 'gym'],
+    [{ hasClinic: false, businessType: 'Medical & Allied Health' }, 'clinic'],
+    [{ hasClinic: false, businessType: 'Gym & Fitness', name: 'Iron Den' }, 'gym'],
+    [{ hasClinic: false, businessType: 'Healthcare' }, 'clinic'],
   ] as const)('detects %o → %s', (input, expected) => {
     expect(detectVertical(input)).toBe(expected);
   });

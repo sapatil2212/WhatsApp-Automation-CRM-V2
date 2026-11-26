@@ -3,33 +3,28 @@
 type PublicDepartment = { id: string; name: string; description: string | null; doctorCount: number };
 
 /**
- * Departments shown on the booking page. Every doctor must stay bookable,
- * even one the clinic never assigned to a department (a common gap after an
- * AI/document import):
- *   - an unassigned doctor whose specialisation matches a configured
- *     department's name is listed under that department;
- *   - any other unassigned doctor is grouped under its specialisation
- *     (`spec:<name>`, which the booking API already accepts);
- *   - configured departments with no doctors are left out, so patients never
- *     pick a department that leads nowhere.
- * Mutates `doctors[].departmentIds` for the name matches.
+ * Departments shown on the booking page, exactly as configured in Business
+ * Setup; nothing is invented and no doctor is placed automatically.
+ *
+ *   - No departments configured → group doctors by specialisation
+ *     (`spec:<name>`, which the booking API already accepts).
+ *   - Departments configured → show those that have doctors assigned. Only
+ *     the assigned doctors are listed under them; a doctor without a
+ *     department is not bookable until assigned (Setup warns about this).
+ *   - Departments exist but none has doctors → return [] so the page lists
+ *     all doctors without a department step.
  */
 export function bookableDepartments(
   configured: Array<{ id: string; name: string; description: string | null }>,
   doctors: Array<{ departmentIds: string[]; department: string }>,
 ): PublicDepartment[] {
-  const byName = new Map(configured.map((d) => [d.name.trim().toLowerCase(), d.id]));
-  for (const doc of doctors) {
-    if (doc.departmentIds.length) continue;
-    const match = byName.get(doc.department.trim().toLowerCase());
-    if (match) doc.departmentIds.push(match);
+  if (configured.length === 0) {
+    return [...new Set(doctors.map((d) => d.department))]
+      .sort()
+      .map((name) => ({ id: `spec:${name}`, name, description: null, doctorCount: doctors.filter((d) => d.department === name).length }));
   }
-  const real = configured
-    .map((d) => ({ id: d.id, name: d.name, description: d.description, doctorCount: doctors.filter((doc) => doc.departmentIds.includes(d.id)).length }))
+  const count = (id: string) => doctors.filter((doc) => doc.departmentIds.includes(id)).length;
+  return configured
+    .map((d) => ({ id: d.id, name: d.name, description: d.description, doctorCount: count(d.id) }))
     .filter((d) => d.doctorCount > 0);
-  const unassigned = doctors.filter((d) => !d.departmentIds.length);
-  const groups = [...new Set(unassigned.map((d) => d.department))]
-    .sort()
-    .map((name) => ({ id: `spec:${name}`, name, description: null, doctorCount: unassigned.filter((d) => d.department === name).length }));
-  return [...real, ...groups];
 }

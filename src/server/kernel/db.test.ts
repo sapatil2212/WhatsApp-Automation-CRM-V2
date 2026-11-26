@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { applyWhereGuard } from './db';
+import { applyWhereGuard, parentOwnerWhere } from './db';
 import type { TenantScope } from './tenant-scope';
 
 const TENANT = 'tenant-a';
@@ -134,5 +134,17 @@ describe('applyWhereGuard — scalar-only owner', () => {
       resolveOwnedIds: resolver(['biz-1']),
     });
     expect(where.businessId).toEqual({ in: ['biz-1'] });
+  });
+});
+
+describe('parentOwnerWhere — ownership check for child inserts', () => {
+  it('checks a direct parent by tenantId', () => {
+    expect(parentOwnerWhere('Clinic', TENANT)).toEqual({ tenantId: TENANT });
+  });
+
+  it('checks Doctor through its clinic (Doctor has no tenantId column)', () => {
+    // Regression: saving a doctor with departments wrote DoctorDepartment rows,
+    // whose ownership check filtered Doctor by a non-existent tenantId → 500.
+    expect(parentOwnerWhere('Doctor', TENANT)).toEqual({ clinic: { tenantId: TENANT } });
   });
 });

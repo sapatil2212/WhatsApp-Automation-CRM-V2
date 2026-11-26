@@ -716,7 +716,7 @@ export default function AppointmentsPage() {
         notes={[
           'This cannot be undone.',
           deleting && deleting.length > 1 ? 'Patients are not notified. To tell them, cancel instead.' : 'The patient is not notified. To tell them, cancel instead.',
-          deleting && deleting.length > 1 ? 'Appointments with a consultation record are skipped.' : 'Appointments with a consultation record cannot be deleted.',
+          'Any consultation, prescription and dictation for the visit is deleted too.',
         ]}
         confirmText={deleting && deleting.length > 1 ? `Delete ${deleting.length}` : 'Delete'}
         variant="destructive"

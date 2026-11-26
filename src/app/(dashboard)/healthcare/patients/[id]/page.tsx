@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
   Activity, AlertTriangle, ArrowLeft, CalendarClock, Download, Eye, FileText, HeartPulse, Loader2, Pill, Printer,
@@ -68,6 +68,8 @@ function ageFrom(dob: string | null | undefined): number | null {
 
 export default function PatientRecordPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [rec, setRec] = useState<Record_ | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('overview');
@@ -202,8 +204,40 @@ ${currentMeds.length ? `<h2>Last prescription (${esc(rec.prescriptions[0].number
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" className="gap-1.5" onClick={printSummary}><Printer className="size-3.5" /> Print summary</Button>
           <Button size="sm" className="gap-1.5" onClick={() => setTab('profile')}><HeartPulse className="size-3.5" /> Update record</Button>
+          <Button variant="outline" size="icon-sm" className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive" title="Delete patient record" aria-label="Delete patient record" onClick={() => setConfirmDelete(true)}><Trash2 className="size-3.5" /></Button>
         </div>
       </div>
+
+      <ConfirmationDialog
+        isOpen={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Delete this patient record?"
+        description="Everything the clinic recorded for the patient is permanently deleted."
+        details={
+          <div className="flex items-center justify-between gap-3">
+            <span className="truncate font-semibold">{rec.name}</span>
+            <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{rec.profile?.patientCode ?? (rec.phone ? `+${rec.phone}` : '')}</span>
+          </div>
+        }
+        notes={[
+          'Appointments, consultations, prescriptions, medical profile, documents, intake forms and feedback are deleted.',
+          'The WhatsApp contact and chat history stay in the Inbox.',
+          'This cannot be undone.',
+        ]}
+        confirmText="Delete"
+        variant="destructive"
+        onConfirm={async () => {
+          try {
+            await api(`/api/healthcare/patients/${id}`, { method: 'DELETE' });
+          } catch (e) {
+            toast.error((e as Error).message);
+            throw e;
+          }
+          toast.success('Patient record deleted.');
+          setConfirmDelete(false);
+          router.push('/healthcare/patients');
+        }}
+      />
 
       {/* Clinical alerts */}
       {(rec.profile?.allergies || rec.profile?.conditions) && (

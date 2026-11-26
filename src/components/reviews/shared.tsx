@@ -1,5 +1,6 @@
 'use client';
 
+import type { SocialPlatform } from '@/lib/reviews/social-platforms';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -25,6 +26,7 @@ export interface ReviewBusiness {
   services: string[];
   defaultLanguage: string;
   status: 'active' | 'inactive';
+  socialLinks: Array<{ platform: SocialPlatform; url: string }>;
   publicToken: string;
   createdAt: string;
   qrCount?: number;

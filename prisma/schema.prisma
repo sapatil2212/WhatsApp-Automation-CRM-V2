@@ -103,6 +103,10 @@ model Tenant {
   businessProfs               BusinessProfile[]
   portfolioItems              PortfolioItem[]
   reviewBusinesses            ReviewBusiness[]
+  gymPackages                 GymPackage[]
+  gymMembers                  GymMember[]
+  gymMemberships              GymMembership[]
+  memberMessageLogs           MemberMessageLog[]
 
   @@index([ownerUserId])
 }
@@ -264,6 +268,7 @@ model Contact {
   enquiries        BusinessEnquiry[]
   aiChatLogs       AiChatLog[]
   aiLogs           BusinessAILog[]
+  gymMembers       GymMember[]
 
   // A phone number identifies one person within a workspace. Enforced at the
   // database level so a race between two concurrent creates cannot produce a
@@ -1005,11 +1010,13 @@ model BusinessProfile {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  services   BusinessService[]
-  staff      BusinessStaff[]
-  faqs       BusinessFAQ[]
-  aiSettings BusinessAISettings?
-  enquiries  BusinessEnquiry[]
+  services    BusinessService[]
+  staff       BusinessStaff[]
+  faqs        BusinessFAQ[]
+  aiSettings  BusinessAISettings?
+  enquiries   BusinessEnquiry[]
+  gymPackages GymPackage[]
+  gymMembers  GymMember[]
 
   @@index([tenantId])
 }
@@ -1543,47 +1550,49 @@ model PatientDocument {
 // ==========================================
 
 model ReviewBusiness {
-  id              String   @id @default(uuid())
+  id              String    @id @default(uuid())
   tenantId        String
-  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  name            String   @db.VarChar(160)
-  category        String?  @db.VarChar(120)
-  description     String?  @db.Text
-  address         String?  @db.VarChar(300)
-  googleReviewUrl String?  @db.Text
-  website         String?  @db.VarChar(300)
-  phone           String?  @db.VarChar(40)
-  logoUrl         String?  @db.MediumText
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name            String    @db.VarChar(160)
+  category        String?   @db.VarChar(120)
+  description     String?   @db.Text
+  address         String?   @db.VarChar(300)
+  googleReviewUrl String?   @db.Text
+  website         String?   @db.VarChar(300)
+  phone           String?   @db.VarChar(40)
+  logoUrl         String?   @db.MediumText
   services        Json?
-  defaultLanguage String   @default("en") @db.VarChar(8)
-  status          String   @default("active") @db.VarChar(20) // active | inactive
-  publicToken     String   @unique @db.VarChar(40)
+  /// [{ platform, url }]: Instagram, Facebook, YouTube… shown on the QR landing page.
+  socialLinks     Json?
+  defaultLanguage String    @default("en") @db.VarChar(8)
+  status          String    @default("active") @db.VarChar(20) // active | inactive
+  publicToken     String    @unique @db.VarChar(40)
   deletedAt       DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  campaigns   ReviewCampaign[]
-  qrCodes     ReviewQRCode[]
-  jobs        ReviewAutomationJob[]
-  events      ReviewEngagementEvent[]
-  aiRequests  ReviewAIRequest[]
-  approvals   ReviewCustomerApproval[]
+  campaigns  ReviewCampaign[]
+  qrCodes    ReviewQRCode[]
+  jobs       ReviewAutomationJob[]
+  events     ReviewEngagementEvent[]
+  aiRequests ReviewAIRequest[]
+  approvals  ReviewCustomerApproval[]
 
   @@index([tenantId, deletedAt])
   @@index([tenantId, status])
 }
 
 model ReviewCampaign {
-  id          String   @id @default(uuid())
+  id          String         @id @default(uuid())
   tenantId    String
   businessId  String
   business    ReviewBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  name        String   @db.VarChar(160)
-  description String?  @db.VarChar(500)
-  status      String   @default("active") @db.VarChar(20) // active | paused
+  name        String         @db.VarChar(160)
+  description String?        @db.VarChar(500)
+  status      String         @default("active") @db.VarChar(20) // active | paused
   deletedAt   DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 
   qrCodes   ReviewQRCode[]
   jobs      ReviewAutomationJob[]
@@ -1594,49 +1603,49 @@ model ReviewCampaign {
 }
 
 model ReviewQRCode {
-  id         String   @id @default(uuid())
-  tenantId   String
-  businessId String
-  business   ReviewBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  campaignId String?
-  campaign   ReviewCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  label      String   @db.VarChar(160)
-  placement  String?  @db.VarChar(60) // reception, billing, invoice, whatsapp, website...
-  token      String   @unique @db.VarChar(40)
-  fgColor    String   @default("#0f172a") @db.VarChar(9)
-  bgColor    String   @default("#ffffff") @db.VarChar(9)
-  includeLogo Boolean @default(false)
-  status     String   @default("active") @db.VarChar(20)
-  deletedAt  DateTime?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id          String          @id @default(uuid())
+  tenantId    String
+  businessId  String
+  business    ReviewBusiness  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  campaignId  String?
+  campaign    ReviewCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  label       String          @db.VarChar(160)
+  placement   String?         @db.VarChar(60) // reception, billing, invoice, whatsapp, website...
+  token       String          @unique @db.VarChar(40)
+  fgColor     String          @default("#0f172a") @db.VarChar(9)
+  bgColor     String          @default("#ffffff") @db.VarChar(9)
+  includeLogo Boolean         @default(false)
+  status      String          @default("active") @db.VarChar(20)
+  deletedAt   DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 
-  jobs      ReviewAutomationJob[]
-  events    ReviewEngagementEvent[]
+  jobs       ReviewAutomationJob[]
+  events     ReviewEngagementEvent[]
   aiRequests ReviewAIRequest[]
-  approvals ReviewCustomerApproval[]
+  approvals  ReviewCustomerApproval[]
 
   @@index([tenantId, businessId])
   @@index([campaignId])
 }
 
 model ReviewCustomerApproval {
-  id          String   @id @default(uuid())
-  tenantId    String
-  businessId  String
-  business    ReviewBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  campaignId  String?
-  campaign    ReviewCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  qrCodeId    String?
-  qrCode      ReviewQRCode? @relation(fields: [qrCodeId], references: [id], onDelete: SetNull)
-  visitorId   String   @db.VarChar(64)
-  rating      Int
-  language    String   @db.VarChar(8)
-  feedbackText String? @db.Text
-  finalText   String   @db.Text
-  edited      Boolean  @default(false)
-  consentAt   DateTime @default(now())
-  createdAt   DateTime @default(now())
+  id           String          @id @default(uuid())
+  tenantId     String
+  businessId   String
+  business     ReviewBusiness  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  campaignId   String?
+  campaign     ReviewCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  qrCodeId     String?
+  qrCode       ReviewQRCode?   @relation(fields: [qrCodeId], references: [id], onDelete: SetNull)
+  visitorId    String          @db.VarChar(64)
+  rating       Int
+  language     String          @db.VarChar(8)
+  feedbackText String?         @db.Text
+  finalText    String          @db.Text
+  edited       Boolean         @default(false)
+  consentAt    DateTime        @default(now())
+  createdAt    DateTime        @default(now())
 
   jobs ReviewAutomationJob[]
 
@@ -1644,33 +1653,33 @@ model ReviewCustomerApproval {
 }
 
 model ReviewAutomationJob {
-  id          String   @id @default(uuid())
-  tenantId    String
-  businessId  String
-  business    ReviewBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  campaignId  String?
-  campaign    ReviewCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  qrCodeId    String?
-  qrCode      ReviewQRCode? @relation(fields: [qrCodeId], references: [id], onDelete: SetNull)
-  approvalId  String?
-  approval    ReviewCustomerApproval? @relation(fields: [approvalId], references: [id], onDelete: SetNull)
+  id              String                  @id @default(uuid())
+  tenantId        String
+  businessId      String
+  business        ReviewBusiness          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  campaignId      String?
+  campaign        ReviewCampaign?         @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  qrCodeId        String?
+  qrCode          ReviewQRCode?           @relation(fields: [qrCodeId], references: [id], onDelete: SetNull)
+  approvalId      String?
+  approval        ReviewCustomerApproval? @relation(fields: [approvalId], references: [id], onDelete: SetNull)
   // pending | queued | initializing | browser_launched | navigating | preparing_review |
   // awaiting_customer_confirmation | completed | failed | cancelled
-  status      String   @default("pending") @db.VarChar(40)
-  attempts    Int      @default(0)
-  maxAttempts Int      @default(3)
-  lastError   String?  @db.Text
-  nextRunAt   DateTime @default(now())
-  lockedAt    DateTime?
-  lockedBy    String?  @db.VarChar(80)
-  startedAt   DateTime?
-  finishedAt  DateTime?
-  durationMs  Int?
-  screenshotPath String? @db.VarChar(400)
-  result      Json?
-  cancelRequested Boolean @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  status          String                  @default("pending") @db.VarChar(40)
+  attempts        Int                     @default(0)
+  maxAttempts     Int                     @default(3)
+  lastError       String?                 @db.Text
+  nextRunAt       DateTime                @default(now())
+  lockedAt        DateTime?
+  lockedBy        String?                 @db.VarChar(80)
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  durationMs      Int?
+  screenshotPath  String?                 @db.VarChar(400)
+  result          Json?
+  cancelRequested Boolean                 @default(false)
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
 
   logs ReviewAutomationLog[]
 
@@ -1680,35 +1689,37 @@ model ReviewAutomationJob {
 }
 
 model ReviewAutomationLog {
-  id        String   @id @default(uuid())
+  id        String              @id @default(uuid())
   tenantId  String
   jobId     String
   job       ReviewAutomationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  level     String   @default("info") @db.VarChar(10) // info | warn | error
-  message   String   @db.VarChar(500)
+  level     String              @default("info") @db.VarChar(10) // info | warn | error
+  message   String              @db.VarChar(500)
   meta      Json?
-  createdAt DateTime @default(now())
+  createdAt DateTime            @default(now())
 
   @@index([jobId, createdAt])
   @@index([tenantId, createdAt])
 }
 
 model ReviewEngagementEvent {
-  id         String   @id @default(uuid())
+  id         String          @id @default(uuid())
   tenantId   String
   businessId String
-  business   ReviewBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business   ReviewBusiness  @relation(fields: [businessId], references: [id], onDelete: Cascade)
   campaignId String?
   campaign   ReviewCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   qrCodeId   String?
-  qrCode     ReviewQRCode? @relation(fields: [qrCodeId], references: [id], onDelete: SetNull)
-  visitorId  String   @db.VarChar(64)
+  qrCode     ReviewQRCode?   @relation(fields: [qrCodeId], references: [id], onDelete: SetNull)
+  visitorId  String          @db.VarChar(64)
   // page_view | rating_selected | feedback_submitted | ai_generated | draft_approved |
   // review_copied | google_opened | customer_reported_done
-  eventType  String   @db.VarChar(40)
-  language   String?  @db.VarChar(8)
+  eventType  String          @db.VarChar(40)
+  language   String?         @db.VarChar(8)
   rating     Int?
-  createdAt  DateTime @default(now())
+  /// Social platform for social_opened events (instagram, youtube…).
+  platform   String?         @db.VarChar(30)
+  createdAt  DateTime        @default(now())
 
   @@index([tenantId, businessId, createdAt])
   @@index([tenantId, eventType, createdAt])
@@ -1716,21 +1727,21 @@ model ReviewEngagementEvent {
 }
 
 model ReviewAIRequest {
-  id          String   @id @default(uuid())
+  id          String         @id @default(uuid())
   tenantId    String
   businessId  String
   business    ReviewBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
   qrCodeId    String?
-  qrCode      ReviewQRCode? @relation(fields: [qrCodeId], references: [id], onDelete: SetNull)
-  kind        String   @db.VarChar(20) // generate | translate | shorten | expand
-  language    String   @db.VarChar(8)
+  qrCode      ReviewQRCode?  @relation(fields: [qrCodeId], references: [id], onDelete: SetNull)
+  kind        String         @db.VarChar(20) // generate | translate | shorten | expand
+  language    String         @db.VarChar(8)
   rating      Int?
-  inputChars  Int      @default(0)
-  outputCount Int      @default(0)
-  tokensUsed  Int      @default(0)
-  success     Boolean  @default(true)
-  error       String?  @db.VarChar(300)
-  createdAt   DateTime @default(now())
+  inputChars  Int            @default(0)
+  outputCount Int            @default(0)
+  tokensUsed  Int            @default(0)
+  success     Boolean        @default(true)
+  error       String?        @db.VarChar(300)
+  createdAt   DateTime       @default(now())
 
   @@index([tenantId, businessId, createdAt])
 }
@@ -1739,25 +1750,24 @@ model ReviewAIRequest {
 /// interested?" nudges went out after the customer's last message. Resets
 /// when the customer replies (`inboundAt` changes).
 model LeadFollowUp {
-  id             String   @id @default(uuid())
+  id             String    @id @default(uuid())
   tenantId       String
-  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  conversationId String   @unique
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversationId String    @unique
   contactId      String
-  contact        Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact        Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
   /// The customer message these nudges answer; a newer one restarts the cycle.
   inboundAt      DateTime
-  step           Int      @default(0)
-  status         String   @default("active") @db.VarChar(20) // active | exhausted | stopped
-  stopReason     String?  @db.VarChar(60)
+  step           Int       @default(0)
+  status         String    @default("active") @db.VarChar(20) // active | exhausted | stopped
+  stopReason     String?   @db.VarChar(60)
   lastSentAt     DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@index([tenantId, status])
   @@index([contactId])
 }
-
 
 /// A drip sequence: timed WhatsApp messages sent to enrolled contacts.
 /// `steps` = [{ delayHours, kind: "template" | "text", templateName?, language?, params?, text? }];
@@ -1798,4 +1808,126 @@ model DripEnrollment {
   @@index([status, nextRunAt])
   @@index([tenantId])
   @@index([contactId])
+}
+
+// ── Health & fitness: members and packages ──────────────────────────
+
+/// A package a gym sells (e.g. "Monthly", "Quarterly + PT").
+model GymPackage {
+  id           String          @id @default(uuid())
+  tenantId     String
+  tenant       Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  businessId   String
+  business     BusinessProfile @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name         String          @db.VarChar(120)
+  description  String?         @db.Text
+  durationDays Int
+  price        Decimal         @db.Decimal(12, 2)
+  /// Joining / admission fee charged once with the first membership.
+  joiningFee   Decimal?        @db.Decimal(12, 2)
+  features     Json?
+  isActive     Boolean         @default(true)
+  sortOrder    Int             @default(0)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  memberships  GymMembership[]
+
+  @@index([tenantId, isActive])
+  @@index([businessId])
+}
+
+/// A gym member. Linked to the Contact so the Inbox and CRM see one person.
+model GymMember {
+  id                    String             @id @default(uuid())
+  tenantId              String
+  tenant                Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  businessId            String
+  business              BusinessProfile    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  contactId             String
+  contact               Contact            @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  memberCode            String             @db.VarChar(24)
+  name                  String             @db.VarChar(120)
+  phone                 String             @db.VarChar(32)
+  email                 String?            @db.VarChar(191)
+  gender                String?            @db.VarChar(20)
+  dateOfBirth           DateTime?          @db.Date
+  address               String?            @db.Text
+  emergencyContactName  String?            @db.VarChar(120)
+  emergencyContactPhone String?            @db.VarChar(32)
+  heightCm              Int?
+  weightKg              Decimal?           @db.Decimal(5, 1)
+  fitnessGoal           String?            @db.VarChar(191)
+  medicalNotes          String?            @db.Text
+  notes                 String?            @db.Text
+  joinedAt              DateTime           @db.Date
+  status                String             @default("active") @db.VarChar(20) // active | frozen | inactive
+  source                String             @default("manual") @db.VarChar(20) // manual | import | enquiry
+  whatsappConsent       Boolean            @default(true)
+  welcomeSentAt         DateTime?
+  lastAttendanceAt      DateTime?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  memberships           GymMembership[]
+  messageLogs           MemberMessageLog[]
+
+  @@unique([businessId, contactId])
+  @@unique([businessId, memberCode])
+  @@index([tenantId, status])
+  @@index([tenantId, phone])
+}
+
+/// A package assigned to a member for a period.
+model GymMembership {
+  id            String      @id @default(uuid())
+  tenantId      String
+  tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  memberId      String
+  member        GymMember   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  packageId     String?
+  package       GymPackage? @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  /// Snapshot, so renaming or deleting a package keeps history readable.
+  packageName   String      @db.VarChar(120)
+  startDate     DateTime    @db.Date
+  endDate       DateTime    @db.Date
+  price         Decimal     @db.Decimal(12, 2)
+  discount      Decimal     @default(0) @db.Decimal(12, 2)
+  amountPaid    Decimal     @default(0) @db.Decimal(12, 2)
+  paymentStatus String      @default("unpaid") @db.VarChar(20) // paid | partial | unpaid
+  paymentMode   String?     @db.VarChar(30)
+  status        String      @default("active") @db.VarChar(20) // active | cancelled
+  notes         String?     @db.Text
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([tenantId, endDate])
+  @@index([memberId])
+  @@index([packageId])
+}
+
+/// One row per member message attempt; (memberId, eventKey) makes sends idempotent.
+model MemberMessageLog {
+  id              String    @id @default(uuid())
+  tenantId        String
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  memberId        String
+  member          GymMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  contactId       String?
+  eventType       String    @db.VarChar(40)
+  eventKey        String    @db.VarChar(120)
+  channel         String    @default("none") @db.VarChar(20)
+  templateId      String?
+  templateName    String?   @db.VarChar(120)
+  templateVersion Int?
+  phoneNumber     String?   @db.VarChar(32)
+  messageId       String?   @db.VarChar(128)
+  status          String    @default("pending") @db.VarChar(30)
+  attempts        Int       @default(0)
+  errorMessage    String?   @db.Text
+  scheduledAt     DateTime?
+  sentAt          DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([memberId, eventKey])
+  @@index([tenantId, createdAt])
 }

@@ -52,7 +52,7 @@ function timeOptions(from: number, to: number) {
   return out;
 }
 
-const selectCls = 'h-9 rounded-lg border border-input bg-background px-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring/40 disabled:opacity-50';
+const selectCls = 'h-8 rounded-md border border-input bg-background px-2 text-[12px] text-foreground outline-none focus:ring-2 focus:ring-ring/40 disabled:opacity-50';
 
 function TimeSelect({ value, onChange, from, to, disabled, label }: { value: string; onChange: (v: string) => void; from: number; to: number; disabled?: boolean; label: string }) {
   const opts = useMemo(() => timeOptions(from, to), [from, to]);
@@ -121,10 +121,10 @@ function SessionCard({
   };
 
   return (
-    <div className={`rounded-xl border p-3 space-y-3 transition-colors ${session.enabled ? 'border-border bg-card' : 'border-dashed border-border bg-muted/30'}`}>
+    <div className={`rounded-lg border p-2.5 space-y-2.5 transition-colors ${session.enabled ? 'border-border bg-card' : 'border-dashed border-border bg-muted/30'}`}>
       <div className="flex items-center justify-between gap-2">
         <div>
-          <p className="text-sm font-semibold text-foreground">{bounds.label}</p>
+          <p className="text-[13px] font-semibold text-foreground">{bounds.label}</p>
           <p className="text-[11px] text-muted-foreground">{SESSION_HINT[k]}</p>
         </div>
         <Switch checked={session.enabled} onCheckedChange={(v: boolean) => set({ enabled: v })} aria-label={`${day} ${bounds.label} session`} />
@@ -157,7 +157,7 @@ function SessionCard({
               <div key={b.id} className="space-y-2 rounded-lg bg-muted/50 p-2">
                 <div className="flex items-center gap-1.5">
                   <Coffee className="h-3.5 w-3.5 shrink-0 text-amber-500" />
-                  <Input aria-label="Break name" value={b.name} maxLength={40} className="h-8 text-xs" onChange={(e) => set({ breaks: session.breaks.map((x) => (x.id === b.id ? { ...x, name: e.target.value } : x)) })} />
+                  <Input aria-label="Break name" value={b.name} maxLength={40} className="h-7 text-[12px] md:text-[12px]" onChange={(e) => set({ breaks: session.breaks.map((x) => (x.id === b.id ? { ...x, name: e.target.value } : x)) })} />
                   <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" aria-label="Copy break to other days" title="Copy break to days" onClick={() => setCopying(copying === b.id ? null : b.id)}><Copy className="h-3.5 w-3.5" /></Button>
                   <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0 text-destructive hover:text-destructive" aria-label="Remove break" onClick={() => set({ breaks: session.breaks.filter((x) => x.id !== b.id) })}><Trash2 className="h-3.5 w-3.5" /></Button>
                 </div>
@@ -199,10 +199,10 @@ export function ScheduleEditor({ value, onChange }: { value: WeeklySchedule; onC
   return (
     <div className="space-y-4">
       {/* Summary */}
-      <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
+      <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <CalendarDays className="h-4 w-4 text-primary" />
-          <span className="text-sm font-semibold text-foreground">
+          <span className="text-[13px] font-semibold text-foreground">
             {summary.workingDays} Working Day{summary.workingDays === 1 ? '' : 's'} · {summary.slotsPerWeek} Available Slot{summary.slotsPerWeek === 1 ? '' : 's'} per Week
           </span>
           <span className="text-xs text-muted-foreground">Breaks: {summary.breakMinutesPerWeek >= 60 ? `${Math.floor(summary.breakMinutesPerWeek / 60)}h ${summary.breakMinutesPerWeek % 60}m` : `${summary.breakMinutesPerWeek} min`} / week</span>
@@ -221,9 +221,9 @@ export function ScheduleEditor({ value, onChange }: { value: WeeklySchedule; onC
 
       {/* Presets */}
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="mr-1 text-xs text-muted-foreground">Quick presets:</span>
+        <span className="mr-1 text-[11px] text-muted-foreground">Quick presets:</span>
         {PRESETS.map((p) => (
-          <Button key={p.id} type="button" size="sm" variant="outline" className={p.id === 'clear' ? 'text-destructive hover:text-destructive' : ''} onClick={() => onChange(applyPreset(value, p.id))}>
+          <Button key={p.id} type="button" size="sm" variant="outline" className={p.id === 'clear' ? 'h-7 text-xs text-destructive hover:text-destructive' : 'h-7 text-xs'} onClick={() => onChange(applyPreset(value, p.id))}>
             {p.label}
           </Button>
         ))}
@@ -236,21 +236,21 @@ export function ScheduleEditor({ value, onChange }: { value: WeeklySchedule; onC
           const dayIssues = issues.filter((i) => i.day === d);
           const expanded = open === d;
           return (
-            <div key={d} className={`rounded-xl border ${dayIssues.length ? 'border-destructive/50' : 'border-border'} bg-muted/20`}>
-              <div className="flex flex-wrap items-center gap-3 p-3">
+            <div key={d} className={`rounded-lg border ${dayIssues.length ? 'border-destructive/50' : 'border-border'} bg-muted/20`}>
+              <div className="flex flex-wrap items-center gap-2.5 px-3 py-2">
                 <Switch checked={day.enabled} onCheckedChange={(v: boolean) => { setDay(d, { enabled: v }); if (v) setOpen(d); }} aria-label={`${d} working day`} />
                 <button type="button" className="flex min-w-0 flex-1 items-center gap-2 text-left" onClick={() => setOpen(expanded ? null : d)}>
-                  {expanded ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
-                  <span className={`w-24 shrink-0 text-sm font-medium ${day.enabled ? 'text-foreground' : 'text-muted-foreground'}`}>{d}</span>
+                  {expanded ? <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" /> : <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />}
+                  <span className={`w-24 shrink-0 text-[13px] font-medium ${day.enabled ? 'text-foreground' : 'text-muted-foreground'}`}>{d}</span>
                   <span className="truncate text-xs text-muted-foreground">{day.enabled ? describeDay(day) : 'Not working'}</span>
                 </button>
                 {day.enabled && <span className="text-xs text-muted-foreground">{summary.perDay[d]} slots</span>}
                 {day.enabled && (
                   <div className="flex gap-1">
-                    <Button type="button" size="sm" variant="ghost" className="h-8 gap-1 px-2 text-xs" onClick={() => setCopyFrom(copyFrom === d ? null : d)} title="Copy hours to other days">
+                    <Button type="button" size="sm" variant="ghost" className="h-7 gap-1 px-2 text-[11px]" onClick={() => setCopyFrom(copyFrom === d ? null : d)} title="Copy hours to other days">
                       <Copy className="h-3.5 w-3.5" /> Copy hours
                     </Button>
-                    <Button type="button" size="sm" variant="ghost" className="h-8 gap-1 px-2 text-xs" onClick={() => onChange(applyToActiveDays(value, d))} title="Apply these sessions to every active day">
+                    <Button type="button" size="sm" variant="ghost" className="h-7 gap-1 px-2 text-[11px]" onClick={() => onChange(applyToActiveDays(value, d))} title="Apply these sessions to every active day">
                       <CopyCheck className="h-3.5 w-3.5" /> Apply to active days
                     </Button>
                   </div>
@@ -262,7 +262,7 @@ export function ScheduleEditor({ value, onChange }: { value: WeeklySchedule; onC
                 </div>
               )}
               {expanded && day.enabled && (
-                <div className="grid gap-3 border-t border-border p-3 md:grid-cols-3">
+                <div className="grid gap-2.5 border-t border-border p-2.5 md:grid-cols-3">
                   {SESSION_KEYS.map((k) => (
                     <SessionCard
                       key={k}

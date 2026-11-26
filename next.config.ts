@@ -61,6 +61,8 @@ const nextConfig: NextConfig = {
   // worker failed: Cannot find module './pdf.worker.mjs'"), so load it with
   // plain Node `require` from node_modules instead.
   serverExternalPackages: ["pdf-parse"],
+  // The auth pages' dashboard preview uses quality 70; the default only allows 75.
+  images: { qualities: [70, 75] },
   experimental: {
     // Business-setup documents can be up to 50 MB; the proxy buffers bodies.
     proxyClientMaxBodySize: "55mb",

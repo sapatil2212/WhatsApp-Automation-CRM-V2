@@ -5,10 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
-import {
-  Combobox, ComboboxClear, ComboboxContent, ComboboxEmpty,
-  ComboboxInput, ComboboxInputGroup, ComboboxItem, ComboboxList, ComboboxTrigger,
-} from "@/components/ui/combobox";
+import { CategoryPicker } from "@/components/auth/category-picker";
 import { ArrowLeft, ArrowRight, Check, CheckCircle, Eye, EyeOff, Loader2, Paperclip, PartyPopper, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AuthShell } from "@/components/auth/auth-shell";
@@ -18,20 +15,6 @@ import { cn } from "@/lib/utils";
 import { planById, SELF_SERVE_PLANS } from "@/lib/billing/plans";
 
 const WHATSAPP_CONTACT = "917745868073";
-
-// ─── Business Categories ──────────────────────────────────────────────────────
-const BUSINESS_CATEGORIES = [
-  "Beauty & Personal Care",
-  "Health & Wellness",
-  "Trades & Home Services",
-  "Professional Services",
-  "Automotive Services",
-  "Medical & Allied Health",
-  "Education & Training",
-  "Hospitality",
-  "Pet Services",
-  "Other",
-];
 
 // ─── Pricing Plans (shared with the marketing site) ───────────────────────────
 const PLAN_ICONS = { starter: Sparkles, managed: CheckCircle, custom: ArrowRight } as const;
@@ -47,6 +30,9 @@ const STEP_TABS = [
 
 const STEP_INDEX: Record<Step, number> = { form: 0, otp: 1, payment: 2, done: 3 };
 const MIN_PASSWORD = 8;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+type FieldKey = "fullName" | "email" | "mobileNumber" | "businessCategory" | "password" | "confirmPassword";
+const FIELD_ORDER: FieldKey[] = ["fullName", "email", "mobileNumber", "businessCategory", "password", "confirmPassword"];
 
 export default function SignupPage() {
   const [fullName, setFullName]                     = useState("");
@@ -76,6 +62,20 @@ export default function SignupPage() {
   const [proofFile, setProofFile]                   = useState<File | null>(null);
   const [sending, setSending]                       = useState(false);
 
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldKey, string>>>({});
+  const [emailTaken, setEmailTaken] = useState(false);
+  /** Updates a field and clears its error as soon as the user edits it. */
+  const edit = <T,>(key: FieldKey, setter: (v: T) => void) => (v: T) => {
+    setter(v);
+    setFieldErrors((f) => (f[key] ? { ...f, [key]: undefined } : f));
+    if (key === "email") setEmailTaken(false);
+  };
+  const showErrors = (errs: Partial<Record<FieldKey, string>>) => {
+    setFieldErrors(errs);
+    const first = FIELD_ORDER.find((k) => errs[k]);
+    if (first) document.getElementById(first)?.focus();
+  };
+
   const fileRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
 
@@ -83,14 +83,23 @@ export default function SignupPage() {
     e.preventDefault();
     setError(null);
 
-    if (password !== confirmPassword) { setError("Passwords do not match"); return; }
-    if (!businessCategory) { setError("Choose your business category"); return; }
-    if (password.length < MIN_PASSWORD) { setError(`Password must be at least ${MIN_PASSWORD} characters`); return; }
+    const errs: Partial<Record<FieldKey, string>> = {};
+    if (fullName.trim().length < 2) errs.fullName = "Enter your full name.";
+    if (!email.trim()) errs.email = "Enter your work email.";
+    else if (!EMAIL_RE.test(email.trim())) errs.email = "Enter a valid email, like you@company.com.";
+    if (mobileNumber.replace(/\D/g, "").length < 10) errs.mobileNumber = "Enter a valid mobile number.";
+    if (!businessCategory) errs.businessCategory = "Choose your business category.";
+    if (!password) errs.password = "Create a password.";
+    else if (password.length < MIN_PASSWORD) errs.password = `Use at least ${MIN_PASSWORD} characters.`;
+    if (!confirmPassword) errs.confirmPassword = "Re-enter your password.";
+    else if (password !== confirmPassword) errs.confirmPassword = "Passwords don't match.";
+    if (Object.keys(errs).length) return showErrors(errs);
+    setFieldErrors({});
 
     setLoading(true);
 
     const { data, error: signupError } = await supabase.auth.signUp({
-      email,
+      email: email.trim(),
       password,
       options: {
         data: {
@@ -105,7 +114,14 @@ export default function SignupPage() {
     setLoading(false);
 
     if (signupError) {
-      setError(signupError.message);
+      // Errors about one field go under that field; anything else above the form.
+      const { field, code } = signupError as { field?: string; code?: string };
+      if (field && (FIELD_ORDER as string[]).includes(field)) {
+        showErrors({ [field]: signupError.message });
+        setEmailTaken(code === "email_taken");
+      } else {
+        setError(signupError.message);
+      }
       return;
     }
 
@@ -233,39 +249,40 @@ export default function SignupPage() {
               <p className="text-sm text-[var(--m-text-tertiary)]">Set up ChatNexGen for your business in a few minutes.</p>
             </div>
 
-            <form onSubmit={handleSignupSubmit} className="flex flex-col gap-3.5">
+            <form onSubmit={handleSignupSubmit} className="flex flex-col gap-3.5" noValidate>
               {error && <AuthNotice tone="error">{error}</AuthNotice>}
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <AuthField label="Full name" htmlFor="fullName">
-                  <Input id="fullName" type="text" placeholder="Your name" value={fullName} onChange={(e) => setFullName(e.target.value)} required autoComplete="name" autoFocus className={authInputClass} />
+                <AuthField label="Full name" htmlFor="fullName" error={fieldErrors.fullName}>
+                  <Input id="fullName" type="text" placeholder="Your name" value={fullName} onChange={(e) => edit("fullName", setFullName)(e.target.value)} aria-invalid={Boolean(fieldErrors.fullName)} aria-describedby={fieldErrors.fullName ? "fullName-error" : undefined} required autoComplete="name" autoFocus className={authInputClass} />
                 </AuthField>
-                <AuthField label="Work email" htmlFor="email">
-                  <Input id="email" type="email" placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" className={authInputClass} />
+                <AuthField
+                  label="Work email"
+                  htmlFor="email"
+                  error={
+                    fieldErrors.email &&
+                    (emailTaken ? (
+                      <>
+                        {fieldErrors.email}{" "}
+                        <Link href={`/login?email=${encodeURIComponent(email.trim())}`} className="underline underline-offset-2 hover:text-rose-400">Log in instead</Link>
+                      </>
+                    ) : (
+                      fieldErrors.email
+                    ))
+                  }
+                >
+                  <Input id="email" type="email" placeholder="you@company.com" value={email} onChange={(e) => edit("email", setEmail)(e.target.value)} aria-invalid={Boolean(fieldErrors.email)} aria-describedby={fieldErrors.email ? "email-error" : undefined} required autoComplete="email" className={authInputClass} />
                 </AuthField>
-                <AuthField label="Mobile number" htmlFor="mobileNumber">
-                  <Input id="mobileNumber" type="tel" inputMode="tel" placeholder="+91 98765 43210" value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value)} required autoComplete="tel" className={authInputClass} />
+                <AuthField label="Mobile number" htmlFor="mobileNumber" error={fieldErrors.mobileNumber}>
+                  <Input id="mobileNumber" type="tel" inputMode="tel" placeholder="+91 98765 43210" value={mobileNumber} onChange={(e) => edit("mobileNumber", setMobileNumber)(e.target.value)} aria-invalid={Boolean(fieldErrors.mobileNumber)} aria-describedby={fieldErrors.mobileNumber ? "mobileNumber-error" : undefined} required autoComplete="tel" className={authInputClass} />
                 </AuthField>
-                <AuthField label="Business category" htmlFor="businessCategory">
-                  <Combobox items={BUSINESS_CATEGORIES} value={businessCategory || null} onValueChange={(value) => setBusinessCategory((value as string) ?? "")}>
-                    <ComboboxInputGroup>
-                      <ComboboxInput id="businessCategory" placeholder="Search category" required className={cn(authInputClass, "cursor-text pr-14")} />
-                      {businessCategory && <ComboboxClear />}
-                      <ComboboxTrigger />
-                    </ComboboxInputGroup>
-                    <ComboboxContent className="border border-[var(--m-border-secondary)] bg-[var(--m-bg-secondary)] text-[12px]">
-                      <ComboboxEmpty>No category found.</ComboboxEmpty>
-                      <ComboboxList>
-                        {(item: string) => (
-                          <ComboboxItem key={item} value={item} className="text-[12px] text-[var(--m-text-primary)]">{item}</ComboboxItem>
-                        )}
-                      </ComboboxList>
-                    </ComboboxContent>
-                  </Combobox>
+                <AuthField label="Business category" htmlFor="businessCategory" error={fieldErrors.businessCategory}>
+                  <CategoryPicker id="businessCategory" value={businessCategory} onChange={edit("businessCategory", setBusinessCategory)} triggerClassName={cn(authInputClass, "cursor-pointer")} />
                 </AuthField>
                 <AuthField
                   label="Password"
                   htmlFor="password"
+                  error={fieldErrors.password}
                   hint={
                     strength > 0 ? (
                       <div className="flex items-center gap-1.5">
@@ -286,9 +303,11 @@ export default function SignupPage() {
                     type={showPassword ? "text" : "password"}
                     placeholder={`At least ${MIN_PASSWORD} characters`}
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => edit("password", setPassword)(e.target.value)}
                     required
                     autoComplete="new-password"
+                    aria-invalid={Boolean(fieldErrors.password)}
+                    aria-describedby={fieldErrors.password ? "password-error" : undefined}
                     className={`${authInputClass} pr-10`}
                   />
                   <button type="button" onClick={() => setShowPassword((s) => !s)} aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--m-text-muted)] hover:text-[var(--m-text-primary)]">
@@ -298,17 +317,18 @@ export default function SignupPage() {
                 <AuthField
                   label="Confirm password"
                   htmlFor="confirmPassword"
-                  hint={passwordsMismatch ? <span className="text-[10px] font-medium text-rose-500">Passwords don&apos;t match</span> : undefined}
+                  error={fieldErrors.confirmPassword ?? (passwordsMismatch ? "Passwords don't match." : undefined)}
                 >
                   <Input
                     id="confirmPassword"
                     type={showConfirmPassword ? "text" : "password"}
                     placeholder="Re-enter password"
                     value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    onChange={(e) => edit("confirmPassword", setConfirmPassword)(e.target.value)}
                     required
                     autoComplete="new-password"
-                    aria-invalid={passwordsMismatch}
+                    aria-invalid={passwordsMismatch || Boolean(fieldErrors.confirmPassword)}
+                    aria-describedby={passwordsMismatch || fieldErrors.confirmPassword ? "confirmPassword-error" : undefined}
                     className={`${authInputClass} pr-10`}
                   />
                   <button type="button" onClick={() => setShowConfirmPassword((s) => !s)} aria-label={showConfirmPassword ? "Hide password" : "Show password"} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--m-text-muted)] hover:text-[var(--m-text-primary)]">
@@ -377,8 +397,10 @@ export default function SignupPage() {
               </p>
             </div>
             <form onSubmit={handleVerifyOtp} className="flex flex-col gap-4">
-              {error && <AuthNotice tone="error">{error}</AuthNotice>}
-              <OtpInput value={otp} onChange={(next) => setOtp(next.replace(/\D/g, "").slice(0, 6))} length={6} autoFocus disabled={verifyLoading} />
+              <div className="flex flex-col gap-1.5">
+                <OtpInput value={otp} onChange={(next) => { setOtp(next.replace(/\D/g, "").slice(0, 6)); if (error) setError(null); }} length={6} autoFocus disabled={verifyLoading} />
+                {error && <p role="alert" className="text-center text-[11px] font-medium text-rose-500">{error}</p>}
+              </div>
               <button type="submit" disabled={verifyLoading || otp.length < 6} className={authPrimaryButton}>
                 {verifyLoading ? <><Loader2 className="size-4 animate-spin" /> Verifying…</> : <>Verify email <ArrowRight className="size-4" /></>}
               </button>

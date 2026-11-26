@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
+import { ArrowRight, Menu, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useMarketingTheme } from "@/components/marketing/marketing-theme-provider";
 import { ThemeToggle } from "./theme-toggle";
@@ -111,9 +111,10 @@ export function GlassNavbar() {
             </BookDemoTrigger>
             <Link
               href={ctaHref}
-              className="text-xs font-semibold bg-[#00DF82] hover:bg-[#00c673] text-slate-950 px-4 py-2 transition-colors whitespace-nowrap"
+              className="group inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-[#00DF82] px-5 py-2.5 text-xs font-semibold text-slate-950 shadow-[0_6px_24px_rgba(0,223,130,0.25)] transition-all duration-300 ease-out hover:-translate-y-px hover:bg-[#00c673]"
             >
               {ctaLabel}
+              <ArrowRight className="size-4 transition-transform duration-300 ease-out group-hover:translate-x-1" />
             </Link>
           </div>
 
@@ -175,9 +176,10 @@ export function GlassNavbar() {
             <Link
               href={ctaHref}
               onClick={() => setIsOpen(false)}
-              className="w-full text-center text-xs font-semibold bg-[#00DF82] text-slate-950 py-3 hover:bg-[#00c673] transition-colors"
+              className="group inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#00DF82] py-3 text-xs font-semibold text-slate-950 shadow-[0_6px_24px_rgba(0,223,130,0.25)] transition-all duration-300 ease-out hover:bg-[#00c673]"
             >
               {ctaLabel}
+              <ArrowRight className="size-4 transition-transform duration-300 ease-out group-hover:translate-x-1" />
             </Link>
           </div>
         </div>

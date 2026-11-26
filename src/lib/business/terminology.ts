@@ -32,18 +32,18 @@ export const SEGMENTS: Record<string, BusinessTerminology> = {
   },
   wellness: {
     segment: "wellness",
-    businessNameLabel: "Wellness Center Name",
-    businessSetupLabel: "Center Setup",
+    businessNameLabel: "Gym / Fitness Centre Name",
+    businessSetupLabel: "Gym Setup",
     staffLabel: "Trainer / Coach",
     staffPluralLabel: "Trainers & Coaches",
     serviceLabel: "Class / Service",
     servicePluralLabel: "Classes & Services",
     bookingLabel: "Class Booking",
     bookingPluralLabel: "Class Bookings",
-    dashboardTitle: "Wellness Booking & Automation Dashboard",
+    dashboardTitle: "Gym & Fitness Automation Dashboard",
     clientLabel: "Member",
     clientPluralLabel: "Members",
-    specializationLabel: "Specialization (e.g. Yoga, Nutrition)",
+    specializationLabel: "Specialization (e.g. Strength, Yoga, Nutrition)",
   },
   trades: {
     segment: "trades",
@@ -156,7 +156,8 @@ export function getBusinessSegment(businessType: string | null | undefined): str
   if (!businessType) return "business";
   const type = businessType.toLowerCase().trim();
   if (type.includes("beauty")) return "beauty";
-  if (type.includes("wellness")) return "wellness";
+  // "Gym & Fitness" (signup) and the older "Health & Wellness" both open the fitness dashboard.
+  if (type.includes("wellness") || type.includes("gym") || type.includes("fitness")) return "wellness";
   if (type.includes("trades")) return "trades";
   if (type.includes("professional")) return "professional";
   if (type.includes("automotive")) return "automotive";
@@ -170,4 +171,10 @@ export function getBusinessSegment(businessType: string | null | undefined): str
 export function getTerminology(segment: string | null | undefined): BusinessTerminology {
   if (!segment) return SEGMENTS.business;
   return SEGMENTS[segment] || SEGMENTS.business;
+}
+
+/** Segments with members and packages (health & fitness). */
+export const FITNESS_SEGMENTS: readonly string[] = ["wellness"];
+export function isFitnessSegment(segment: string | null | undefined): boolean {
+  return Boolean(segment && FITNESS_SEGMENTS.includes(segment));
 }

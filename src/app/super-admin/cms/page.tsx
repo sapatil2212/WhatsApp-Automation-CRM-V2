@@ -10,7 +10,6 @@ import {
   Mail, Phone, MapPin, Send, Palette, Layout, Server, Lock
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { SuperAdminShell } from "../super-admin-shell";
 
 type TabType = "branding" | "footer" | "contact" | "smtp" | "announcements" | "articles" | "changelog";
 
@@ -283,7 +282,7 @@ export default function SuperAdminCmsPage() {
   };
 
   return (
-    <SuperAdminShell>
+    <>
       <div className="space-y-4">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1604,6 +1603,6 @@ export default function SuperAdminCmsPage() {
           </div>
         )}
       </AnimatePresence>
-    </SuperAdminShell>
+    </>
   );
 }

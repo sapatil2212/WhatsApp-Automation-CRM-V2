@@ -13,6 +13,7 @@ import { z } from 'zod';
 
 import { LANGUAGE_CODES, QR_PLACEMENTS } from '@/lib/reviews/constants';
 import { validateGoogleReviewUrl } from '@/lib/reviews/google-url';
+import { normalizeSocialLink, PLATFORM, sanitizeSocialLinks, SOCIAL_PLATFORMS, type SocialLink } from '@/lib/reviews/social-platforms';
 import { qrPng, qrSvg, reviewUrl } from '@/lib/reviews/qr';
 import { newPublicToken } from '@/lib/reviews/token';
 
@@ -43,6 +44,8 @@ export const businessBodySchema = z.object({
   services: z.array(z.string().trim().min(1).max(120)).max(30).default([]),
   defaultLanguage: z.enum(LANGUAGE_CODES).default('en'),
   status: z.enum(['active', 'inactive']).default('active'),
+  /** Shown on the universal QR page next to the Google review button. */
+  socialLinks: z.array(z.object({ platform: z.enum(SOCIAL_PLATFORMS), url: z.string().trim().max(500) })).max(SOCIAL_PLATFORMS.length).default([]),
 });
 export type BusinessBody = z.infer<typeof businessBodySchema>;
 
@@ -53,8 +56,23 @@ function checkGoogleUrl(url: string | null): string | null {
   return check.normalized ?? url;
 }
 
-function toBusiness(b: Record<string, unknown> & { services: unknown }) {
-  return { ...b, services: Array.isArray(b.services) ? (b.services as string[]) : [] };
+/** Validates and canonicalises social links; the first problem is reported by platform. */
+function checkSocialLinks(list: Array<{ platform: (typeof SOCIAL_PLATFORMS)[number]; url: string }>): SocialLink[] {
+  const seen = new Set<string>();
+  const out: SocialLink[] = [];
+  for (const item of list) {
+    if (!item.url) continue;
+    if (seen.has(item.platform)) throw new ValidationError(`Add only one ${PLATFORM[item.platform].label} link.`, { details: { field: 'socialLinks' } });
+    const n = normalizeSocialLink(item.platform, item.url);
+    if ('error' in n) throw new ValidationError(n.error, { details: { field: 'socialLinks', platform: item.platform } });
+    seen.add(item.platform);
+    out.push({ platform: item.platform, url: n.url });
+  }
+  return out;
+}
+
+function toBusiness<T extends { services: unknown; socialLinks?: unknown }>(b: T): Omit<T, 'services' | 'socialLinks'> & { services: string[]; socialLinks: SocialLink[] } {
+  return { ...b, services: Array.isArray(b.services) ? (b.services as string[]) : [], socialLinks: sanitizeSocialLinks(b.socialLinks) };
 }
 
 export async function listBusinesses(db: TenantDb, q: { search?: string; status?: string }) {
@@ -74,13 +92,13 @@ export async function listBusinesses(db: TenantDb, q: { search?: string; status?
 export async function getBusiness(db: TenantDb, id: string) {
   const b = await db.reviewBusiness.findFirst({ where: { id, deletedAt: null } });
   if (!b) throw new NotFoundError('Business');
-  return b;
+  return toBusiness(b);
 }
 
 export async function createBusiness(db: TenantDb, body: BusinessBody) {
   const googleReviewUrl = checkGoogleUrl(body.googleReviewUrl);
   const created = await db.reviewBusiness.create({
-    data: scoped({ ...body, googleReviewUrl, publicToken: newPublicToken() }),
+    data: scoped({ ...body, googleReviewUrl, socialLinks: checkSocialLinks(body.socialLinks ?? []), publicToken: newPublicToken() }),
   });
   return toBusiness(created);
 }
@@ -89,6 +107,7 @@ export async function updateBusiness(db: TenantDb, id: string, body: Partial<Bus
   await getBusiness(db, id);
   const data: Record<string, unknown> = { ...body };
   if ('googleReviewUrl' in body) data.googleReviewUrl = checkGoogleUrl(body.googleReviewUrl ?? null);
+  if ('socialLinks' in body) data.socialLinks = checkSocialLinks(body.socialLinks ?? []);
   const updated = await db.reviewBusiness.update({ where: { id }, data });
   return toBusiness(updated);
 }
@@ -102,6 +121,39 @@ export async function deleteBusiness(db: TenantDb, id: string) {
   await db.reviewCampaign.updateMany({ where: { businessId: id, deletedAt: null }, data: { deletedAt: now, status: 'paused' } });
   await db.reviewAutomationJob.updateMany({ where: { businessId: id, status: { in: ['pending', 'queued'] } }, data: { status: 'cancelled', finishedAt: now, lastError: 'Business was deleted.' } });
   return { deleted: true as const };
+}
+
+/**
+ * Business details from Business Setup (clinic or business profile), so the
+ * owner can fill the review business in one click. Read-only; nothing is saved.
+ */
+export async function setupPrefill(db: TenantDb) {
+  const [clinic, biz] = await Promise.all([
+    db.clinic.findFirst({ select: { clinicName: true, clinicType: true, clinicDescription: true, phone: true, website: true, address: true, city: true, instagramUrl: true, facebookUrl: true, whatsappNumber: true, services: { select: { serviceName: true }, take: 30 } } }),
+    db.businessProfile.findFirst({ select: { businessName: true, businessType: true, description: true, phone: true, website: true, address: true, city: true, instagramUrl: true, facebookUrl: true, whatsappNumber: true, services: { where: { isActive: true }, select: { name: true }, take: 30 } } }),
+  ]);
+  const src = clinic
+    ? { name: clinic.clinicName, category: clinic.clinicType, description: clinic.clinicDescription, phone: clinic.phone, website: clinic.website, address: [clinic.address, clinic.city].filter(Boolean).join(', '), instagram: clinic.instagramUrl, facebook: clinic.facebookUrl, whatsapp: clinic.whatsappNumber, services: clinic.services.map((x) => x.serviceName) }
+    : biz
+      ? { name: biz.businessName, category: biz.businessType, description: biz.description, phone: biz.phone, website: biz.website, address: [biz.address, biz.city].filter(Boolean).join(', '), instagram: biz.instagramUrl, facebook: biz.facebookUrl, whatsapp: biz.whatsappNumber, services: biz.services.map((x) => x.name) }
+      : null;
+  if (!src) throw new NotFoundError('Business setup', { details: { hint: 'Complete Business Setup first.' } });
+  const socialLinks = sanitizeSocialLinks([
+    src.instagram && { platform: 'instagram', url: src.instagram },
+    src.facebook && { platform: 'facebook', url: src.facebook },
+    src.whatsapp && { platform: 'whatsapp', url: src.whatsapp },
+    src.website && { platform: 'website', url: src.website },
+  ].filter(Boolean));
+  return {
+    name: src.name ?? '',
+    category: src.category ?? '',
+    description: (src.description ?? '').slice(0, 2000),
+    phone: src.phone ?? '',
+    website: src.website ?? '',
+    address: src.address.slice(0, 300),
+    services: [...new Set(src.services.map((x) => x.trim()).filter(Boolean))].slice(0, 30),
+    socialLinks,
+  };
 }
 
 // ── campaigns ────────────────────────────────────────────────────────
@@ -358,7 +410,7 @@ export async function analyticsOverview(db: TenantDb, r: Range) {
   const bizWhere = r.businessId ? { businessId: r.businessId } : {};
   const events = await db.reviewEngagementEvent.findMany({
     where: { createdAt: { gte: since }, ...bizWhere },
-    select: { createdAt: true, eventType: true, visitorId: true, language: true, businessId: true, campaignId: true, qrCodeId: true },
+    select: { createdAt: true, eventType: true, visitorId: true, language: true, businessId: true, campaignId: true, qrCodeId: true, platform: true },
     take: 100_000,
   });
   const [aiAgg, jobGroups, approvals] = await Promise.all([
@@ -390,6 +442,8 @@ export async function analyticsOverview(db: TenantDb, r: Range) {
   for (const e of events) if (e.eventType === 'ai_generated' && e.language) languages.set(e.language, (languages.get(e.language) ?? 0) + 1);
 
   const funnel = FUNNEL.map((s) => ({ ...s, count: uniq(s.key) }));
+  const social = new Map<string, number>();
+  for (const e of events) if (e.eventType === 'social_opened' && e.platform) social.set(e.platform, (social.get(e.platform) ?? 0) + 1);
 
   return {
     rangeDays: r.days,
@@ -401,6 +455,7 @@ export async function analyticsOverview(db: TenantDb, r: Range) {
       approvedDrafts: approvals,
       copyActions: count('review_copied'),
       googleOpens: count('google_opened'),
+      socialOpens: count('social_opened'),
       customerReportedDone: count('customer_reported_done'),
       automationJobs: jobTotal,
       prepSuccess: (jobs.awaiting_customer_confirmation ?? 0) + (jobs.completed ?? 0),
@@ -413,6 +468,7 @@ export async function analyticsOverview(db: TenantDb, r: Range) {
     monthly: series(monthKey),
     languages: [...languages.entries()].map(([language, count]) => ({ language, count })).sort((a, b) => b.count - a.count),
     funnel,
+    socialByPlatform: [...social.entries()].map(([platform, count]) => ({ platform, count })).sort((a, b) => b.count - a.count),
     note: 'Google page opens are not published reviews. A review counts as confirmed only when the customer says they finished; ChatNexGen cannot verify publication on Google.',
   };
 }

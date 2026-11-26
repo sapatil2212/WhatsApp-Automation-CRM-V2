@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useTotalUnread } from "@/hooks/use-total-unread";
 import { useTheme } from "@/hooks/use-theme";
-import { getBusinessSegment, getTerminology } from "@/lib/business/terminology";
+import { getBusinessSegment, getTerminology, isFitnessSegment } from "@/lib/business/terminology";
 import { ReviewsNavSection } from "@/components/reviews/reviews-nav-section";
 import {
   LayoutDashboard,
@@ -34,6 +34,8 @@ import {
   ClipboardList,
   FileSignature,
   CreditCard,
+  Package,
+  UsersRound,
 } from "lucide-react";
 
 interface NavItem {
@@ -84,6 +86,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
   const segment = getBusinessSegment(profile?.business_type);
   const term = getTerminology(segment);
   const isHealthcare = segment === "healthcare";
+  const isFitness = isFitnessSegment(segment);
 
   // Services, staff/doctors and AI behaviour are all managed inside
   // Business Setup now, so the business section stays short.
@@ -94,6 +97,12 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
           { href: "/healthcare/consultations", label: "Consultation", icon: Stethoscope },
           { href: "/healthcare/patients", label: "Patients", icon: ClipboardList },
           { href: "/healthcare/prescription-settings", label: "Prescription Setup", icon: FileSignature },
+        ]
+      : []),
+    ...(isFitness
+      ? [
+          { href: `/${segment}/members`, label: term.clientPluralLabel, icon: UsersRound },
+          { href: `/${segment}/packages`, label: "Packages", icon: Package },
         ]
       : []),
     { href: `/${segment}/setup`, label: term.businessSetupLabel, icon: Building },

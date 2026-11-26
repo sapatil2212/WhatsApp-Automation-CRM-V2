@@ -21,6 +21,7 @@ import {
   analyticsCampaigns,
   analyticsOverview,
   businessBodySchema,
+  setupPrefill,
   businessLink,
   campaignBodySchema,
   cancelJob,
@@ -100,6 +101,7 @@ async function logAi(db: TenantDb, input: { businessId: string; kind: string; la
 
 export const reviewController = {
   // ── businesses ────────────────────────────────────────────────────
+  businessPrefill: createHandler({ operation: 'reviews.business.prefill', auth: 'tenant', response: loose, handle: ({ db }) => setupPrefill(db) }),
   businessList: createHandler({
     operation: 'reviews.business.list',
     auth: 'tenant',

@@ -10,7 +10,6 @@ import {
   Edit2, MessageSquare, Radio, Zap, Crown, LogIn, Sliders, Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { SuperAdminShell } from "../super-admin-shell";
 
 interface User {
   id: string;
@@ -443,7 +442,7 @@ export default function SuperAdminUsersPage() {
   };
 
   return (
-    <SuperAdminShell>
+    <>
       <div className="space-y-4">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -823,6 +822,6 @@ export default function SuperAdminUsersPage() {
           )}
         </AnimatePresence>
       </div>
-    </SuperAdminShell>
+    </>
   );
 }

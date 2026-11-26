@@ -82,9 +82,14 @@ const ERROR_TEXT: Record<string, string> = {
   pending_approval: "Your account is waiting for approval. We'll notify you on WhatsApp/email once it's active.",
 };
 
+/** Login errors that belong to one field; account-level ones (approval, renewal) stay above the form. */
+const FIELD_OF: Record<string, "email" | "password"> = { email_unverified: "email" };
+
 function LoginPageInner() {
-  const [email, setEmail] = useState("");
+  const searchParamsForEmail = useSearchParams();
+  const [email, setEmail] = useState(() => searchParamsForEmail.get("email") ?? "");
   const [password, setPassword] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expired, setExpired] = useState<ExpiredInfo | null>(null);
@@ -131,6 +136,15 @@ function LoginPageInner() {
     e.preventDefault();
     setError(null);
     setExpired(null);
+    const errs: { email?: string; password?: string } = {};
+    if (!email.trim()) errs.email = "Enter your email.";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) errs.email = "Enter a valid email, like you@company.com.";
+    if (!password) errs.password = "Enter your password.";
+    setFieldErrors(errs);
+    if (errs.email || errs.password) {
+      document.getElementById(errs.email ? "email" : "password")?.focus();
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/auth/login", {
@@ -147,7 +161,14 @@ function LoginPageInner() {
           setExpired({ email: email.trim(), name: data.name ?? null, plan: data.plan ?? null });
           setError("Your subscription has ended. Renew to continue using ChatNexGen.");
         } else {
-          setError(ERROR_TEXT[data.error as string] || data.message || data.error || "Invalid email or password");
+          const text = ERROR_TEXT[data.error as string] || data.message || data.error || "Incorrect email or password.";
+          const field = (data.field as "email" | "password" | undefined) ?? FIELD_OF[data.error as string];
+          if (field) {
+            setFieldErrors({ [field]: text });
+            document.getElementById(field)?.focus();
+          } else {
+            setError(text);
+          }
         }
         setLoading(false);
         return;
@@ -155,7 +176,7 @@ function LoginPageInner() {
 
       const { error: authError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (authError) {
-        setError(authError.message);
+        setFieldErrors({ password: authError.message || "Incorrect email or password." });
         setLoading(false);
         return;
       }
@@ -198,13 +219,14 @@ function LoginPageInner() {
             </AuthNotice>
           )}
 
-          <AuthField label="Email" htmlFor="email">
-            <Input id="email" type="email" placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" autoFocus disabled={loading} className={authInputClass} />
+          <AuthField label="Email" htmlFor="email" error={fieldErrors.email}>
+            <Input id="email" type="email" placeholder="you@company.com" value={email} onChange={(e) => { setEmail(e.target.value); if (fieldErrors.email) setFieldErrors((f) => ({ ...f, email: undefined })); }} required autoComplete="email" autoFocus disabled={loading} aria-invalid={Boolean(fieldErrors.email)} aria-describedby={fieldErrors.email ? "email-error" : undefined} className={authInputClass} />
           </AuthField>
 
           <AuthField
             label="Password"
             htmlFor="password"
+            error={fieldErrors.password}
             action={<Link href="/forgot-password" className="text-[11px] font-medium text-emerald-500 hover:text-emerald-400">Forgot password?</Link>}
           >
             <Input
@@ -212,10 +234,12 @@ function LoginPageInner() {
               type={showPassword ? "text" : "password"}
               placeholder="Your password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => { setPassword(e.target.value); if (fieldErrors.password) setFieldErrors((f) => ({ ...f, password: undefined })); }}
               required
               autoComplete="current-password"
               disabled={loading}
+              aria-invalid={Boolean(fieldErrors.password)}
+              aria-describedby={fieldErrors.password ? "password-error" : undefined}
               className={`${authInputClass} pr-10`}
             />
             <button
@@ -228,7 +252,7 @@ function LoginPageInner() {
             </button>
           </AuthField>
 
-          <button type="submit" disabled={loading || !email.trim() || !password} id="sign-in-btn" className={`mt-1 ${authPrimaryButton}`}>
+          <button type="submit" disabled={loading} id="sign-in-btn" className={`mt-1 ${authPrimaryButton}`}>
             {loading ? <><Loader2 className="size-4 animate-spin" /> Logging in…</> : "Log in"}
           </button>
         </form>

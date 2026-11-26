@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Settings, Shield, Bell, Key, Server, Globe, Save } from "lucide-react";
-import { SuperAdminShell } from "../super-admin-shell";
 
 const inputCls = "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 transition-all";
 const labelCls = "block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5";
@@ -22,7 +21,7 @@ export default function SuperAdminSettingsPage() {
   };
 
   return (
-    <SuperAdminShell>
+    <>
       <div className="space-y-6 max-w-2xl">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
@@ -136,6 +135,6 @@ export default function SuperAdminSettingsPage() {
           {saved ? "Saved!" : "Save Settings"}
         </button>
       </div>
-    </SuperAdminShell>
+    </>
   );
 }

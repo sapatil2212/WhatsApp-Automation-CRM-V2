@@ -107,6 +107,41 @@ export async function listPatients(db: TenantDb, q: z.infer<typeof patientListSc
   };
 }
 
+export const patientBulkDeleteSchema = z.object({ ids: z.array(z.string().uuid()).min(1).max(200) });
+
+/**
+ * Permanently deletes a patient's clinical record: appointments at this
+ * clinic (which cascade to consultations, prescriptions, transcripts, details
+ * and notification logs), any remaining consultations and prescriptions,
+ * the EHR profile, documents, intakes, feedback and notification logs.
+ * The contact and their WhatsApp conversations are kept so the Inbox and CRM
+ * stay intact; without appointments the contact no longer lists as a patient.
+ */
+export async function deletePatients(db: TenantDb, ctx: { tenantId: string }, contactIds: string[]) {
+  const clinic = await requireClinic(db);
+  const ids = [...new Set(contactIds)];
+  const found = await db.contact.findMany({ where: { id: { in: ids }, appointments: { some: { clinicId: clinic.id } } }, select: { id: true } });
+  const deletable = found.map((c) => c.id);
+  const foundSet = new Set(deletable);
+  const blocked = ids.filter((id) => !foundSet.has(id)).map((id) => ({ id, reason: 'Patient not found.' }));
+  if (deletable.length) {
+    const where = { contactId: { in: deletable } };
+    await db.$transaction(async (tx) => {
+      await tx.prescription.deleteMany({ where });
+      await tx.consultation.deleteMany({ where });
+      await tx.appointment.deleteMany({ where: { ...where, clinicId: clinic.id } });
+      await tx.appointmentNotificationLog.deleteMany({ where });
+      await tx.patientDocument.deleteMany({ where });
+      await tx.patientIntake.deleteMany({ where });
+      await tx.patientFeedback.deleteMany({ where });
+      await tx.patientProfile.deleteMany({ where });
+    });
+    log.info('patients.deleted', { tenantId: ctx.tenantId, count: deletable.length });
+    const { appointmentsChanged } = await import('./appointment-board.service');
+    appointmentsChanged(ctx.tenantId, { kind: 'deleted' });
+  }
+  return { deleted: deletable, blocked };
+}
 export async function patientRecord(db: TenantDb, contactId: string) {
   const clinic = await requireClinic(db);
   const contact = await db.contact.findFirst({

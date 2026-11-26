@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { Check, CheckCircle2, ChevronLeft, ChevronRight, Copy, ExternalLink, HelpCircle, ImagePlus, Loader2, Pencil, Plus, Power, Search, Trash2, XCircle } from 'lucide-react';
+import { Check, CheckCircle2, ChevronLeft, ChevronRight, Copy, Download, ExternalLink, HelpCircle, ImagePlus, Loader2, Pencil, Plus, Power, Search, Trash2, XCircle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
@@ -13,19 +13,52 @@ import { api } from '@/lib/campaigns/api';
 import { cn } from '@/lib/utils';
 import { REVIEW_LANGUAGES } from '@/lib/reviews/constants';
 import { GOOGLE_LINK_STEPS, validateGoogleReviewUrl } from '@/lib/reviews/google-url';
+import { normalizeSocialLink, PLATFORM, SOCIAL_PLATFORMS, type SocialPlatform } from '@/lib/reviews/social-platforms';
+import { SocialLogo } from '@/components/reviews/social-logo';
 
-type Draft = Omit<ReviewBusiness, 'id' | 'publicToken' | 'createdAt' | 'qrCount' | 'campaignCount'> & { servicesText: string };
+type Draft = Omit<ReviewBusiness, 'id' | 'publicToken' | 'createdAt' | 'qrCount' | 'campaignCount' | 'socialLinks'> & { servicesText: string; links: Partial<Record<SocialPlatform, string>> };
 
-const blank: Draft = { name: '', category: '', description: '', address: '', googleReviewUrl: '', website: '', phone: '', logoUrl: null, services: [], servicesText: '', defaultLanguage: 'en', status: 'active' };
+const linksOf = (list: ReviewBusiness['socialLinks'] | undefined) => Object.fromEntries((list ?? []).map((l) => [l.platform, l.url])) as Draft['links'];
+
+const blank: Draft = { name: '', category: '', description: '', address: '', googleReviewUrl: '', website: '', phone: '', logoUrl: null, services: [], servicesText: '', defaultLanguage: 'en', status: 'active', links: {} };
 
 const STEPS = [
   { title: 'Basics', sub: 'Name, category and logo' },
   { title: 'Google link', sub: 'Where customers post' },
+  { title: 'Social links', sub: 'Instagram, YouTube…' },
   { title: 'AI & settings', sub: 'Services and language' },
 ] as const;
 
 function BusinessForm({ initial, onClose, onSaved }: { initial: ReviewBusiness | null; onClose: () => void; onSaved: () => void }) {
-  const [d, setD] = useState<Draft>(() => (initial ? { ...initial, servicesText: initial.services.join(', ') } : blank));
+  const [d, setD] = useState<Draft>(() => (initial ? { ...initial, servicesText: initial.services.join(', '), links: linksOf(initial.socialLinks) } : blank));
+  const [prefilling, setPrefilling] = useState(false);
+  const linkErrors = useMemo(() => Object.fromEntries(Object.entries(d.links).filter(([, v]) => v?.trim()).map(([k, v]) => { const n = normalizeSocialLink(k as SocialPlatform, v!); return [k, 'error' in n ? n.error : null]; })) as Partial<Record<SocialPlatform, string | null>>, [d.links]);
+  const setLink = (p: SocialPlatform, v: string) => setD((x) => ({ ...x, links: { ...x.links, [p]: v } }));
+
+  /** Copies name, contact, services and social links from Business Setup (fills empty fields only). */
+  const prefill = async () => {
+    setPrefilling(true);
+    try {
+      const res = await api<{ name: string; category: string; description: string; phone: string; website: string; address: string; services: string[]; socialLinks: Array<{ platform: SocialPlatform; url: string }> }>('/api/reviews/businesses/from-setup');
+      const v = res.data;
+      setD((x) => ({
+        ...x,
+        name: x.name || v.name,
+        category: x.category || v.category,
+        description: x.description || v.description,
+        phone: x.phone || v.phone,
+        website: x.website || v.website,
+        address: x.address || v.address,
+        servicesText: x.servicesText || v.services.join(', '),
+        links: { ...linksOf(v.socialLinks), ...Object.fromEntries(Object.entries(x.links).filter(([, u]) => u?.trim())) },
+      }));
+      toast.success('Filled from Business Setup. Check the details, then continue.');
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setPrefilling(false);
+    }
+  };
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +80,7 @@ function BusinessForm({ initial, onClose, onSaved }: { initial: ReviewBusiness |
   const problem = (i: number): string | null => {
     if (i === 0 && d.name.trim().length < 2) return 'Business name is required.';
     if (i === 1 && url && !url.valid) return url.reason ?? 'The Google review link is not valid.';
+    if (i === 2) { const bad = Object.entries(linkErrors).find(([, e]) => e); if (bad) return bad[1]!; }
     return null;
   };
 
@@ -85,6 +119,7 @@ function BusinessForm({ initial, onClose, onSaved }: { initial: ReviewBusiness |
       services: d.servicesText.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 30),
       defaultLanguage: d.defaultLanguage,
       status: d.status,
+      socialLinks: SOCIAL_PLATFORMS.filter((p) => d.links[p]?.trim()).map((p) => ({ platform: p, url: d.links[p]!.trim() })),
     };
     try {
       await api(initial ? `/api/reviews/businesses/${initial.id}` : '/api/reviews/businesses', { method: initial ? 'PATCH' : 'POST', json: body });
@@ -118,7 +153,7 @@ function BusinessForm({ initial, onClose, onSaved }: { initial: ReviewBusiness |
   return (
     <Modal title={initial ? 'Edit business' : 'Add business'} subtitle="Each business gets its own review page, QR codes and analytics." onClose={onClose} busy={busy} wide footer={footer}>
       {/* Step indicator */}
-      <ol className="mb-4 grid grid-cols-3 gap-1.5" aria-label="Steps">
+      <ol className="mb-4 grid grid-cols-2 gap-1.5 sm:grid-cols-4" aria-label="Steps">
         {STEPS.map((s, i) => {
           const done = i < step;
           const on = i === step;
@@ -146,6 +181,10 @@ function BusinessForm({ initial, onClose, onSaved }: { initial: ReviewBusiness |
 
       {step === 0 && (
         <div className="grid gap-3 sm:grid-cols-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 sm:col-span-2">
+            <p className="text-[12px] text-muted-foreground">Already set up your business? Copy its name, contact, services and social links.</p>
+            <Button type="button" size="sm" variant="outline" className="h-7 gap-1.5 text-xs" onClick={prefill} disabled={prefilling}>{prefilling ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />} Fill from Business Setup</Button>
+          </div>
           <Field label="Business name *"><SmallInput autoFocus value={d.name} onChange={(e) => set('name', e.target.value)} maxLength={160} placeholder="e.g. BrightSmile Dental Studio" /></Field>
           <Field label="Category"><SmallInput value={d.category ?? ''} onChange={(e) => set('category', e.target.value)} placeholder="e.g. Dental clinic" maxLength={120} /></Field>
           <Field label="Short description" className="sm:col-span-2" hint="One or two lines. The AI uses it to understand the business.">
@@ -199,6 +238,28 @@ function BusinessForm({ initial, onClose, onSaved }: { initial: ReviewBusiness |
       )}
 
       {step === 2 && (
+        <div className="space-y-2">
+          <p className="text-[12px] text-muted-foreground">Customers who scan your QR code see these next to the Google review button, with each platform&apos;s own logo. Paste a link or just your username. Leave blank to hide.</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {SOCIAL_PLATFORMS.map((p) => {
+              const err = linkErrors[p];
+              const filled = Boolean(d.links[p]?.trim());
+              return (
+                <label key={p} className="flex items-start gap-2.5 rounded-lg border border-border/70 p-2">
+                  <SocialLogo platform={p} size="sm" />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center justify-between gap-2 text-[11px] font-medium">{PLATFORM[p].label}{filled && !err && <CheckCircle2 className="size-3 text-emerald-600" />}</span>
+                    <SmallInput value={d.links[p] ?? ''} onChange={(e) => setLink(p, e.target.value)} placeholder={PLATFORM[p].placeholder} className={err ? 'border-destructive/60' : ''} />
+                    {err && <span className="mt-0.5 block text-[10px] text-destructive">{err}</span>}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {step === 3 && (
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Services" className="sm:col-span-2" hint="Comma separated. Gives the AI context; it never mentions a service the customer did not.">
             <SmallInput autoFocus value={d.servicesText} onChange={(e) => set('servicesText', e.target.value)} placeholder="Cleaning, Braces, Root canal" />
@@ -221,6 +282,8 @@ function BusinessForm({ initial, onClose, onSaved }: { initial: ReviewBusiness |
               <dt className="text-muted-foreground">Google link</dt>
               <dd className="truncate">{d.googleReviewUrl ? (url?.valid ? <span className="text-emerald-600">Added</span> : <span className="text-destructive">Needs fixing</span>) : <span className="text-amber-600">Not added yet</span>}</dd>
               <dt className="text-muted-foreground">Contact</dt><dd className="truncate">{[d.phone, d.website].filter(Boolean).join(' · ') || '—'}</dd>
+              <dt className="text-muted-foreground">Social</dt>
+              <dd className="flex flex-wrap gap-1">{SOCIAL_PLATFORMS.filter((p) => d.links[p]?.trim()).length ? SOCIAL_PLATFORMS.filter((p) => d.links[p]?.trim()).map((p) => <SocialLogo key={p} platform={p} size="sm" />) : '—'}</dd>
             </dl>
           </div>
         </div>
@@ -299,9 +362,9 @@ function BusinessesInner() {
           <Empty title={debounced || status ? 'No businesses match these filters' : 'No businesses yet'} body="Add a business with its Google review link to start collecting reviews." action={<Button size="sm" onClick={() => setEditing('new')}>Add business</Button>} />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[820px] text-[13px]">
+            <table className="w-full min-w-[940px] text-[13px]">
               <thead className="border-b border-border bg-muted/40 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                <tr><th className="py-2 pl-4 pr-3">Business</th><th className="px-3 py-2">Google link</th><th className="px-3 py-2">Language</th><th className="px-3 py-2">QR codes</th><th className="px-3 py-2">Status</th><th className="py-2 pl-3 pr-4 text-right">Actions</th></tr>
+                <tr><th className="py-2 pl-4 pr-3">Business</th><th className="px-3 py-2">Google link</th><th className="px-3 py-2">Social</th><th className="px-3 py-2">Language</th><th className="px-3 py-2">QR codes</th><th className="px-3 py-2">Status</th><th className="py-2 pl-3 pr-4 text-right">Actions</th></tr>
               </thead>
               <tbody className="divide-y divide-border/60">
                 {data.map((b) => (
@@ -313,6 +376,7 @@ function BusinessesInner() {
                       </div>
                     </td>
                     <td className="px-3 py-2">{b.googleReviewUrl ? <a href={b.googleReviewUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">Open <ExternalLink className="size-3" /></a> : <Pill tone="amber">Not set</Pill>}</td>
+                    <td className="px-3 py-2">{b.socialLinks?.length ? <span className="flex flex-wrap gap-1">{b.socialLinks.map((l) => <a key={l.platform} href={l.url} target="_blank" rel="noreferrer" title={PLATFORM[l.platform].label}><SocialLogo platform={l.platform} size="sm" /></a>)}</span> : <span className="text-[11px] text-muted-foreground">None</span>}</td>
                     <td className="px-3 py-2">{REVIEW_LANGUAGES.find((l) => l.code === b.defaultLanguage)?.label ?? b.defaultLanguage}</td>
                     <td className="px-3 py-2 tabular-nums">{b.qrCount ?? 0}</td>
                     <td className="px-3 py-2">{b.status === 'active' ? <Pill tone="green">Active</Pill> : <Pill>Inactive</Pill>}</td>

@@ -845,25 +845,19 @@ export async function finalizeConsultation(db: TenantDb, ctx: AuthContext, consu
 }
 
 /**
- * Discards a consultation that is still in progress: the draft notes,
- * transcripts and draft prescription go; the appointment stays and returns to
- * the queue as Ready. A completed consultation is a medical record and is
- * never deleted here.
+ * Permanently deletes a consultation together with its visit: the
+ * appointment row is removed and the database cascades to the consultation,
+ * prescription (draft or finalized), transcripts, appointment details and
+ * notification logs. Intakes and feedback stay with the patient.
  */
 export async function discardConsultation(db: TenantDb, ctx: AuthContext, consultationId: string) {
   assertCanSign(ctx);
-  const c = await db.consultation.findFirst({
-    where: { id: consultationId },
-    select: { id: true, status: true, appointmentId: true, tenantId: true, prescription: { select: { status: true } } },
-  });
+  const c = await db.consultation.findFirst({ where: { id: consultationId }, select: { id: true, appointmentId: true, tenantId: true } });
   if (!c) throw new NotFoundError('Consultation');
-  if (c.status === 'completed' || c.prescription?.status === 'finalized') {
-    throw new ConflictError('A completed consultation is part of the medical record and cannot be deleted.');
-  }
-  // Children cascade (prescription, transcripts) on the consultation FK.
-  const removed = await db.consultation.deleteMany({ where: { id: consultationId, status: { not: 'completed' } } });
-  if (!removed.count) throw new ConflictError('This consultation was completed in the meantime.');
-  appointmentsChanged(c.tenantId, { id: c.appointmentId, kind: 'consultation_discarded' });
+  const removed = await db.appointment.deleteMany({ where: { id: c.appointmentId } });
+  // Appointment already gone: remove the orphan consultation directly.
+  if (!removed.count) await db.consultation.deleteMany({ where: { id: consultationId } });
+  appointmentsChanged(c.tenantId, { id: c.appointmentId, kind: 'deleted' });
   return { deleted: true, appointmentId: c.appointmentId };
 }
 /**

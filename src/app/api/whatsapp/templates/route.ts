@@ -55,6 +55,7 @@ export async function GET() {
         footer_text: t.footerText,
         buttons: t.buttons,
         status: t.status,
+        event_type: t.eventType,
         created_at: t.createdAt,
         updated_at: t.updatedAt,
       })),

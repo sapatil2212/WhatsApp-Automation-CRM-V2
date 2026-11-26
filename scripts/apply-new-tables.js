@@ -6,6 +6,8 @@
  *   - LeadFollowUp table        (sales follow-up engine)
  *   - DripSequence / DripEnrollment tables (drip sequences)
  *   - FlowRun.resumeAt column   (flow delay step)
+ *   - GymPackage / GymMember / GymMembership / MemberMessageLog (health & fitness members)
+ *   - ReviewBusiness.socialLinks + ReviewEngagementEvent.platform (universal QR page)
  *
  * Why not `prisma migrate deploy`: this database was not created with
  * Prisma Migrate (there is no _prisma_migrations table), so `migrate deploy`
@@ -29,6 +31,8 @@ const STEPS = [
   { dir: '20261123000000_lead_follow_up', table: 'LeadFollowUp' },
   { dir: '20261124000000_drip_sequences', table: 'DripSequence' },
   { dir: '20261125000000_flow_delay_resume', table: 'FlowRun', column: 'resumeAt' },
+  { dir: '20261126000000_gym_members_packages', table: 'GymPackage' },
+  { dir: '20261127000000_review_social_links', table: 'ReviewBusiness', column: 'socialLinks' },
 ];
 
 async function exists({ table, column }) {

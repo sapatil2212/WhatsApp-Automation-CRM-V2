@@ -5,14 +5,18 @@ import { useParams } from 'next/navigation';
 import { Check, CheckCircle2, Copy, ExternalLink, Loader2, Mic, MicOff, PenLine, RefreshCw, Sparkles, Star } from 'lucide-react';
 
 import { REVIEW_LANGUAGES, type ReviewLanguage } from '@/lib/reviews/constants';
+import { PLATFORM, type SocialPlatform } from '@/lib/reviews/social-platforms';
+import { GoogleLogo, SocialLogo } from '@/components/reviews/social-logo';
 
 interface PageData {
   business: { name: string; category: string | null; description: string | null; logoUrl: string | null; defaultLanguage: string };
   campaign: string | null;
   googleConfigured: boolean;
+  socialLinks: Array<{ platform: SocialPlatform; url: string }>;
+  services: string[];
   maxChars: number;
 }
-type Step = 'rate' | 'describe' | 'choose' | 'google';
+type Step = 'hub' | 'rate' | 'describe' | 'choose' | 'google';
 
 const STEPS: Array<{ id: Step; label: string }> = [
   { id: 'rate', label: 'Rate' },
@@ -21,6 +25,13 @@ const STEPS: Array<{ id: Step; label: string }> = [
   { id: 'google', label: 'Google' },
 ];
 const RATING_WORDS = ['', 'Very poor', 'Poor', 'Okay', 'Good', 'Excellent'];
+/** Tap-to-select highlights; the customer chooses what applies, the AI only uses what they chose. */
+const HIGHLIGHTS: Record<'good' | 'mixed' | 'bad', string[]> = {
+  good: ['Friendly staff', 'Clean and well kept', 'Professional service', 'Good value for money', 'Quick and on time', 'Great results'],
+  mixed: ['Friendly staff', 'Clean and well kept', 'Long waiting time', 'Could be better value', 'Service was slow', 'Good results'],
+  bad: ['Long waiting time', 'Staff were not helpful', 'Not clean', 'Too expensive', 'Service was slow', 'Problem not solved'],
+};
+const moodFor = (r: number) => (r >= 4 ? 'good' : r === 3 ? 'mixed' : 'bad');
 
 async function call<T>(path: string, init?: { method?: string; json?: unknown }): Promise<T> {
   const res = await fetch(path, {
@@ -109,6 +120,8 @@ export default function PublicReviewPage() {
   const [jobState, setJobState] = useState<{ ready: boolean; failed: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
   const [done, setDone] = useState(false);
+  const [usedServices, setUsedServices] = useState<string[]>([]);
+  const [highlights, setHighlights] = useState<string[]>([]);
 
   const event = useCallback(
     (eventType: string, extra?: Record<string, unknown>) => {
@@ -124,6 +137,7 @@ export default function PublicReviewPage() {
       .then((d) => {
         if (!live) return;
         setPage(d);
+        if (d.socialLinks?.length) setStep('hub');
         setLanguage((REVIEW_LANGUAGES.some((l) => l.code === d.business.defaultLanguage) ? d.business.defaultLanguage : 'en') as ReviewLanguage);
         event('page_view');
       })
@@ -151,12 +165,27 @@ export default function PublicReviewPage() {
     setStep('describe');
   };
 
+  /** The customer's own words plus the highlights they tapped. */
+  const composedFeedback = () =>
+    [
+      feedback.trim(),
+      usedServices.length ? `Service I used: ${usedServices.join(', ')}.` : '',
+      highlights.length ? `${rating <= 2 ? 'What went wrong' : rating === 3 ? 'What I noticed' : 'What I liked'}: ${highlights.join(', ')}.` : '',
+    ].filter(Boolean).join(' ').slice(0, 1500);
+
+  const toggle = (list: string[], set: (v: string[]) => void, item: string) => set(list.includes(item) ? list.filter((x) => x !== item) : [...list, item]);
+
+  const openSocial = (platform: SocialPlatform, url: string) => {
+    event('social_opened', { platform });
+    window.open(url, '_blank', 'noopener');
+  };
+
   const generate = async () => {
     setBusy('generate');
     setError(null);
     event('feedback_submitted', { rating, language });
     try {
-      const out = await call<{ drafts: string[] }>(`${base}/feedback`, { method: 'POST', json: { mode: 'generate', visitorId: vid, rating, language, feedback } });
+      const out = await call<{ drafts: string[] }>(`${base}/feedback`, { method: 'POST', json: { mode: 'generate', visitorId: vid, rating, language, feedback: composedFeedback() } });
       setDrafts(out.drafts);
       setText(out.drafts[0] ?? '');
       setAiText(out.drafts[0] ?? '');
@@ -185,7 +214,7 @@ export default function PublicReviewPage() {
 
   const writeMyself = () => {
     setDrafts([]);
-    setText(feedback.trim());
+    setText(composedFeedback());
     setAiText('');
     setStep('choose');
   };
@@ -207,7 +236,7 @@ export default function PublicReviewPage() {
     setBusy('approve');
     setError(null);
     try {
-      const out = await call<{ jobId: string; googleUrl: string }>(`${base}/approve`, { method: 'POST', json: { visitorId: vid, rating, language, feedback, finalText: text.trim(), edited: text.trim() !== aiText.trim(), confirmed: true } });
+      const out = await call<{ jobId: string; googleUrl: string }>(`${base}/approve`, { method: 'POST', json: { visitorId: vid, rating, language, feedback: composedFeedback(), finalText: text.trim(), edited: text.trim() !== aiText.trim(), confirmed: true } });
       setJobId(out.jobId);
       setGoogleUrl(out.googleUrl);
       await copy();
@@ -264,7 +293,7 @@ export default function PublicReviewPage() {
         </header>
 
         {/* Progress */}
-        <ol className="flex items-center gap-1.5" aria-label="Progress">
+        <ol className={`flex items-center gap-1.5 ${step === 'hub' ? 'hidden' : ''}`} aria-label="Progress">
           {STEPS.map((s, i) => (
             <li key={s.id} className="flex flex-1 items-center gap-1.5">
               <span className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${i < stepIndex ? 'bg-emerald-600 text-white' : i === stepIndex ? 'bg-emerald-100 text-emerald-700 ring-2 ring-emerald-600' : 'bg-slate-200 text-slate-500'}`}>{i < stepIndex ? <Check className="size-3" /> : i + 1}</span>
@@ -275,8 +304,40 @@ export default function PublicReviewPage() {
         </ol>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          {step === 'hub' && (
+            <div>
+              <h2 className="text-center text-lg font-semibold">Connect with {b.name}</h2>
+              <p className="mt-1 text-center text-xs text-slate-500">Tap where you&apos;d like to go. It only takes a moment.</p>
+              {page.googleConfigured && (
+                <button type="button" onClick={() => setStep('rate')} className="mt-4 flex w-full items-center gap-3 rounded-2xl border-2 border-emerald-500 bg-emerald-50/60 p-3.5 text-left transition-colors hover:bg-emerald-50">
+                  <GoogleLogo size="lg" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] font-semibold">Review us on Google</span>
+                    <span className="mt-0.5 flex items-center gap-1 text-xs text-slate-600"><Sparkles className="size-3 text-emerald-600" /> AI helps you write it. Ready in seconds.</span>
+                  </span>
+                  <ExternalLink className="size-4 shrink-0 text-emerald-700" aria-hidden />
+                </button>
+              )}
+              <ul className="mt-3 grid gap-2">
+                {page.socialLinks.map((l) => (
+                  <li key={l.platform}>
+                    <button type="button" onClick={() => openSocial(l.platform, l.url)} className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 p-3 text-left transition-colors hover:border-slate-300 hover:bg-slate-50">
+                      <SocialLogo platform={l.platform} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-semibold">{PLATFORM[l.platform].cta}</span>
+                        <span className="block truncate text-[11px] text-slate-500">{l.url.replace(/^https:\/\/(www\.)?/, '').replace(/\?.*$/, '').replace(/\/$/, '')}</span>
+                      </span>
+                      <ExternalLink className="size-4 shrink-0 text-slate-400" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {step === 'rate' && (
             <div className="text-center">
+              {page.socialLinks.length > 0 && <button type="button" className="mb-2 block text-xs text-slate-500 hover:text-slate-900" onClick={() => setStep('hub')}>← All links</button>}
               <h2 className="text-lg font-semibold">How was your experience?</h2>
               {b.description && <p className="mt-1 text-xs text-slate-500">{b.description.slice(0, 160)}</p>}
               <div className="mt-5 flex justify-center gap-1.5" role="radiogroup" aria-label="Rating" onMouseLeave={() => setHover(0)}>
@@ -304,6 +365,24 @@ export default function PublicReviewPage() {
                 )}
               </div>
               {voice.listening && <p className="mt-1 text-[11px] text-rose-600">Listening… tap the mic again to stop.</p>}
+              {page.services.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-[11px] font-medium text-slate-500">Service you used</p>
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {page.services.map((sv) => (
+                      <button key={sv} type="button" aria-pressed={usedServices.includes(sv)} onClick={() => toggle(usedServices, setUsedServices, sv)} className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${usedServices.includes(sv) ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 text-slate-700 hover:border-slate-300'}`}>{sv}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="mt-3">
+                <p className="text-[11px] font-medium text-slate-500">{rating <= 2 ? 'What went wrong?' : rating === 3 ? 'What did you notice?' : 'What stood out?'} <span className="font-normal">(tap all that apply)</span></p>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {HIGHLIGHTS[moodFor(rating)].map((h) => (
+                    <button key={h} type="button" aria-pressed={highlights.includes(h)} onClick={() => toggle(highlights, setHighlights, h)} className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${highlights.includes(h) ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 text-slate-700 hover:border-slate-300'}`}>{h}</button>
+                  ))}
+                </div>
+              </div>
               {error && <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700" role="alert">{error}</p>}
               <button type="button" onClick={generate} disabled={busy !== null} className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60">
                 {busy === 'generate' ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} {busy === 'generate' ? 'Preparing drafts…' : 'Help me write it'}
@@ -373,6 +452,18 @@ export default function PublicReviewPage() {
                 <button type="button" onClick={() => { setDone(true); event('customer_reported_done', { rating, language, jobId: jobId ?? undefined }); }} className="mt-3 text-xs font-medium text-slate-600 underline-offset-2 hover:underline">I&apos;ve posted my review</button>
               ) : (
                 <p className="mt-3 text-sm font-medium text-emerald-700">Thank you for sharing your experience!</p>
+              )}
+              {page.socialLinks.length > 0 && (
+                <div className="mt-5 border-t border-slate-100 pt-4">
+                  <p className="text-xs font-medium text-slate-600">Stay connected with {b.name}</p>
+                  <div className="mt-2 flex flex-wrap justify-center gap-2">
+                    {page.socialLinks.map((l) => (
+                      <button key={l.platform} type="button" onClick={() => openSocial(l.platform, l.url)} aria-label={PLATFORM[l.platform].cta} title={PLATFORM[l.platform].cta} className="rounded-xl transition-transform hover:scale-105">
+                        <SocialLogo platform={l.platform} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           )}

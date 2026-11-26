@@ -94,6 +94,14 @@ const fmtTime = (t: string) => {
   return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
 };
 const fmtDate = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+const fmtPhone = (p?: string | null) => {
+  if (!p) return '';
+  const d = p.replace(/\D/g, '');
+  return d.length === 12 && d.startsWith('91') ? `+91 ${d.slice(2, 7)} ${d.slice(7)}` : `+${d}`;
+};
+const initials = (n?: string | null) => (n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join('');
+const AVATARS = ['bg-sky-500/15', 'bg-emerald-500/15', 'bg-violet-500/15', 'bg-amber-500/15', 'bg-rose-500/15', 'bg-teal-500/15'];
+const avatarColor = (id: string) => AVATARS[[...id].reduce((a, c) => a + c.charCodeAt(0), 0) % AVATARS.length];
 
 export default function ConsultationsPage() {
   const router = useRouter();
@@ -262,22 +270,22 @@ export default function ConsultationsPage() {
     await load();
   };
 
-  const deletableSelected = selectedRows.filter((r) => !r.consultationId);
+  /** Deletes the selected visits: appointment, consultation, prescription and dictations. */
   const applyBulkDelete = async () => {
     const res = await api<{ deleted: string[]; blocked: Array<{ id: string; reason: string }> }>('/api/healthcare/appointments/board/bulk-delete', {
       method: 'POST',
-      json: { ids: deletableSelected.map((r) => r.appointmentId) },
+      json: { ids: selectedRows.map((r) => r.appointmentId) },
     }).catch((e: Error) => {
       toast.error(e.message);
       throw e;
     });
-    toast.success(`${res.data.deleted.length} appointment${res.data.deleted.length === 1 ? '' : 's'} deleted.`);
+    if (res.data.deleted.length) toast.success(`${res.data.deleted.length} record${res.data.deleted.length === 1 ? '' : 's'} deleted.`);
     if (res.data.blocked.length) toast.error(`${res.data.blocked.length} not deleted. ${res.data.blocked[0].reason}`);
     setSelected(new Set());
     await load();
   };
   const filters = Boolean(debounced || doctorId || departmentId || from || to);
-  const COLS = 9;
+  const COLS = 8;
 
   return (
     <div className="space-y-5">
@@ -321,111 +329,126 @@ export default function ConsultationsPage() {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-2xl border border-border/70 bg-card">
-        {/* Toolbar: tabs on the left, filters on the right */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 px-3 py-2.5">
-          <div className="flex flex-wrap gap-0.5 rounded-xl border border-border/70 bg-background p-1" role="tablist">
-            {TABS.map((t) => (
-              <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => { setTab(t.id); setPage(1); }} className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${tab === t.id ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent'}`}>{t.label}</button>
-            ))}
-          </div>
+      {/* Tabs + filters */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap rounded-xl border border-border/70 bg-card p-1" role="tablist">
+          {TABS.map((t) => (
+            <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => { setTab(t.id); setPage(1); }} className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${tab === t.id ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent'}`}>{t.label}</button>
+          ))}
+        </div>
+        <div className="relative min-w-[200px] flex-1 sm:max-w-xs">
+          <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Name, phone, patient ID…" className={`${inputCls} pl-8 pr-8`} aria-label="Search consultations" />
+          {search && <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label="Clear search"><X className="size-3.5" /></button>}
+        </div>
+        <select aria-label="Doctor" className={selectCls} value={doctorId} onChange={(e) => { setDoctorId(e.target.value); setPage(1); }}>
+          <option value="">All doctors</option>
+          {data?.doctors.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+        </select>
+        {data && data.departments.length > 0 && (
+          <select aria-label="Department" className={selectCls} value={departmentId} onChange={(e) => { setDepartmentId(e.target.value); setPage(1); }}>
+            <option value="">All departments</option>
+            {data.departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+        )}
+        <div className="flex items-center gap-1.5">
+          <Input type="date" aria-label="From date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }} className={`${inputCls} w-[132px]`} />
+          <span className="text-[11px] text-muted-foreground">to</span>
+          <Input type="date" aria-label="To date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} className={`${inputCls} w-[132px]`} />
+        </div>
+        {filters && <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => { setSearch(''); setDoctorId(''); setDepartmentId(''); setFrom(''); setTo(''); }}>Clear filters</Button>}
+        <p className="ml-auto text-[11px] text-muted-foreground">{(data?.pagination.total ?? 0).toLocaleString()} {filters ? 'matching' : 'patients'}</p>
+      </div>
+
+      {/* Bulk actions */}
+      {selected.size > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-[13px]" role="status">
+          <span className="font-medium">{selected.size} selected</span>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="relative w-[210px]">
-              <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Name, phone, patient ID…" className={`${inputCls} pl-8`} aria-label="Search" />
-            </div>
-            <select aria-label="Doctor" className={selectCls} value={doctorId} onChange={(e) => { setDoctorId(e.target.value); setPage(1); }}>
-              <option value="">All doctors</option>
-              {data?.doctors.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
-            {data && data.departments.length > 0 && (
-              <select aria-label="Department" className={selectCls} value={departmentId} onChange={(e) => { setDepartmentId(e.target.value); setPage(1); }}>
-                <option value="">All departments</option>
-                {data.departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-              </select>
-            )}
-            <div className="flex items-center gap-1.5">
-              <Input type="date" aria-label="From date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }} className={`${inputCls} w-[128px]`} />
-              <span className="text-[11px] text-muted-foreground">to</span>
-              <Input type="date" aria-label="To date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} className={`${inputCls} w-[128px]`} />
-            </div>
-            {filters && <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground" onClick={() => { setSearch(''); setDoctorId(''); setDepartmentId(''); setFrom(''); setTo(''); }}><X className="size-3.5" /> Clear</Button>}
+            <Button variant="outline" size="sm" onClick={() => setSelected(new Set())}>Clear</Button>
+            <Button variant="outline" size="sm" className="gap-1.5" disabled={bulkBusy || !selectedRows.some(canRemind)} onClick={async () => { setBulkBusy(true); try { await remind(selectedRows); } finally { setBulkBusy(false); } }}>
+              <BellRing className="size-3.5" /> Send reminder
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="gap-1.5" disabled={bulkBusy} />}>
+                Change status <ChevronDown className="size-3.5" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                {STATUS_OPTIONS.map((o) => (
+                  <DropdownMenuItem key={o.id} onClick={() => { setNotify(true); setBulkStatus(o.id); }}>
+                    <span className={`size-1.5 rounded-full ${STATUS[o.id].cls.split(' ').find((c) => c.startsWith('text-')) ?? ''} bg-current`} /> <span className="text-[13px]">{o.label}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button variant="destructive" size="sm" className="gap-1.5" disabled={bulkBusy} onClick={() => setBulkDelete(true)}>
+              <Trash2 className="size-3.5" /> Delete selected
+            </Button>
           </div>
         </div>
+      )}
 
-        {selected.size > 0 && (
-          <div className="flex flex-wrap items-center gap-2 border-b border-primary/20 bg-primary/5 px-3 py-2 text-[13px]" role="status">
-            <span className="font-medium">{selected.size} selected</span>
-            <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>Clear</Button>
-            <div className="ml-auto flex flex-wrap items-center gap-2">
-              <Button variant="outline" size="sm" className="gap-1.5" disabled={bulkBusy || !selectedRows.some(canRemind)} onClick={async () => { setBulkBusy(true); try { await remind(selectedRows); } finally { setBulkBusy(false); } }}>
-                <BellRing className="size-3.5" /> Send reminder
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="gap-1.5" disabled={bulkBusy} />}>
-                  Change status <ChevronDown className="size-3.5" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-52">
-                  {STATUS_OPTIONS.map((o) => (
-                    <DropdownMenuItem key={o.id} onClick={() => { setNotify(true); setBulkStatus(o.id); }}>
-                      <span className={`size-1.5 rounded-full ${STATUS[o.id].cls.split(' ').find((c) => c.startsWith('text-')) ?? ''} bg-current`} /> <span className="text-[13px]">{o.label}</span>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <Button variant="destructive" size="sm" className="gap-1.5" disabled={bulkBusy || deletableSelected.length === 0} title={deletableSelected.length === 0 ? 'Only appointments without a consultation can be deleted' : undefined} onClick={() => setBulkDelete(true)}>
-                <Trash2 className="size-3.5" /> Delete
-              </Button>
-            </div>
-          </div>
-        )}
-
+      <div className="overflow-hidden rounded-2xl border border-border/70 bg-card">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1180px] table-fixed text-[13px]">
+          <table className="w-full min-w-[1100px] table-fixed text-[13px]">
             <colgroup>
-              <col className="w-10" /><col className="w-[10%]" /><col className="w-[18%]" /><col className="w-[11%]" /><col className="w-[14%]" /><col className="w-10" /><col className="w-[10%]" /><col className="w-[8%]" /><col className="w-[12%]" /><col className="w-[240px]" />
+              <col className="w-10" />
+              <col className="w-[22%]" />
+              <col className="w-[12%]" />
+              <col className="w-[16%]" />
+              <col className="w-[12%]" />
+              <col className="w-[10%]" />
+              <col className="w-[14%]" />
+              <col className="w-[230px]" />
             </colgroup>
             <thead className="border-b border-border bg-muted/50 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
               <tr>
-                <th className="py-2 pl-4"><input type="checkbox" className="rx-check" aria-label="Select all on this page" checked={allSelected} onChange={toggleAll} disabled={rows.length === 0} /></th>
-                <th className="py-2 pl-2 pr-3">Appointment</th>
-                <th className="px-3 py-2">Patient</th>
-                <th className="px-3 py-2">Phone</th>
+                <th className="py-2 pl-4"><input type="checkbox" className="size-4 rx-check" aria-label="Select all on this page" checked={allSelected} onChange={toggleAll} disabled={rows.length === 0} /></th>
+                <th className="px-4 py-2">Patient</th>
+                <th className="px-3 py-2">Appointment</th>
                 <th className="px-3 py-2">Doctor</th>
                 <th className="px-3 py-2">Date &amp; time</th>
                 <th className="px-3 py-2">Type</th>
                 <th className="px-3 py-2">Status</th>
-                <th className="py-2 pl-3 pr-4 text-right">Actions</th>
+                <th className="px-3 py-2 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border/60">
+            <tbody className="divide-y divide-border/70">
               {loading && rows.length === 0 ? (
-                Array.from({ length: 6 }).map((_, i) => <tr key={i}><td colSpan={COLS} className="px-4 py-2"><div className="h-8 animate-pulse rounded-md bg-muted/70" /></td></tr>)
+                Array.from({ length: 6 }).map((_, i) => <tr key={i}><td colSpan={COLS} className="px-4 py-3"><div className="h-9 animate-pulse rounded-lg bg-muted/70" /></td></tr>)
               ) : rows.length === 0 ? (
-                <tr><td colSpan={COLS} className="px-4 py-14 text-center"><Stethoscope className="mx-auto size-8 text-muted-foreground/50" /><p className="mt-2.5 text-sm font-medium">{filters ? 'No appointments match these filters' : 'No patients here'}</p><p className="mt-1 text-xs text-muted-foreground">Booked appointments appear here on their day.</p></td></tr>
+                <tr><td colSpan={COLS} className="px-4 py-16 text-center"><Stethoscope className="mx-auto size-9 text-muted-foreground/60" /><p className="mt-3 text-sm font-medium">{filters ? 'No patients match these filters' : 'No patients here'}</p><p className="mt-1 text-xs text-muted-foreground">{filters ? 'Try a different search, doctor or date.' : 'Booked appointments appear here on their day.'}</p></td></tr>
               ) : (
                 rows.map((r) => (
-                  <tr key={r.appointmentId} className={`align-middle transition-colors duration-200 hover:bg-muted/40 ${selected.has(r.appointmentId) ? 'bg-primary/5' : ''} ${loading ? 'opacity-60' : ''}`}>
-                    <td className="py-2 pl-4"><input type="checkbox" className="rx-check" aria-label={`Select ${r.patient.name}`} checked={selected.has(r.appointmentId)} onChange={() => toggleOne(r.appointmentId)} /></td>
-                    <td className="py-2 pl-2 pr-3">
-                      <p className="truncate font-mono text-[11px] font-medium">{r.ref}</p>
-                      {r.prescription?.status === 'finalized' && <p className="truncate font-mono text-[10px] text-muted-foreground">{r.prescription.prescriptionNo}</p>}
+                  <tr key={r.appointmentId} onClick={() => setViewing(r)} className={`group cursor-pointer transition-colors hover:bg-muted/50 ${selected.has(r.appointmentId) ? 'bg-primary/5' : ''} ${loading ? 'opacity-60' : ''}`}>
+                    <td className="py-2 pl-4" onClick={(e) => e.stopPropagation()}><input type="checkbox" className="size-4 rx-check" aria-label={`Select ${r.patient.name}`} checked={selected.has(r.appointmentId)} onChange={() => toggleOne(r.appointmentId)} /></td>
+                    <td className="px-4 py-2">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className={`flex size-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-foreground ${avatarColor(r.patient.contactId)}`}>{initials(r.patient.name)}</span>
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">{r.patient.name}</p>
+                          <p className="truncate text-[11px] text-muted-foreground">
+                            {[r.patient.code, r.patient.age && `${r.patient.age} yrs`, r.patient.gender && r.patient.gender.charAt(0).toUpperCase() + r.patient.gender.slice(1).replace(/_/g, ' ')].filter(Boolean).join(' · ')}
+                            {(r.patient.code || r.patient.age || r.patient.gender) && r.patient.phone ? ' · ' : ''}
+                            <span className="font-mono tabular-nums">{fmtPhone(r.patient.phone)}</span>
+                          </p>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-3 py-2">
-                      <p className="truncate text-[13px] font-medium leading-tight">{r.patient.name}</p>
-                      <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{[r.patient.code, [r.patient.age && `${r.patient.age}y`, r.patient.gender?.charAt(0).toUpperCase()].filter(Boolean).join(' / ')].filter(Boolean).join(' · ') || '—'}</p>
-                    </td>
-                    <td className="px-3 py-2 font-mono text-[11px] tabular-nums">{r.patient.phone ? `+${r.patient.phone}` : '—'}</td>
-                    <td className="px-3 py-2">
-                      <p className="truncate text-[13px] font-medium leading-tight">{r.doctor?.name ?? '—'}</p>
-                      <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{r.department ?? ''}</p>
+                      <p className="truncate font-mono text-[11px]">{r.ref}</p>
+                      {r.prescription?.status === 'finalized' && <p className="truncate font-mono text-[11px] text-muted-foreground">{r.prescription.prescriptionNo}</p>}
                     </td>
                     <td className="px-3 py-2">
-                      <p className="text-[13px] font-medium leading-tight">{r.date === data?.today ? <span className="text-primary">Today</span> : fmtDate(r.date)}</p>
-                      <p className="mt-0.5 text-[11px] tabular-nums text-muted-foreground">{fmtTime(r.time)}</p>
+                      <p className="truncate">{r.doctor?.name ?? '—'}</p>
+                      <p className="truncate text-[11px] text-muted-foreground">{r.department || '—'}</p>
                     </td>
-                    <td className="px-3 py-2"><span className="block truncate text-[13px]">{r.type}</span></td>
                     <td className="px-3 py-2">
+                      <p className="truncate">{r.date === data?.today ? <span className="font-medium text-primary">Today</span> : fmtDate(r.date)}</p>
+                      <p className="text-[11px] tabular-nums text-muted-foreground">{fmtTime(r.time)}</p>
+                    </td>
+                    <td className="px-3 py-2"><span className="block truncate">{r.type}</span></td>
+                    <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                       {allowedFrom(r.status).length > 1 ? (
                         <DropdownMenu>
                           <DropdownMenuTrigger
@@ -458,7 +481,7 @@ export default function ConsultationsPage() {
                         </span>
                       )}
                     </td>
-                    <td className="py-2 pl-3 pr-4">
+                    <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-0.5">
                         {r.status === 'cancelled' || r.status === 'no_show' || (r.status === 'completed' && !r.consultationId) ? null : (
                           <Button size="sm" variant={r.status === 'completed' ? 'outline' : 'default'} className="mr-1 gap-1 whitespace-nowrap" disabled={starting === r.appointmentId} onClick={() => start(r)}>
@@ -473,9 +496,8 @@ export default function ConsultationsPage() {
                           variant="ghost"
                           size="icon-sm"
                           className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                          title={r.status === 'completed' && r.consultationId ? 'Completed consultations are kept as medical records' : r.consultationId ? 'Discard consultation' : 'Delete appointment'}
+                          title="Delete"
                           aria-label={`Delete ${r.patient.name}`}
-                          disabled={r.status === 'completed' && Boolean(r.consultationId)}
                           onClick={() => setRemoving(r)}
                         >
                           <Trash2 className="size-3.5" />
@@ -490,7 +512,7 @@ export default function ConsultationsPage() {
         </div>
 
         <div className="flex items-center justify-between border-t border-border/70 px-4 py-2 text-[11px] text-muted-foreground">
-          <span>{data?.pagination.total ?? 0} appointments</span>
+          <span>{(data?.pagination.total ?? 0).toLocaleString()} patients</span>
           <div className="flex items-center gap-1">
             <Button variant="outline" size="icon-sm" className="size-7" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} aria-label="Previous page"><ChevronLeft className="size-3.5" /></Button>
             <span className="px-2 tabular-nums">Page {page} of {data?.pagination.totalPages ?? 1}</span>
@@ -505,8 +527,8 @@ export default function ConsultationsPage() {
       <ConfirmationDialog
         isOpen={Boolean(removing)}
         onOpenChange={(o) => { if (!o) setRemoving(null); }}
-        title={removing?.consultationId ? 'Discard this consultation?' : 'Delete this appointment?'}
-        description={removing?.consultationId ? 'The consultation in progress is removed. The appointment stays in the queue as Ready.' : 'The appointment is permanently removed.'}
+        title={removing?.consultationId ? 'Delete this consultation?' : 'Delete this appointment?'}
+        description="The visit and everything recorded for it are permanently deleted."
         details={
           removing ? (
             <div className="space-y-0.5">
@@ -518,23 +540,17 @@ export default function ConsultationsPage() {
             </div>
           ) : null
         }
-        notes={
-          removing?.consultationId
-            ? ['Notes, dictations and the draft prescription are deleted.', 'This cannot be undone.']
-            : ['This cannot be undone.', 'The patient is not notified. To tell them, set the status to Cancelled instead.']
-        }
-        confirmText={removing?.consultationId ? 'Discard consultation' : 'Delete appointment'}
+        notes={[
+          ...(removing?.consultationId ? ['The appointment, consultation notes, dictations and prescription (including a finalized one) are deleted.'] : ['The appointment is deleted.']),
+          'This cannot be undone. The patient is not notified.',
+        ]}
+        confirmText="Delete"
         variant="destructive"
         onConfirm={async () => {
           if (!removing) return;
           try {
-            if (removing.consultationId) {
-              await api(`/api/healthcare/consultations/${removing.consultationId}`, { method: 'DELETE' });
-              toast.success('Consultation discarded. The patient is back in the queue.');
-            } else {
-              await api(`/api/healthcare/appointments/board/${removing.appointmentId}`, { method: 'DELETE' });
-              toast.success('Appointment deleted.');
-            }
+            await api(`/api/healthcare/appointments/board/${removing.appointmentId}`, { method: 'DELETE' });
+            toast.success(removing.consultationId ? 'Consultation and appointment deleted.' : 'Appointment deleted.');
             setRemoving(null);
             await load();
           } catch (e) {
@@ -581,13 +597,24 @@ export default function ConsultationsPage() {
       <ConfirmationDialog
         isOpen={bulkDelete}
         onOpenChange={setBulkDelete}
-        title={`Delete ${deletableSelected.length} appointment${deletableSelected.length === 1 ? '' : 's'}?`}
-        description="They will be permanently removed."
+        title={`Delete ${selectedRows.length} record${selectedRows.length === 1 ? '' : 's'}?`}
+        description="Each visit and everything recorded for it are permanently deleted."
+        details={
+          <ul className="max-h-32 space-y-1 overflow-y-auto">
+            {selectedRows.slice(0, 5).map((r) => (
+              <li key={r.appointmentId} className="flex items-center justify-between gap-3">
+                <span className="truncate font-medium">{r.patient.name}</span>
+                <span className="shrink-0 text-[11px] text-muted-foreground">{fmtDate(r.date)} · {fmtTime(r.time)}</span>
+              </li>
+            ))}
+            {selectedRows.length > 5 && <li className="text-[11px] text-muted-foreground">and {selectedRows.length - 5} more</li>}
+          </ul>
+        }
         notes={[
+          'Appointments, consultation notes, dictations and prescriptions (including finalized ones) are deleted.',
           'This cannot be undone. Patients are not notified.',
-          ...(selectedRows.length > deletableSelected.length ? [`${selectedRows.length - deletableSelected.length} with a consultation record will be skipped.`] : []),
         ]}
-        confirmText="Delete"
+        confirmText={`Delete ${selectedRows.length}`}
         variant="destructive"
         onConfirm={applyBulkDelete}
       />

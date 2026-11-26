@@ -310,7 +310,7 @@ export async function publicBook(linkRef: string, body: PublicBookingBody, sourc
     });
     if (!doctor) throw new ValidationError('That doctor is not available for booking.');
     const departmentId = body.departmentId && !body.departmentId.startsWith('spec:') ? body.departmentId : undefined;
-    if (departmentId && doctor.departments.length && !doctor.departments.some((d) => d.departmentId === departmentId)) {
+    if (departmentId && !doctor.departments.some((d) => d.departmentId === departmentId)) {
       throw new ValidationError('The selected doctor is not part of that department.');
     }
     const service = AppointmentService.create(tenantDb(target.tenantId));

@@ -14,6 +14,7 @@ import { z } from 'zod';
 
 import { LANGUAGE_CODES, MAX_REVIEW_CHARS, type ReviewLanguage } from '@/lib/reviews/constants';
 import { PUBLIC_TOKEN_RE } from '@/lib/reviews/token';
+import { sanitizeSocialLinks, SOCIAL_PLATFORMS, type SocialLink } from '@/lib/reviews/social-platforms';
 
 import { ConflictError, NotFoundError, RateLimitError, scoped, systemDb, tenantDb, ValidationError, type TenantDb } from '../kernel';
 import { generateDrafts, transformDraft } from './review-ai.service';
@@ -28,7 +29,7 @@ const AI_DAILY_CAP = Number(process.env.REVIEW_AI_DAILY_CAP ?? 300);
 interface Resolved {
   tenantId: string;
   db: TenantDb;
-  business: { id: string; name: string; category: string | null; description: string | null; logoUrl: string | null; services: string[]; defaultLanguage: string; googleReviewUrl: string | null };
+  business: { id: string; name: string; category: string | null; description: string | null; logoUrl: string | null; services: string[]; defaultLanguage: string; googleReviewUrl: string | null; socialLinks: SocialLink[] };
   qrCodeId: string | null;
   campaignId: string | null;
   campaignName: string | null;
@@ -56,6 +57,7 @@ async function resolve(token: string): Promise<Resolved> {
       services: Array.isArray(biz.services) ? (biz.services as string[]) : [],
       defaultLanguage: biz.defaultLanguage,
       googleReviewUrl: biz.googleReviewUrl,
+      socialLinks: sanitizeSocialLinks(biz.socialLinks),
     },
     qrCodeId: qr?.id ?? null,
     campaignId: qr?.campaign?.id ?? null,
@@ -75,6 +77,10 @@ export async function publicPage(token: string) {
     },
     campaign: r.campaignName,
     googleConfigured: Boolean(r.business.googleReviewUrl),
+    // Universal QR page: every platform the business is on.
+    socialLinks: r.business.socialLinks,
+    // Tap-to-select highlights for the review (the customer picks what applies).
+    services: r.business.services.slice(0, 8),
     maxChars: MAX_REVIEW_CHARS,
   };
 }
@@ -168,17 +174,20 @@ export async function publicJobStatus(token: string, jobId: string) {
 
 // ── events ───────────────────────────────────────────────────────────
 
-export const PUBLIC_EVENTS = ['page_view', 'rating_selected', 'feedback_submitted', 'review_copied', 'google_opened', 'customer_reported_done'] as const;
+export const PUBLIC_EVENTS = ['page_view', 'rating_selected', 'feedback_submitted', 'review_copied', 'google_opened', 'customer_reported_done', 'social_opened'] as const;
 export const eventBodySchema = z.object({
   visitorId,
   eventType: z.enum(PUBLIC_EVENTS),
   rating: rating.optional(),
   language: language.optional(),
   jobId: z.string().uuid().optional(),
+  platform: z.enum(SOCIAL_PLATFORMS).optional(),
 });
 
 export async function publicEvent(token: string, body: z.infer<typeof eventBodySchema>) {
   const r = await resolve(token);
+  // Only platforms this business actually shows can be counted.
+  if (body.eventType === 'social_opened' && !r.business.socialLinks.some((l) => l.platform === body.platform)) throw new ValidationError('Unknown platform.');
   // A page refresh is not a second scan: one page_view per visitor per 30 minutes.
   if (body.eventType === 'page_view') {
     const recent = await r.db.reviewEngagementEvent.count({
@@ -187,7 +196,7 @@ export async function publicEvent(token: string, body: z.infer<typeof eventBodyS
     if (recent > 0) return { recorded: false };
   }
   await r.db.reviewEngagementEvent.create({
-    data: scoped({ businessId: r.business.id, campaignId: r.campaignId, qrCodeId: r.qrCodeId, visitorId: body.visitorId, eventType: body.eventType, rating: body.rating ?? null, language: body.language ?? null }),
+    data: scoped({ businessId: r.business.id, campaignId: r.campaignId, qrCodeId: r.qrCodeId, visitorId: body.visitorId, eventType: body.eventType, rating: body.rating ?? null, language: body.language ?? null, platform: body.eventType === 'social_opened' ? body.platform ?? null : null }),
   });
   // The customer says they finished on Google. This is self-reported, never verified.
   if (body.eventType === 'customer_reported_done' && body.jobId) {

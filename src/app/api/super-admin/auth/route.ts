@@ -1,11 +1,22 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { generateSuperAdminToken, verifySuperAdminToken } from "@/lib/auth";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
-const ADMIN_USER = (process.env.SUPER_ADMIN_USERNAME ?? "chatnexgen@gmail.com").trim().toLowerCase();
-const ADMIN_PASS = (process.env.SUPER_ADMIN_PASSWORD ?? "123").trim();
 const SESSION_COOKIE = "super_admin_session";
+
+/** Credentials come only from the environment; without them admin login is off. */
+function adminCredentials(): { user: string; pass: string } | null {
+  const user = process.env.SUPER_ADMIN_USERNAME?.trim().toLowerCase();
+  const pass = process.env.SUPER_ADMIN_PASSWORD?.trim();
+  return user && pass ? { user, pass } : null;
+}
+
+/** Constant-time string comparison (hashing first makes the lengths equal). */
+function safeEqual(a: string, b: string): boolean {
+  return timingSafeEqual(createHash("sha256").update(a).digest(), createHash("sha256").update(b).digest());
+}
 
 // POST /api/super-admin/auth — Login
 export async function POST(req: NextRequest) {
@@ -15,17 +26,20 @@ export async function POST(req: NextRequest) {
     return rateLimitResponse(limit);
   }
 
-  const body = await req.json();
-  const email = (body.email ?? body.username ?? "").trim().toLowerCase();
-  const password = (body.password ?? "").trim();
+  const creds = adminCredentials();
+  if (!creds) {
+    return NextResponse.json({ error: "Admin sign-in is not configured on this server." }, { status: 503 });
+  }
 
-  const isValid =
-    (email === ADMIN_USER && password === ADMIN_PASS) ||
-    (email === "chatnexgen@gmail.com" && password === "123") ||
-    (email === "admin@chatnexgen.com" && password === "admin123");
+  const body = await req.json().catch(() => ({}));
+  const email = String(body.email ?? body.username ?? "").trim().toLowerCase();
+  const password = String(body.password ?? "").trim();
 
-  if (!isValid) {
-    return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+  // Evaluate both so a wrong email and a wrong password take the same time.
+  const userOk = safeEqual(email, creds.user);
+  const passOk = safeEqual(password, creds.pass);
+  if (!userOk || !passOk) {
+    return NextResponse.json({ error: "Incorrect email or password." }, { status: 401 });
   }
 
   const token = generateSuperAdminToken(email);

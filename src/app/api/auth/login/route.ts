@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     const { email, password } = await req.json()
 
     if (!email || !password) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+      return NextResponse.json({ error: !email ? 'Enter your email.' : 'Enter your password.', field: !email ? 'email' : 'password' }, { status: 400 })
     }
 
     // 1. Fetch user with profile
@@ -24,13 +24,13 @@ export async function POST(req: NextRequest) {
     })
 
     if (!user) {
-      return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
+      return NextResponse.json({ error: 'Invalid email or password', message: 'Incorrect email or password.', field: 'password' }, { status: 401 })
     }
 
     // 2. Verify password
     const isPasswordValid = await verifyPassword(password, user.passwordHash)
     if (!isPasswordValid) {
-      return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
+      return NextResponse.json({ error: 'Invalid email or password', message: 'Incorrect email or password.', field: 'password' }, { status: 401 })
     }
 
     // 3. Check subscription and verification status

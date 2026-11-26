@@ -5,6 +5,8 @@ import { Eye, MousePointerClick, PenLine, QrCode, Sparkles, ThumbsUp } from 'luc
 
 import { Bars, BusinessPicker, Card, ErrorPanel, PageHead, selectCls, Skeleton, Stat, useApi } from '@/components/reviews/shared';
 import { REVIEW_LANGUAGES } from '@/lib/reviews/constants';
+import { PLATFORM, SOCIAL_PLATFORMS, type SocialPlatform } from '@/lib/reviews/social-platforms';
+import { SocialLogo } from '@/components/reviews/social-logo';
 
 interface Row { period: string; scans: number; drafts: number; approvals: number; googleOpens: number }
 interface Overview {
@@ -14,6 +16,7 @@ interface Overview {
   monthly: Row[];
   languages: Array<{ language: string; count: number }>;
   funnel: Array<{ key: string; label: string; count: number }>;
+  socialByPlatform?: Array<{ platform: string; count: number }>;
   note: string;
 }
 interface Perf { id: string; name: string; business?: string; placement?: string | null; scans: number; drafts: number; approvals: number; googleOpens: number; copies?: number }
@@ -111,6 +114,19 @@ export default function AnalyticsPage() {
                 </div>
               ))}
             </div>
+          </Card>
+          <Card className="p-4">
+            <p className="text-sm font-semibold">Social clicks</p>
+            {!ov.data?.socialByPlatform?.length ? <p className="mt-2 text-xs text-muted-foreground">No clicks yet. Add social links to a business to show them on its QR page.</p> : (
+              <div className="mt-2 space-y-1.5">
+                {ov.data.socialByPlatform.filter((x) => (SOCIAL_PLATFORMS as readonly string[]).includes(x.platform)).map((x) => (
+                  <div key={x.platform} className="flex items-center gap-2">
+                    <SocialLogo platform={x.platform as SocialPlatform} size="sm" />
+                    <div className="min-w-0 flex-1"><div className="flex justify-between text-[11px]"><span>{PLATFORM[x.platform as SocialPlatform].label}</span><span className="tabular-nums text-muted-foreground">{x.count}</span></div><div className="mt-0.5 h-1.5 rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${(x.count / Math.max(1, ov.data!.socialByPlatform![0].count)) * 100}%` }} /></div></div>
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
           <Card className="p-4">
             <p className="text-sm font-semibold">Review languages</p>

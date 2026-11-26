@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -15,7 +16,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { BookDemoTrigger } from "./book-demo-trigger";
-import { AIChatSimulation } from "./ai-chat-simulation";
 
 const HERO = {
   eyebrow: "Tired of repetitive messages & missed leads?",
@@ -77,7 +77,7 @@ function MarqueeRow({ items, reverse }: { items: typeof FEATURES; reverse?: bool
 
 export function InteractiveHero() {
   return (
-    <section className="hero-gradient relative -mt-16 overflow-hidden pt-[76px] pb-6 sm:pt-20 sm:pb-8 lg:pt-[84px] px-8 sm:px-20 lg:px-32">
+    <section className="hero-gradient relative -mt-16 overflow-hidden pt-28 pb-6 sm:pt-[120px] sm:pb-8 lg:pt-32 px-8 sm:px-20 lg:px-32">
       <style>{`
         .hero-gradient { background: linear-gradient(135deg, #07120e 0%, #0a1b14 100%); }
         [data-mtheme="light"] .hero-gradient { background: linear-gradient(135deg, #f8fdfa 0%, #eef9f3 100%); }
@@ -96,7 +96,7 @@ export function InteractiveHero() {
       {/* Grid backdrop that fades out in a circle around the right-hand visual */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,var(--m-grid-stroke)_1px,transparent_1px),linear-gradient(to_bottom,var(--m-grid-stroke)_1px,transparent_1px)] bg-[size:16px_16px] [mask-image:radial-gradient(circle_at_75%_42%,#000_0%,rgba(0,0,0,0.6)_28%,transparent_62%)] [-webkit-mask-image:radial-gradient(circle_at_75%_42%,#000_0%,rgba(0,0,0,0.6)_28%,transparent_62%)]"
+        className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,var(--m-grid-stroke)_1px,transparent_1px),linear-gradient(to_bottom,var(--m-grid-stroke)_1px,transparent_1px)] bg-[size:16px_16px] opacity-60 [mask-image:radial-gradient(circle_at_75%_42%,rgba(0,0,0,0.8)_0%,rgba(0,0,0,0.4)_18%,transparent_40%)] [-webkit-mask-image:radial-gradient(circle_at_75%_42%,rgba(0,0,0,0.8)_0%,rgba(0,0,0,0.4)_18%,transparent_40%)]"
       />
       <div className="relative z-10 mx-auto max-w-[1360px]">
         <div className="grid items-center gap-6 lg:grid-cols-[1.15fr_1fr] lg:gap-4">
@@ -148,34 +148,19 @@ export function InteractiveHero() {
             </div>
           </div>
 
-          {/* Right: phone with floating stat pills */}
-          <div className="relative mx-auto flex w-full justify-center py-2">
-            <div className="relative" style={{ zoom: 0.7 }}>
-              <AIChatSimulation />
-
-              <div className="hero-float pointer-events-none absolute -right-10 top-16 z-20 hidden items-center gap-2 rounded-2xl border border-[var(--m-border-primary)] bg-[var(--m-bg-primary)] px-3.5 py-2 shadow-xl sm:flex">
-                <div className="flex size-8 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500">
-                  <WhatsAppIcon className="size-5" />
-                </div>
-                <div>
-                  <p className="text-[11px] font-semibold text-[var(--m-text-heading)]">98% Open Rate</p>
-                  <p className="text-[10px] text-[var(--m-text-tertiary)]">vs 12% on Email</p>
-                </div>
-              </div>
-
-              <div className="hero-float hero-float-2 pointer-events-none absolute -left-12 bottom-24 z-20 hidden items-center gap-2 rounded-2xl border border-[var(--m-border-primary)] bg-[var(--m-bg-primary)] px-3.5 py-2 shadow-xl sm:flex">
-                <div className="flex size-8 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500">
-                  <Bot className="size-5" />
-                </div>
-                <div>
-                  <p className="text-[11px] font-semibold text-[var(--m-text-heading)]">Replies in &lt;1s</p>
-                  <p className="text-[10px] font-medium text-emerald-500">● 24/7 AI Assistant</p>
-                </div>
-              </div>
-            </div>
+          {/* Right: hero visual */}
+          <div className="relative mx-auto w-full max-w-[640px] lg:max-w-none">
+            <Image
+              src="/images/hero-images/hero-01.png"
+              alt="Customer receiving WhatsApp cart and payment reminders from a business"
+              width={1264}
+              height={844}
+              priority
+              sizes="(min-width: 1024px) 45vw, 90vw"
+              className="h-auto w-full select-none drop-shadow-[0_20px_40px_rgba(0,0,0,0.12)]"
+            />
           </div>
         </div>
-
         {/* Feature marquee: two rows moving in opposite directions, pause on hover */}
         <div className="mt-6 border-t border-[var(--m-border-primary)] pt-4">
           <p className="text-center text-[0.72rem] font-semibold uppercase tracking-[0.2em] text-[var(--m-text-muted)]">
