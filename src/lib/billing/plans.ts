@@ -10,6 +10,8 @@ export interface BillingPlan {
   tagline: string;
   /** Longer marketing description. */
   description: string;
+  /** Monthly price in paise (charged at signup and renewal); null for quoted plans. */
+  pricePaise: number | null;
   /** Display price, e.g. "₹999", or "Custom". */
   price: string;
   /** Text after the price, e.g. "/month". Empty for custom. */
@@ -32,6 +34,7 @@ export const PLANS: BillingPlan[] = [
     name: 'Self-Managed',
     tagline: 'You manage everything',
     description: 'The full platform for teams who like to set things up themselves. Build your own flows, automations and AI assistant.',
+    pricePaise: 99_900,
     price: '₹999',
     period: '/month',
     renewal: '₹999/month',
@@ -52,6 +55,7 @@ export const PLANS: BillingPlan[] = [
     name: 'Fully Managed',
     tagline: 'We manage everything',
     description: 'Our team sets up and runs WhatsApp for you: verification, templates, automations and the AI assistant, with monthly reviews.',
+    pricePaise: 199_900,
     price: '₹1,999',
     period: '/month',
     renewal: '₹1,999/month',
@@ -75,6 +79,7 @@ export const PLANS: BillingPlan[] = [
     name: 'Custom',
     tagline: 'Built around your business',
     description: 'For multi-branch businesses, high volumes or special requirements. We scope a plan and price that fits.',
+    pricePaise: null,
     price: 'Custom',
     period: '',
     renewal: 'Quoted',
@@ -93,11 +98,9 @@ export const PLANS: BillingPlan[] = [
 
 export const SELF_SERVE_PLANS = PLANS.filter((p) => p.selfServe);
 
-/** WhatsApp number that receives payment confirmations (digits only). */
+/** Billing support contacts (WhatsApp digits only). Payments themselves go through Razorpay. */
 export const BILLING_WHATSAPP = '917745868073';
 export const BILLING_EMAIL = 'chatnexgen@gmail.com';
-/** UPI QR shown for payments (public/images/payment-qr.png). */
-export const PAYMENT_QR_SRC = '/images/payment-qr.png';
 
 /** Plan by id. Also maps ids written by older versions of signup. */
 export function planById(id: string | null | undefined): BillingPlan | null {
@@ -105,4 +108,10 @@ export function planById(id: string | null | undefined): BillingPlan | null {
   const legacy: Record<string, BillingPlan['id']> = { growth: 'managed', professional: 'managed', enterprise: 'custom' };
   const key = (legacy[id] ?? id) as BillingPlan['id'];
   return PLANS.find((p) => p.id === key) ?? null;
+}
+
+/** ₹ amount for paise, e.g. 99900 → "₹999", 49950 → "₹499.50". */
+export function formatPaise(paise: number): string {
+  const rupees = paise / 100;
+  return `₹${rupees.toLocaleString('en-IN', { minimumFractionDigits: paise % 100 ? 2 : 0, maximumFractionDigits: 2 })}`;
 }

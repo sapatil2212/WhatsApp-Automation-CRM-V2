@@ -20,19 +20,28 @@ export default function SuperAdminLoginPage() {
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState("");
 
-  // Already signed in? Go straight to the portal.
+  /** Back to where the admin was going (e.g. the approval link in an email); admin paths only. */
+  const goNext = () => {
+    const next = new URLSearchParams(window.location.search).get("next") ?? "";
+    const safe = /^\/(super-admin|api\/super-admin\/approve)(\/|\?|$)/.test(next) && !next.startsWith("//");
+    if (safe && next.startsWith("/api/")) window.location.assign(next);
+    else router.replace(safe ? next : "/super-admin");
+  };
+
+  // Already signed in? Go straight on.
   useEffect(() => {
     let live = true;
     fetch("/api/super-admin/auth", { cache: "no-store" })
       .then((res) => {
         if (!live) return;
-        if (res.ok) router.replace("/super-admin");
+        if (res.ok) goNext();
         else setChecking(false);
       })
       .catch(() => live && setChecking(false));
     return () => {
       live = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -51,7 +60,7 @@ export default function SuperAdminLoginPage() {
         setLoading(false);
         return;
       }
-      router.replace("/super-admin");
+      goNext();
     } catch {
       setError("Network error. Check your connection and try again.");
       setLoading(false);

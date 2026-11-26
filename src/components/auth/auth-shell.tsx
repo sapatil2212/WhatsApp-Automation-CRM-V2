@@ -14,18 +14,13 @@ interface AuthShellProps {
   className?: string;
 }
 
-const HEADLINE: Record<AuthShellProps["variant"], string> = {
-  login: "Pick up every WhatsApp conversation where it left off",
-  signup: "Send personalized campaigns on WhatsApp",
-};
-
 const TRUST_POINTS = ["Official WhatsApp Business API", "0% markup on Meta fees", "Live in under 30 minutes"];
 
 /**
  * Simple two-column auth layout: a static brand panel on the left (hidden below
  * `lg`) and the form on the right. No animation, no blur layers.
  */
-export function AuthShell({ variant, children, topRight, maxWidth = "narrow", className }: AuthShellProps) {
+export function AuthShell({ children, topRight, maxWidth = "narrow", className }: AuthShellProps) {
   const { resolvedTheme } = useMarketingTheme();
   const logo =
     resolvedTheme === "light" ? "/images/logo/chatnexgen-logo-light.png" : "/images/logo/chatnexgen-logo.png";
@@ -40,20 +35,16 @@ export function AuthShell({ variant, children, topRight, maxWidth = "narrow", cl
         </Link>
 
         <div className="space-y-6">
-          <h2 className="max-w-md text-2xl font-semibold leading-snug text-[var(--m-text-heading)]">
-            {HEADLINE[variant]}
-          </h2>
-          <div className="overflow-hidden border border-[var(--m-border-primary)] bg-[var(--m-bg-surface)]">
-            <Image
-              src="/images/hero-dashboard.png"
-              alt="ChatNexGen dashboard preview"
-              width={1684}
-              height={934}
-              sizes="40vw"
-              quality={70}
-              className="h-auto w-full"
-            />
-          </div>
+          {/* Same visual as the home-page hero. */}
+          <Image
+            src="/images/hero-images/hero-01.png"
+            alt="Customer receiving WhatsApp cart and payment reminders from a business"
+            width={1264}
+            height={844}
+            priority
+            sizes="40vw"
+            className="h-auto w-full select-none drop-shadow-[0_20px_40px_rgba(0,0,0,0.12)]"
+          />
         </div>
 
         <ul className="flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-[var(--m-text-tertiary)]">

@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sendSystemEmail } from "@/lib/email/smtp";
-import { emailLayout, emailHeading, emailSubtitle, emailText, emailButton, emailDivider, emailTokens } from "@/lib/email/template";
+import { activateAccount } from "@/server/services/account-activation";
+import { requireSuperAdmin } from "@/server/kernel/auth-context";
 
 export async function GET(req: NextRequest) {
+  // Only a signed-in super admin may activate accounts (this link is emailed to the admin).
+  // Without this, anyone who knows a userId could activate an account without paying.
+  try {
+    await requireSuperAdmin();
+  } catch {
+    const back = `/api/super-admin/approve${req.nextUrl.search}`;
+    return NextResponse.redirect(new URL(`/super-admin/login?next=${encodeURIComponent(back)}`, req.url));
+  }
+
   try {
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("userId");
@@ -40,64 +49,8 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Activate User & Start 1-month Subscription
-    const subscriptionExpiresAt = new Date();
-    subscriptionExpiresAt.setMonth(subscriptionExpiresAt.getMonth() + 1); // 1 month from now
-
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        isVerified: true,
-        subscriptionExpiresAt,
-      },
-    });
-
-    // Update Tenant Plan if exists and set isActive to true
-    if (user.tenantsOwned.length > 0) {
-      const tenant = user.tenantsOwned[0];
-      await prisma.tenant.update({
-        where: { id: tenant.id },
-        data: {
-          plan: user.selectedPlan || "starter",
-          isActive: true,
-        },
-      });
-    }
-
-    // Send Welcome & Activation Confirmation Email to the user
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-    const dashboardUrl = `${siteUrl}/dashboard`;
-    const fullName = user.profile?.fullName || "Valued Partner";
-
-    const htmlContent = emailLayout({
-      title: "Your ChatNexGen account is activated",
-      preview: "Your workspace is active and ready to use.",
-      contentHtml:
-        emailHeading("Account activated 🎉") +
-        emailSubtitle(`Welcome to ChatNexGen, ${fullName}!`) +
-        emailDivider() +
-        emailText(
-          "Your payment has been confirmed and your 1-month subscription has started. Your workspace is fully active and ready to use."
-        ) +
-        emailText(`Subscription active until <strong>${subscriptionExpiresAt.toLocaleDateString()}</strong>.`, {
-          size: 12,
-          color: emailTokens.muted,
-        }) +
-        emailButton(dashboardUrl, "Log in to dashboard"),
-    });
-
-    sendSystemEmail({
-      to: user.email,
-      subject: "🎉 Account Activated! Your ChatNexGen Workspace is Ready",
-      text: `Welcome, ${fullName}! Your account has been activated. Subscription valid until ${subscriptionExpiresAt.toLocaleDateString()}. Login here: ${dashboardUrl}`,
-      html: htmlContent,
-    })
-      .then(() => {
-        console.log(`[SMTP] Welcome and activation email sent to ${user.email}`);
-      })
-      .catch((mailErr: any) => {
-        console.error("[approve] Error sending welcome activation email:", mailErr.message || mailErr);
-      });
+    // Activate, start the 1-month subscription and send the welcome email.
+    const { subscriptionExpiresAt } = await activateAccount(user.id, { plan: user.selectedPlan, reason: "manual" });
 
     return new NextResponse(
       `

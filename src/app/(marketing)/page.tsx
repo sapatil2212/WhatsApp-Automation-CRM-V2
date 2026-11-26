@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRight, Bot, Check, ChevronDown, Landmark } from "lucide-react";
 import { PLANS } from "@/lib/billing/plans";
 import { InteractiveHero } from "@/components/marketing/interactive-hero";
+import { OfferPopups } from "@/components/marketing/offer-popups";
 import { SpotlightCard } from "@/components/marketing/spotlight-card";
 import { MagneticButton } from "@/components/marketing/magnetic-button";
 import { AIChatSimulation } from "@/components/marketing/ai-chat-simulation";
@@ -99,6 +100,7 @@ export default function HomePage() {
       />
 
       {/* 1. HERO SECTION */}
+      <OfferPopups />
       <InteractiveHero />
 
       {/* 2. WHAT WE DO */}

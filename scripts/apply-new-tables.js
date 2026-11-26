@@ -8,6 +8,7 @@
  *   - FlowRun.resumeAt column   (flow delay step)
  *   - GymPackage / GymMember / GymMembership / MemberMessageLog (health & fitness members)
  *   - ReviewBusiness.socialLinks + ReviewEngagementEvent.platform (universal QR page)
+ *   - MarketingOffer / PromoCode / PromoRedemption / BillingPayment / BillingWebhookEvent (offers, promo codes, Razorpay)
  *
  * Why not `prisma migrate deploy`: this database was not created with
  * Prisma Migrate (there is no _prisma_migrations table), so `migrate deploy`
@@ -33,6 +34,7 @@ const STEPS = [
   { dir: '20261125000000_flow_delay_resume', table: 'FlowRun', column: 'resumeAt' },
   { dir: '20261126000000_gym_members_packages', table: 'GymPackage' },
   { dir: '20261127000000_review_social_links', table: 'ReviewBusiness', column: 'socialLinks' },
+  { dir: '20261128000000_billing_promo_offers', table: 'PromoCode' },
 ];
 
 async function exists({ table, column }) {

@@ -49,6 +49,8 @@ model User {
   flows             Flow[]
   businessProfiles  BusinessProfile[]
   portfolioItems    PortfolioItem[]
+  billingPayments   BillingPayment[]
+  promoRedemptions  PromoRedemption[]
 
   @@index([email])
 }
@@ -1930,4 +1932,124 @@ model MemberMessageLog {
 
   @@unique([memberId, eventKey])
   @@index([tenantId, createdAt])
+}
+
+// ── Platform billing & marketing (super admin) ──────────────────────
+
+/// Pop-up offers on the marketing home page (welcome and exit intent).
+model MarketingOffer {
+  id           String     @id @default(uuid())
+  kind         String     @db.VarChar(20) // welcome | exit_intent
+  title        String     @db.VarChar(160)
+  body         String?    @db.Text
+  /// https link or uploaded data URL (PNG/JPEG/WebP).
+  imageUrl     String?    @db.MediumText
+  ctaLabel     String?    @db.VarChar(60)
+  ctaUrl       String?    @db.VarChar(500)
+  /// Promo code shown on the pop-up (copied with one tap).
+  promoCodeId  String?
+  promoCode    PromoCode? @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
+  /// Welcome: seconds after landing before it opens.
+  delaySeconds Int        @default(3)
+  /// How often one visitor sees it: session | day | week | always
+  frequency    String     @default("session") @db.VarChar(20)
+  isActive     Boolean    @default(false)
+  startsAt     DateTime?
+  endsAt       DateTime?
+  views        Int        @default(0)
+  clicks       Int        @default(0)
+  dismissals   Int        @default(0)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([kind, isActive])
+}
+
+/// Discount code applied to a plan at signup.
+model PromoCode {
+  id               String            @id @default(uuid())
+  /// Stored upper-case; matched case-insensitively.
+  code             String            @unique @db.VarChar(40)
+  description      String?           @db.VarChar(300)
+  discountType     String            @db.VarChar(10) // percent | flat
+  /// Percent (1-100) or flat rupees.
+  discountValue    Decimal           @db.Decimal(10, 2)
+  /// Cap for percent discounts, in rupees.
+  maxDiscount      Decimal?          @db.Decimal(10, 2)
+  /// Plan ids it applies to; empty = every self-serve plan.
+  plans            Json?
+  startsAt         DateTime?
+  endsAt           DateTime?
+  /// Total uses allowed; null = unlimited.
+  maxRedemptions   Int?
+  /// Uses allowed per email.
+  perUserLimit     Int               @default(1)
+  timesRedeemed    Int               @default(0)
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  redemptions      PromoRedemption[]
+  payments         BillingPayment[]
+  offers           MarketingOffer[]
+
+  @@index([isActive])
+}
+
+/// One use of a promo code. `pending` while the payment is open, `redeemed` once paid.
+model PromoRedemption {
+  id            String          @id @default(uuid())
+  promoCodeId   String
+  promoCode     PromoCode       @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
+  userId        String?
+  user          User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email         String          @db.VarChar(191)
+  plan          String          @db.VarChar(40)
+  originalPaise Int
+  discountPaise Int
+  finalPaise    Int
+  status        String          @default("pending") @db.VarChar(20) // pending | redeemed | released
+  paymentId     String?         @unique
+  payment       BillingPayment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  createdAt     DateTime        @default(now())
+  redeemedAt    DateTime?
+
+  @@index([promoCodeId, status])
+  @@index([email])
+}
+
+/// Subscription payments (Razorpay, or free activations from a 100% promo).
+model BillingPayment {
+  id                String           @id @default(uuid())
+  userId            String?
+  user              User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email             String           @db.VarChar(191)
+  plan              String           @db.VarChar(40)
+  provider          String           @default("razorpay") @db.VarChar(20) // razorpay | free
+  amountPaise       Int
+  originalPaise     Int
+  discountPaise     Int              @default(0)
+  currency          String           @default("INR") @db.VarChar(3)
+  promoCodeId       String?
+  promoCode         PromoCode?       @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
+  providerOrderId   String?          @unique @db.VarChar(64)
+  providerPaymentId String?          @unique @db.VarChar(64)
+  status            String           @default("created") @db.VarChar(20) // created | paid | failed
+  method            String?          @db.VarChar(30)
+  failureReason     String?          @db.VarChar(500)
+  /// How it was confirmed: checkout (signature) or webhook.
+  confirmedVia      String?          @db.VarChar(20)
+  paidAt            DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  redemption        PromoRedemption?
+
+  @@index([status, createdAt])
+  @@index([email])
+}
+
+/// Razorpay webhook deliveries already processed (event id), for idempotency.
+model BillingWebhookEvent {
+  id         String   @id @db.VarChar(64)
+  event      String   @db.VarChar(60)
+  receivedAt DateTime @default(now())
 }

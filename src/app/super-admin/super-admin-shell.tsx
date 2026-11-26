@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { BarChart2, FileText, Loader2, LogOut, Menu, Moon, Settings, ShieldCheck, Sun, UserPlus, Users, X } from "lucide-react";
+import { BarChart2, FileText, Gift, Loader2, LogOut, Menu, Moon, Plug, Settings, ShieldCheck, Sun, UserPlus, Users, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
@@ -13,6 +13,8 @@ const NAV = [
   { href: "/super-admin", label: "Overview", icon: BarChart2, title: "Overview" },
   { href: "/super-admin/new-users", label: "New users", icon: UserPlus, title: "New users" },
   { href: "/super-admin/users", label: "Users & tenants", icon: Users, title: "Users & tenants" },
+  { href: "/super-admin/offers", label: "Offers", icon: Gift, title: "Offers" },
+  { href: "/super-admin/integrations", label: "Integrations", icon: Plug, title: "Integrations" },
   { href: "/super-admin/cms", label: "CMS & content", icon: FileText, title: "CMS & content" },
   { href: "/super-admin/settings", label: "Settings", icon: Settings, title: "Settings" },
 ];

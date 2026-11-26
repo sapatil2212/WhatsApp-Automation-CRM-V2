@@ -1,18 +1,19 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { CategoryPicker } from "@/components/auth/category-picker";
-import { ArrowLeft, ArrowRight, Check, CheckCircle, Eye, EyeOff, Loader2, Paperclip, PartyPopper, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, CheckCircle, Eye, EyeOff, Loader2, PartyPopper, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AuthShell } from "@/components/auth/auth-shell";
-import { AuthField, AuthNotice, authInputClass, authPrimaryButton, authSecondaryButton } from "@/components/auth/auth-field";
+import { AuthField, AuthNotice, authInputClass, authPrimaryButton } from "@/components/auth/auth-field";
 import { OtpInput } from "@/components/auth/otp-input";
 import { cn } from "@/lib/utils";
-import { planById, SELF_SERVE_PLANS } from "@/lib/billing/plans";
+import { formatPaise, planById, SELF_SERVE_PLANS } from "@/lib/billing/plans";
+import { PromoCodeField, type AppliedPromo } from "@/components/auth/promo-code-field";
+import { SignupCheckout } from "@/components/auth/signup-checkout";
 
 const WHATSAPP_CONTACT = "917745868073";
 
@@ -57,10 +58,10 @@ export default function SignupPage() {
   useEffect(() => {
     const wanted = planById(new URLSearchParams(window.location.search).get("plan"));
     const match = wanted && PLANS.find((p) => p.id === wanted.id);
+    // Read after mount so the server render and first client render match.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (match) setSelectedPlan(match);
   }, []);
-  const [proofFile, setProofFile]                   = useState<File | null>(null);
-  const [sending, setSending]                       = useState(false);
 
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldKey, string>>>({});
   const [emailTaken, setEmailTaken] = useState(false);
@@ -76,7 +77,21 @@ export default function SignupPage() {
     if (first) document.getElementById(first)?.focus();
   };
 
-  const fileRef = useRef<HTMLInputElement>(null);
+  // Promo code (preview on the form; the server applies it again at checkout).
+  const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null);
+  // Offer pop-ups link to /signup?promo=CODE.
+  const [linkPromo, setLinkPromo] = useState<string | null>(null);
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get("promo");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- URL is read after mount (see above)
+    if (code) setLinkPromo(code.slice(0, 40));
+  }, []);
+  const [activated, setActivated] = useState<"paid" | "free" | null>(null);
+  const handleActivated = useCallback((kind: "paid" | "free") => {
+    setActivated(kind);
+    setStep("done");
+  }, []);
+
   const supabase = createClient();
 
   const handleSignupSubmit = async (e: React.FormEvent) => {
@@ -155,48 +170,6 @@ export default function SignupPage() {
       setRegisteredUserId(data.user.id);
     }
     setStep("payment");
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setProofFile(e.target.files?.[0] ?? null);
-  };
-
-  const handleSendProof = async () => {
-    if (!registeredUserId) {
-      setError("Session expired. Please sign up again.");
-      setStep("form");
-      return;
-    }
-    setSending(true);
-
-    try {
-      // Mark as payment proof attached in the database
-      const res = await fetch("/api/auth/payment-proof", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: registeredUserId }),
-      });
-
-      if (!res.ok) throw new Error("Could not update payment proof status.");
-
-      const message = encodeURIComponent(
-        `🧾 *Payment Confirmation*\n\n` +
-        `Hello! I have completed the payment for ChatNexGen CRM.\n\n` +
-        `*Name:* ${fullName}\n` +
-        `*Email:* ${email}\n` +
-        `*Plan Selected:* ${selectedPlan.name} (${selectedPlan.price}${selectedPlan.period})\n` +
-        `*Proof File:* ${proofFile?.name ?? "Attached"}\n\n` +
-        `Please activate my account. Thank you! 🙏`
-      );
-
-      await new Promise((r) => setTimeout(r, 600));
-      window.open(`https://wa.me/${WHATSAPP_CONTACT}?text=${message}`, "_blank");
-      setStep("done");
-    } catch (err) {
-      setError((err instanceof Error && err.message) || "Something went wrong. Please try again.");
-    } finally {
-      setSending(false);
-    }
   };
 
   const currentIndex = STEP_INDEX[step];
@@ -373,6 +346,20 @@ export default function SignupPage() {
                 </p>
               </div>
 
+              {/* Promo code + total */}
+              <div className="flex flex-col gap-2">
+                <PromoCodeField plan={selectedPlan.id} email={email} value={appliedPromo} onChange={setAppliedPromo} initialCode={linkPromo} />
+                {appliedPromo && (
+                  <div className="flex items-center justify-between rounded-lg bg-[var(--m-bg-secondary)] px-3 py-2 text-[12px]">
+                    <span className="text-[var(--m-text-secondary)]">
+                      Total for the first month{" "}
+                      <span className="text-[var(--m-text-muted)] line-through">{formatPaise(appliedPromo.originalPaise)}</span>
+                    </span>
+                    <span className="text-[15px] font-bold text-[var(--m-text-heading)]">{formatPaise(appliedPromo.finalPaise)}</span>
+                  </div>
+                )}
+              </div>
+
               <button type="submit" disabled={loading || passwordsMismatch} className={`mt-1 ${authPrimaryButton}`}>
                 {loading ? <><Loader2 className="size-4 animate-spin" /> Creating account…</> : <>Create account <ArrowRight className="size-4" /></>}
               </button>
@@ -413,34 +400,26 @@ export default function SignupPage() {
         {step === "payment" && (
           <motion.div key="payment" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
             <div className="mb-4">
-              <h1 className="text-2xl font-bold tracking-tight text-[var(--m-text-heading)]">Scan &amp; pay</h1>
-              <p className="text-sm text-[var(--m-text-tertiary)]">Pay by UPI, then send us the payment screenshot to activate your account.</p>
+              <h1 className="text-2xl font-bold tracking-tight text-[var(--m-text-heading)]">Complete your payment</h1>
+              <p className="text-sm text-[var(--m-text-tertiary)]">Pay securely and your workspace is activated instantly.</p>
             </div>
-
-            <div className="mb-3 flex items-center justify-between gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
-              <span className="text-[12px] font-semibold text-emerald-500">{selectedPlan.name}</span>
-              <span className="text-[13px] font-bold text-[var(--m-text-heading)]">{selectedPlan.price}<span className="text-[10px] font-medium text-[var(--m-text-muted)]">{selectedPlan.period}</span></span>
-            </div>
-
-            <div className="relative mx-auto size-48 overflow-hidden rounded-lg border border-[var(--m-border-secondary)] bg-white p-1.5">
-              <Image src="/images/payment-qr.png" alt="UPI payment QR code" fill className="object-contain" priority unoptimized />
-            </div>
-
-            <div className="mt-4 space-y-2">
-              {error && <AuthNotice tone="error">{error}</AuthNotice>}
-              <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleFileChange} />
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                className="flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-emerald-500/40 bg-emerald-500/5 text-[12px] font-medium text-emerald-500 hover:border-emerald-500/70 hover:bg-emerald-500/10"
-              >
-                <Paperclip className="size-3.5" /> <span className="truncate">{proofFile ? proofFile.name : "Attach payment screenshot"}</span>
-              </button>
-              <button type="button" disabled={!proofFile || sending} onClick={handleSendProof} className={authPrimaryButton}>
-                {sending ? <><Loader2 className="size-4 animate-spin" /> Sending…</> : <><CheckCircle className="size-4" /> I&apos;ve paid, send proof on WhatsApp</>}
-              </button>
-              <p className="text-center text-[11px] text-[var(--m-text-muted)]">WhatsApp opens with your details filled in. Attach the screenshot there and send.</p>
-            </div>
+            {registeredUserId ? (
+              <SignupCheckout
+                userId={registeredUserId}
+                plan={selectedPlan.id}
+                planName={selectedPlan.name}
+                promoCode={appliedPromo?.code ?? null}
+                onActivated={handleActivated}
+              />
+            ) : (
+              <AuthNotice tone="error">Your session expired. Please sign up again.</AuthNotice>
+            )}
+            <p className="mt-3 text-center text-[11px] text-[var(--m-text-muted)]">
+              Payment trouble?{" "}
+              <a href={`https://wa.me/${WHATSAPP_CONTACT}?text=${encodeURIComponent(`Hello! I need help paying for my ChatNexGen account (${email.trim()}).`)}`} target="_blank" rel="noopener noreferrer" className="font-medium text-emerald-500 hover:text-emerald-400">
+                Chat with us on WhatsApp
+              </a>
+            </p>
           </motion.div>
         )}
 
@@ -451,12 +430,13 @@ export default function SignupPage() {
               <PartyPopper className="size-6 text-emerald-500" />
             </span>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-[var(--m-text-heading)]">You&apos;re all set</h1>
-              <p className="mt-1 text-sm text-[var(--m-text-tertiary)]">We&apos;re confirming your payment. You&apos;ll get a WhatsApp/email message when your account is active.</p>
+              <h1 className="text-2xl font-bold tracking-tight text-[var(--m-text-heading)]">Your workspace is active</h1>
+              <p className="mt-1 text-sm text-[var(--m-text-tertiary)]">
+                {activated === "free" ? "Your promo code covered the full amount." : "Payment received, thank you."} We&apos;ve emailed your receipt and login details to {email}.
+              </p>
             </div>
-            <AuthNotice tone="info">Payments are usually checked within <span className="font-semibold text-[var(--m-text-primary)]">24–48 hours</span>. You can log in once your account is activated.</AuthNotice>
-            <Link href="/login" className={authSecondaryButton}>
-              <ArrowLeft className="size-3.5" /> Back to log in
+            <Link href={`/login?email=${encodeURIComponent(email.trim())}`} className={authPrimaryButton}>
+              Log in to your dashboard <ArrowRight className="size-4" />
             </Link>
           </motion.div>
         )}
