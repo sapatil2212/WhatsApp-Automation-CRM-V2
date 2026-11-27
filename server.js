@@ -197,6 +197,13 @@ app.prepare().then(() => {
           } catch (err) {
             console.warn("[Appointment Ticker] lifecycle failed:", err.message || err);
           }
+          // Reminders for WhatsApp bookings the patient left half-way (5 min / 5 h / 10 h).
+          try {
+            const follow = await fetch(`http://127.0.0.1:${port}/api/appointments/followup`, { method: "POST", headers });
+            if (!follow.ok && follow.status !== 404) console.warn(`[Booking Follow-up Ticker] returned ${follow.status}`);
+          } catch (err) {
+            console.warn("[Booking Follow-up Ticker] failed:", err.message || err);
+          }
         }        // Sales follow-ups for customers who went quiet — every 5 minutes.
         if (tick % Math.max(1, Math.round(300_000 / intervalMs)) === 0) {
           const nurture = await fetch(`http://127.0.0.1:${port}/api/leads/nurture`, { method: "POST", headers });

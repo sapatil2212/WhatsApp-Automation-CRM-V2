@@ -115,6 +115,8 @@ export async function runLeadNurture(now = new Date()): Promise<{ checked: numbe
   for (const c of candidates) {
     const tenant = tenantById.get(c.tenantId);
     if (!tenant || !isEnabled(tenant.settings)) continue;
+    // An unfinished WhatsApp booking gets its own reminders (booking-followup.ts).
+    if (c.bookingStage?.startsWith('wizard_')) continue;
     try {
       const recent = await systemDb.message.findMany({ where: { conversationId: c.id }, orderBy: { createdAt: 'desc' }, take: 8, select: { senderType: true, contentText: true, createdAt: true } });
       const last = recent[0];

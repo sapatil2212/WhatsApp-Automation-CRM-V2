@@ -46,6 +46,12 @@ export interface WizardState {
   targetId?: string;
   targetLabel?: string;
   options?: string[];
+  /** Follow-up reminders sent while the patient was away (see booking-followup.ts). */
+  reminders?: number;
+  /** When the last reminder went out (ms). */
+  remindedAt?: number;
+  /** The patient message (createdAt ms) the reminder cycle belongs to. */
+  reminderFor?: number;
 }
 
 export interface FlowDepartment {
@@ -152,11 +158,21 @@ export function isRescheduleRequest(text: string): boolean {
   return /\b(change|shift|move|badalna|badal)\b/.test(t) && (APPT_WORDS.test(t) || /\b(date|time|timing)\b/.test(t));
 }
 
+/** A booking we reminded the patient about can be resumed for a day (WhatsApp's reply window). */
+export const REMINDED_WIZARD_TTL_MS = 24 * 60 * 60 * 1000;
+
 export function isActiveWizard(v: unknown, now = Date.now()): v is WizardState {
   if (!v || typeof v !== 'object') return false;
   const s = v as Partial<WizardState>;
-  return s.flow === 'wizard' && typeof s.updatedAt === 'number' && now - s.updatedAt < WIZARD_TTL_MS;
+  if (s.flow !== 'wizard' || typeof s.updatedAt !== 'number') return false;
+  const ttl = s.reminders ? REMINDED_WIZARD_TTL_MS : WIZARD_TTL_MS;
+  return now - s.updatedAt < ttl;
 }
+
+const YES_AFTER_REMINDER = /^(yes|yeah|yep|ya|yup|ok|okay|okk|sure|continue|go ahead|haan|han|ha|ho|hoy|chalel|chalega|theek hai|thik hai|ji|ji haan|haan ji|bilkul|nakki|👍)\W*$/i;
+const YES_AFTER_REMINDER_NATIVE = /^(हो|होय|हाँ|हां|जी|ठीक आहे|ठीक है|चालेल|चलेगा|नक्की|बिल्कुल)[\s!.।]*$/;
+const NO_AFTER_REMINDER = /^(no|nope|nah|not now|later|nahi|nahin|nako|nko|rehne do|rahu de|abhi nahi|nantar)\W*$/i;
+const NO_AFTER_REMINDER_NATIVE = /^(नको|नाही|नहीं|नही|नंतर|बाद में|रहने दो|राहू दे)[\s!.।]*$/;
 
 const HINGLISH = /\b(hai|hain|kal|parso|chahiye|chaiye|karna|krna|karni|mujhe|muje|mera|meri|naam|umar|umr|saal|kab|kya|haan|nahi|aap|dikhana|baje|subah|shaam|sham|ji)\b/;
 export function detectLang(text: string, fallback: Lang = 'en'): Lang {
@@ -877,7 +893,19 @@ export async function retryTime(state: WizardState, data: FlowData, reason: stri
 /** Handles the patient's next message in an ongoing booking chat. */
 export async function advance(state: WizardState, input: string, data: FlowData, now = Date.now()): Promise<FlowResult> {
   const raw = input.trim();
-  const s: WizardState = { ...state, updatedAt: now, lang: detectLang(raw, state.lang) };
+  const afterReminder = Boolean(state.reminders);
+  // The patient is back: the reminder cycle ends with this reply.
+  const s: WizardState = { ...state, updatedAt: now, lang: detectLang(raw, state.lang), reminders: undefined, remindedAt: undefined, reminderFor: undefined };
+
+  if (afterReminder && s.awaiting !== 'appointment' && s.awaiting !== 'confirm_cancel') {
+    // "Yes" to "shall we continue?" → ask the pending question again; "no" → stop.
+    if (NO_AFTER_REMINDER.test(raw) || NO_AFTER_REMINDER_NATIVE.test(raw)) {
+      return { kind: 'exit', text: s.mode === 'reschedule' ? T.keepAppt[s.lang] : T.cancelled[s.lang] };
+    }
+    if (YES_AFTER_REMINDER.test(raw) || YES_AFTER_REMINDER_NATIVE.test(raw)) {
+      return respond({ ...s, invalid: 0 }, await loadCtx(data), data, '', false);
+    }
+  }
 
   if (s.awaiting === 'appointment' || s.awaiting === 'confirm_cancel') {
     const managed = await continueManage(s, raw, data);
