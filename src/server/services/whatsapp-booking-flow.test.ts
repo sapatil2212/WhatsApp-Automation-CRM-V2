@@ -194,6 +194,41 @@ describe('Hinglish', () => {
   });
 });
 
+describe('Marathi and several details in one reply', () => {
+  it('books directly when the date reply also carries the time ("1 december sakali 11 vajta")', async () => {
+    const d = data({}, { '2026-12-01': ['09:00', '10:30', '11:00', '11:30'] });
+    const { last } = await chat('book appointment', ['Riya 30', '1', '1 december sakali 11 vajta'], d);
+    expect(last.kind).toBe('book');
+    if (last.kind === 'book') expect(last.state).toMatchObject({ date: '2026-12-01', time: '11:00' });
+  });
+
+  it('understands Devanagari time words and "vajta" without a period word', async () => {
+    const d = data({}, { '2026-11-20': ['11:00', '15:00'] });
+    expect((await chat('book appointment', ['Riya 30', '1', 'tomorrow दुपारी 3 वाजता'], d)).last.kind).toBe('book');
+    expect((await chat('book appointment', ['Riya 30', '1', 'tomorrow 11 vajta'], d)).last.kind).toBe('book');
+  });
+
+  it('shows the slot list only when the asked time is not free', async () => {
+    const d = data({}, { '2026-12-01': ['09:00', '09:30'] });
+    const { last } = await chat('book appointment', ['Riya 30', '1', '1 december sakali 11 vajta'], d);
+    expect(reply(last).text).toContain("11:00 AM isn't available");
+  });
+
+  it('lets the AI read a longer reply the rules only partly understood', async () => {
+    const seen: string[] = [];
+    const d = data({
+      extract: async (message) => {
+        seen.push(message);
+        return message.includes('पुढच्या') ? { date: '2026-11-23', time: '10:30' } : null;
+      },
+    });
+    const { last } = await chat('book appointment', ['Riya 30', '1', 'पुढच्या सोमवारी सकाळी साडेदहा'], d);
+    expect(seen).toContain('पुढच्या सोमवारी सकाळी साडेदहा');
+    expect(last.kind).toBe('book');
+    if (last.kind === 'book') expect(last.state).toMatchObject({ date: '2026-11-23', time: '10:30' });
+  });
+});
+
 describe('side questions, mistakes, cancel', () => {
   it('lets the regular AI answer a side question and keeps the booking', async () => {
     const { last } = await chat('book appointment', ['Riya 30', 'what are your clinic timings?']);
@@ -263,6 +298,12 @@ describe('parsers', () => {
     expect(parseTime('shaam 6 baje')).toBe('18:00');
     expect(parseTime('subah 10')).toBe('10:00');
     expect(parseTime('later')).toBeNull();
+    expect(parseTime('sakali 11 vajta')).toBe('11:00');
+    expect(parseTime('11 vajta sakali')).toBe('11:00');
+    expect(parseTime('दुपारी 3 वाजता')).toBe('15:00');
+    expect(parseTime('sandhyakali 6')).toBe('18:00');
+    expect(parseTime('dupari 12')).toBe('12:00');
+    expect(parseTime('रात्री 8 वाजता')).toBe('20:00');
   });
 
   it('pulls several details from one sentence', () => {

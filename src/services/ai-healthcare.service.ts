@@ -102,14 +102,15 @@ export function bookingFlowData(tenantId: string, clinic: any, contactName: stri
       }))
     },
     async extract(message, hint) {
-      const prompt = `Extract appointment booking details from a patient's WhatsApp message (English, Hindi or Hinglish).
+      const prompt = `Extract appointment booking details from a patient's WhatsApp message. It can be in any language or script (English, Hindi, Hinglish, Marathi in Devanagari or Roman letters, Gujarati, Tamil…) and may give several details at once.
+Time words: morning = subah/sakali/सकाळी/सुबह, afternoon = dopahar/dupari/दुपारी, evening = shaam/sandhyakali/संध्याकाळी, night = raat/ratri/रात्री; o'clock = baje/vajta/वाजता/बजे. Example: "1 december sakali 11 vajta" -> date 1 Dec, time "11:00"; "दुपारी 3 वाजता" -> "15:00".
 Today is ${hint.today} (YYYY-MM-DD). ${hint.awaiting ? `We just asked the patient for: ${hint.awaiting}.` : ''}
 Departments: ${hint.departments.join(', ') || 'none'}
 Doctors: ${hint.doctors.join(', ')}
 Message: <<${message.slice(0, 500)}>>
 Return JSON only: {"name":"patient name or empty","age":"number or empty","department":"one of the departments or empty","doctor":"one of the doctors or empty","date":"YYYY-MM-DD or empty","time":"HH:MM 24h or empty","is_question":true|false}
 Use empty strings for anything not clearly stated. The message may be in any language or script, with typos. "name" is only the person's actual given/full name: never a label or filler word such as naam, name, mera, hai, aur, and, umar, age, saal. Example: "name swapnil aur uma 26" -> name "Swapnil", age "26". is_question is true when the message asks something unrelated to giving booking details.`
-      const res = await callLLM(prompt, { jsonMode: true, maxTokens: 300, temperature: 0, taskCriticality: 'basic' })
+      const res = await callLLM(prompt, { jsonMode: true, maxTokens: 300, temperature: 0, taskCriticality: 'basic', timeoutMs: 10_000, deadlineMs: 20_000 })
       if (!res.success) return null
       const j = parseJSONFromLLM<Record<string, unknown>>(res.text)
       if (!j) return null

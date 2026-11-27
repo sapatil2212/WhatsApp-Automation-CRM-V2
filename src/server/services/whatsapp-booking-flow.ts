@@ -252,18 +252,36 @@ export function parseDate(input: string, today: string): string | null {
   return null;
 }
 
-/** "5:30 pm", "17:30", "5pm", "5.30 PM", "subah 10", "shaam 6 baje" → HH:MM. */
+// Time-of-day and "o'clock" words in English, Hindi/Hinglish and Marathi (Roman + Devanagari).
+const MORNING_WORDS = 'subah|subha|savere|sakali|sakaali|sakal|morning|सकाळी|सकाळ|सुबह|सवेरे';
+const AFTERNOON_WORDS = 'dopahar|dophar|dupari|dupaari|dupar|afternoon|noon|दुपारी|दुपार|दोपहर';
+const EVENING_WORDS = 'shaam|sham|saam|sandhyakali|sandhyakaali|sandhyakal|evening|संध्याकाळी|संध्याकाळ|शाम';
+const NIGHT_WORDS = 'raat|rat|ratri|night|रात्री|रात';
+const PERIOD_WORDS = `${MORNING_WORDS}|${AFTERNOON_WORDS}|${EVENING_WORDS}|${NIGHT_WORDS}`;
+const OCLOCK_WORDS = "baje|bje|bajey|vajta|vajata|vaajta|vajle|vaje|wajta|o'?clock|वाजता|वाजे|बजे";
+const hasWord = (t: string, words: string) => new RegExp(`(?<!\\p{L})(?:${words})(?!\\p{L})`, 'iu').test(t);
+
+/**
+ * "5:30 pm", "17:30", "5pm", "5.30 PM", "subah 10", "shaam 6 baje",
+ * "sakali 11 vajta", "दुपारी 2 वाजता" → HH:MM.
+ */
 export function parseTime(input: string): string | null {
-  let t = input.trim().toLowerCase().replace(/\s+/g, '').replace(/a\.m\.?/g, 'am').replace(/p\.m\.?/g, 'pm');
-  let pm: boolean | null = null;
-  if (/^(shaam|sham|raat|evening)/.test(t)) pm = true;
-  if (/^(subah|morning)/.test(t)) pm = false;
-  t = t.replace(/^(subah|morning|shaam|sham|raat|evening|dopahar|afternoon)/, '').replace(/(baje|o'?clock)$/, '');
+  const raw = input.trim().toLowerCase().replace(/a\.m\.?/g, 'am').replace(/p\.m\.?/g, 'pm');
+  const period = hasWord(raw, MORNING_WORDS)
+    ? 'am'
+    : hasWord(raw, AFTERNOON_WORDS)
+      ? 'afternoon'
+      : hasWord(raw, EVENING_WORDS) || hasWord(raw, NIGHT_WORDS)
+        ? 'pm'
+        : null;
+  const t = raw
+    .replace(new RegExp(`(?<!\\p{L})(?:${PERIOD_WORDS}|${OCLOCK_WORDS}|ko|ke|la|ला|को|at|around|la)(?!\\p{L})`, 'giu'), ' ')
+    .replace(/\s+/g, '');
   const m = /^(\d{1,2})(?:[:.](\d{2}))?(am|pm)?$/.exec(t);
   if (!m) return null;
   let h = Number(m[1]);
   const min = Number(m[2] ?? 0);
-  const ampm = m[3] ?? (pm === null ? null : pm ? 'pm' : 'am');
+  const ampm = m[3] ?? (period === 'afternoon' ? (h >= 1 && h <= 7 ? 'pm' : null) : period);
   if (ampm === 'pm' && h < 12) h += 12;
   if (ampm === 'am' && h === 12) h = 0;
   if (h > 23 || min > 59) return null;
@@ -327,12 +345,17 @@ export function extractRules(raw: string, ctx: { today: string; departments: Flo
     });
   }
 
-  // Times (need am/pm, a colon, or a Hindi time word, so "26" stays an age)
+  // Times (need am/pm, a colon, or a time-of-day / o'clock word, so "26" stays an age)
+  const N = '\\d{1,2}(?:[:.]\\d{2})?';
   const timePatterns = [
-    /\b(?:subah|morning|shaam|sham|raat|evening)\s*\d{1,2}(?:[:.]\d{2})?\s*(?:baje)?\b/,
+    // "sakali 11 vajta", "shaam 6 baje", "दुपारी 2 वाजता"
+    new RegExp(`(?<!\\p{L})(?:${PERIOD_WORDS})\\s*(?:la\\s*|ko\\s*|at\\s*)?${N}\\s*(?:${OCLOCK_WORDS})?(?!\\p{L})`, 'iu'),
+    // "11 vajta sakali", "6 baje shaam", "11 sakali"
+    new RegExp(`(?<![\\p{L}\\d])${N}\\s*(?:${OCLOCK_WORDS})?\\s*(?:${PERIOD_WORDS})(?!\\p{L})`, 'iu'),
     /\b\d{1,2}(?:[:.]\d{2})?\s*(?:am|pm|a\.m\.?|p\.m\.?)(?![a-z])/,
     /\b\d{1,2}:\d{2}\b/,
-    /\b\d{1,2}\s*baje\b/,
+    // "11 vajta", "5 baje", "11 o'clock"
+    new RegExp(`(?<![\\p{L}\\d])${N}\\s*(?:${OCLOCK_WORDS})(?!\\p{L})`, 'iu'),
   ];
   for (const re of timePatterns) {
     if (out.time) break;
@@ -340,7 +363,7 @@ export function extractRules(raw: string, ctx: { today: string; departments: Flo
       const tm = parseTime(m[0]);
       if (tm) {
         out.time = tm;
-        out.meridiem = /(am|pm|a\.m|p\.m|subah|morning|shaam|sham|raat|evening)/.test(m[0]);
+        out.meridiem = /(am|pm|a\.m|p\.m)/.test(m[0]) || hasWord(m[0], PERIOD_WORDS);
       }
       return Boolean(tm);
     });
@@ -732,7 +755,13 @@ async function extractAll(raw: string, s: WizardState, ctx: Ctx, data: FlowData,
   // patient details are expected or this is the opening message. Word rules are the fallback
   // for when the AI is unavailable and for the other wizard steps unless they miss something.
   const patientStep = s.awaiting === 'patient';
-  const useAi = Boolean(data.extract) && (patientStep || first || (awaitedMissing && !rules.isQuestion));
+  // A reply can carry more than the one detail we asked for ("1 december
+  // sakali 11 vajta" answers date AND time). When the rules found little in a
+  // longer message, or it is written in a non-Latin script the rules only
+  // partly read, the AI reads the whole message so nothing is asked twice.
+  const nativeScript = /(?![a-z])\p{L}/iu.test(raw);
+  const moreToRead = wordCount >= 3 && foundCount <= 1;
+  const useAi = Boolean(data.extract) && (patientStep || first || nativeScript || moreToRead || (awaitedMissing && !rules.isQuestion));
   if (!useAi) return rules;
 
   const ai = await data
