@@ -132,7 +132,9 @@ export function isBookingRequest(text: string): boolean {
   if (/\b(cancel\w*|reschedul\w*|postpon\w*|prepon\w*|change|shift|status|fees?|price|cost|charges?|timings?)\b/.test(t)) return false;
   return (
     /\b(book|booking|appointment|appoinment|apointment|appt|schedule|consult|consultation|visit)\b/.test(t) ||
-    /(milna|dikhana|dikhane|checkup|check-up|check up)\b/.test(t)
+    /(milna|dikhana|dikhane|checkup|check-up|check up|dakhvaycha|dakhvaych|tapasni)\b/.test(t) ||
+    // Native-script spellings (Marathi/Hindi/Gujarati…): "अपॉइंटमेंट", "बुक करायची", "दाखवायचे".
+    /(अपॉइ|अपॉई|अपोइ|अपाइ|एपॉइ|ऍपॉ|अपॉंट|बुक कर|बुकिंग|दाखवाय|दिखाना|दिखाने|तपासणी|चेकअप|એપોઇ|એપોઈ|બુક|অ্যাপয়|அப்பாயின்|అపాయిం|ಅಪಾಯಿಂ)/.test(text)
   );
 }
 
@@ -140,7 +142,8 @@ const APPT_WORDS = /(appoint|appoinment|apointment|appt|booking|visit|slot)/;
 /** "cancel my appointment", "appointment cancel karna hai". */
 export function isCancelRequest(text: string): boolean {
   const t = text.toLowerCase();
-  return /\bcancel\w*\b/.test(t) && (APPT_WORDS.test(t) || t.split(/\s+/).length <= 4);
+  const cancelWord = /\bcancel\w*\b/.test(t) || /(रद्द|कॅन्सल|कैंसल)/.test(t);
+  return cancelWord && (APPT_WORDS.test(t) || /(अपॉ|अपो|भेट)/.test(t) || t.split(/\s+/).length <= 4);
 }
 /** "reschedule", "change my appointment time", "appointment postpone karna hai". */
 export function isRescheduleRequest(text: string): boolean {
@@ -163,7 +166,10 @@ export function detectLang(text: string, fallback: Lang = 'en'): Lang {
   return fallback;
 }
 
-const isCancel = (t: string) => t.split(/\s+/).length <= 4 && /^(cancel|stop|exit|quit|no thanks|nahi chahiye|rehne do|band karo)\b/.test(t);
+const isCancel = (t: string) =>
+  t.split(/\s+/).length <= 4 &&
+  (/^(cancel|stop|exit|quit|no thanks|nahi chahiye|rehne do|band karo|nako|nko|rahu de|rahude|cancel kara|cancel karo)\b/.test(t) ||
+    /^(नको|रद्द|राहू दे|रहने दो|नहीं चाहिए|बंद करो|कॅन्सल|कैंसल)/.test(t));
 const looksLikeQuestion = (raw: string) =>
   /\?\s*$/.test(raw) || /^(what|how|where|when|which|why|who|is|are|do|does|can|kya|kab|kaha|kahan|kitna|kitne|kaise)\b/i.test(raw.trim());
 

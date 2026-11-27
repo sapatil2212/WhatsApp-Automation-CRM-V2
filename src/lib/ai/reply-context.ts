@@ -59,9 +59,18 @@ function parseAdNote(text: string): AdReferral {
   return { headline: get('Headline'), body: get('Ad text'), source_url: get('Link'), source_id: get('Ad ID') };
 }
 
+function adPlatform(r: AdReferral): string {
+  const url = (r.source_url || '').toLowerCase();
+  if (/instagram\.com|instagr\.am/.test(url)) return 'Instagram';
+  if (/facebook\.com|fb\.me|fb\.com/.test(url)) return 'Facebook';
+  return 'Facebook/Instagram';
+}
+
 function adBlock(r: AdReferral, firstTouch: boolean): string {
+  const kind = r.source_type === 'post' ? 'post' : 'Click-to-WhatsApp ad';
   return `### CONVERSATION CONTEXT — META ADS LEAD
-This customer ${firstTouch ? 'just tapped' : 'recently came from'} our Click-to-WhatsApp advertisement:
+Source: ${adPlatform(r)} ${kind}${r.media_type ? ` (${r.media_type})` : ''}.
+This customer ${firstTouch ? 'just tapped' : 'recently came from'} our ${kind}:
 - Ad headline: ${r.headline || '(not provided)'}
 - Ad text: ${r.body || '(not provided)'}
 - Ad link: ${r.source_url || '(none)'}

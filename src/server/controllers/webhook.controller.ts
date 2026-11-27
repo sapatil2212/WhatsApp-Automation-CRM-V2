@@ -28,7 +28,8 @@ import { NextResponse } from 'next/server';
 
 import { createRawHandler, getLogger, systemDb, tenantDb, type TenantDb } from '../kernel';
 import { decrypt, encrypt, isLegacyFormat } from '@/lib/whatsapp/encryption';
-import { getMediaUrl } from '@/lib/whatsapp/meta-api';
+import { getMediaUrl, markReadWithTyping } from '@/lib/whatsapp/meta-api';
+import { messageTextForAi } from '@/lib/ai/media-understanding';
 import { verifyMetaWebhookSignature } from '@/lib/whatsapp/webhook-signature';
 import { getBusinessSegment } from '@/lib/business/terminology';
 import { getInboundRoutingMode } from '@/lib/inbound/routing';
@@ -421,8 +422,24 @@ async function route(input: {
   // is safe to retry; any other error may have happened after a reply went
   // out, so it is never retried.
   let aiRetrySafe = true;
+  // What the AI reads: the text, or a transcript/description of a voice
+  // note, photo or document. Computed once and shared by both attempts.
+  let aiTextP: Promise<string> | null = null;
+  const aiText = () =>
+    (aiTextP ??= messageTextForAi({
+      contentType: message.contentType,
+      contentText: stored.text || null,
+      mediaUrl: message.mediaUrl,
+      accessToken: account.accessToken,
+    }).catch(() => stored.text));
+  let typingShown = false;
   const runAi = async (): Promise<AiOutcome> => {
     if (!aiRetrySafe) return 'failed';
+    if (!typingShown) {
+      typingShown = true;
+      // Blue ticks + "typing…" while the reply is prepared, like a person would.
+      void markReadWithTyping({ phoneNumberId: account.phoneNumberId, accessToken: account.accessToken, messageId: message.whatsappMessageId });
+    }
     const replyContext = await resolveReplyContext({
       tenantId: account.tenantId,
       contactId: stored.contactId,
@@ -437,7 +454,7 @@ async function route(input: {
 
     const args = {
       replyContext,
-      messageText: stored.text,
+      messageText: (await aiText()) || stored.text,
       senderPhone: message.from,
       contactId: stored.contactId,
       userId: account.userId,
@@ -515,6 +532,7 @@ async function route(input: {
         contactId: stored.contactId,
         conversationId: stored.conversationId,
         customerLabel: message.profileName || `+${message.from}`,
+        customerText: stored.text,
       }),
   });
   log.info('inbound routed', { mode: routingMode, repliedBy: outcome.repliedBy, ai: outcome.aiOutcome ?? 'not_run' });

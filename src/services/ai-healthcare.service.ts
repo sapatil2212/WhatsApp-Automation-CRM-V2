@@ -9,7 +9,19 @@ import {
   invalidateAppointmentsCache,
 } from '@/lib/healthcare/clinic-cache'
 import { tryFastPath } from '@/lib/healthcare/fast-path-responder'
-import { callLLM, parseJSONFromLLM } from '@/lib/ai/llm'
+import { callLLM, inferTaskCriticality, parseJSONFromLLM } from '@/lib/ai/llm'
+import { normalizeDigits, languageInstruction, type DetectedLanguage } from '@/lib/ai/language'
+import {
+  buildMemory,
+  declinesHuman,
+  ensureLanguage,
+  HANDOFF_RULES,
+  HUMAN_STYLE_RULES,
+  humanIsActive,
+  localizeText,
+  localizedCanned,
+  wantsHuman,
+} from '@/lib/ai/conversation-kit'
 import { AiUnavailableError } from '@/lib/ai/outcome'
 import { getLogger, systemDb, tenantDb } from '@/server/kernel'
 import { AppointmentService } from '@/server/services/appointment.service'
@@ -281,7 +293,6 @@ export async function processHealthcareAIMessage(options: {
     contactId,
     userId,
     conversationId,
-    contextMessageId,
     accessToken,
     phoneNumberId,
     isFirstInboundMessage,
@@ -370,186 +381,161 @@ export async function processHealthcareAIMessage(options: {
     return false
   }
 
-  // ─── Step 1.5: Human Handover Status Check ─────────────────────────────────
-  const convData = await tenantDb(tenantId).conversation.findUnique({
-    where: { id: conversationId },
-    select: { status: true, bookingState: true, bookingStage: true }
-  })
-
-  // Load existing booking memory
-  let currentBookingState = (convData?.bookingState as any) || {}
-
-  if (convData?.status === 'open') {
-    // Get the previous message in this conversation to calculate idle time
-    const prevMsgs = await tenantDb(tenantId).message.findMany({
+  // ─── Step 1.5: Memory, reply language, and who owns the chat ──────────────
+  const db = tenantDb(tenantId)
+  const [convData, recentMessages, contact] = await Promise.all([
+    db.conversation.findUnique({
+      where: { id: conversationId },
+      select: { status: true, bookingState: true, bookingStage: true },
+    }),
+    db.message.findMany({
       where: { conversationId },
       orderBy: { createdAt: 'desc' },
-      take: 2
+      take: 30,
+      select: { senderType: true, contentType: true, contentText: true, createdAt: true },
+    }),
+    db.contact.findUnique({ where: { id: contactId }, select: { name: true, phone: true } }),
+  ])
+  const memory = buildMemory(recentMessages, messageText)
+  const lang = memory.language
+  let currentBookingState = (convData?.bookingState as any) || {}
+  let handoffPending = convData?.bookingStage === 'human_handoff'
+  const handoverEnabled = aiSettings.humanHandoverEnabled !== false
+
+  const reply = (text: string, intent: string, confidence = 1) =>
+    sendReplyAndSave({
+      tenantId,
+      clinicId: clinic.id,
+      contactId,
+      conversationId,
+      responseText: text,
+      intent,
+      confidence,
+      userMessage: messageText,
+      senderPhone,
+      accessToken,
+      phoneNumberId,
     })
 
-    const prevMsg = prevMsgs && prevMsgs[1]
-    const lastMsgTime = prevMsg ? new Date(prevMsg.createdAt).getTime() : 0
-    const idleTimeMs = Date.now() - lastMsgTime
-    const SESSION_TIMEOUT_MS = 15 * 60 * 1000 // 15 minutes
+  // A team member is chatting with this customer right now: stay out of it.
+  if (humanIsActive(memory)) {
+    log.info('team member active in this chat; AI stays quiet', { conversationId })
+    return true
+  }
 
-    if (idleTimeMs > SESSION_TIMEOUT_MS) {
-      log.info('open conversation idle; returning it to the AI', { conversationId, idleMinutes: Math.round(idleTimeMs / 60000) })
-      await tenantDb(tenantId).conversation.update({
-        where: { id: conversationId },
-        data: { status: 'closed', updatedAt: new Date() }
-      })
-    } else {
-      const lastBotMsg = await tenantDb(tenantId).message.findFirst({
-        where: { conversationId, senderType: 'bot' },
-        orderBy: { createdAt: 'desc' }
-      })
-
-      const handoverText = 'Got it! I have forwarded your message to our team members. A representative will be with you shortly to assist you further. Thank you for your patience! 🏥🙏'
-
-      const isLastBotMsgHandover = lastBotMsg && lastBotMsg.contentText && (
-        lastBotMsg.contentText.includes('connecting you to a team member') ||
-        lastBotMsg.contentText.includes('forwarded your message')
-      )
-
-      if (isLastBotMsgHandover) {
-        log.info('conversation owned by a human; handover already sent', { conversationId })
-        return true
-      }
-
-      log.info('conversation owned by a human; sending handover notice', { conversationId })
-      await sendReplyAndSave({
-        tenantId,
-        clinicId: clinic.id,
-        contactId,
-        conversationId,
-        responseText: handoverText,
-        intent: 'human_handover',
-        confidence: 1.0,
-        userMessage: messageText,
-        senderPhone,
-        contextMessageId,
-        accessToken,
-        phoneNumberId,
-      })
-      return true
+  // ─── Step 2: Human handover — only when the customer asks for it ──────────
+  if (declinesHuman(messageText)) {
+    if (handoffPending) {
+      await db.conversation.update({ where: { id: conversationId }, data: { bookingStage: 'idle' } }).catch(() => undefined)
+      handoffPending = false
     }
+    // The AI answers normally below.
+  } else if (handoverEnabled && wantsHuman(messageText)) {
+    await handleHumanEscalation({
+      tenantId,
+      clinic,
+      contactId,
+      conversationId,
+      userMessage: messageText,
+      intent: 'human_handover',
+      reason: 'Customer asked to talk to a team member.',
+      responseText: await localizedCanned('handoff', lang),
+      accessToken,
+      phoneNumberId,
+      senderPhone,
+      customerLabel: contact?.name || `+${senderPhone}`,
+    })
+    return true
   }
 
   const userQuery = messageText.trim().toLowerCase()
   function matchesKeyword(text: string, kw: string): boolean {
-    const escaped = kw.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    return new RegExp(`(?<![a-z0-9])${escaped}(?![a-z0-9])`, 'i').test(text)
+    const k = String(kw || '').toLowerCase().trim()
+    if (!k) return false
+    const escaped = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'iu').test(text)
   }
+  const keywordList = (v: unknown): string[] => (Array.isArray(v) ? v.map(String).filter((s) => s.trim()) : [])
 
-  const isEmergency  = aiSettings.emergencyKeywords?.some((kw: string) => matchesKeyword(userQuery, kw))
-  const isEscalation = aiSettings.escalationKeywords
-    ?.filter((kw: string) => {
-      const cleanKw = kw.toLowerCase().trim()
-      return cleanKw !== 'doctor' && cleanKw !== 'doctors'
-    })
-    ?.some((kw: string) => matchesKeyword(userQuery, kw))
-
-  if (isEmergency || isEscalation) {
-    log.info('escalation keyword matched', { conversationId, emergency: !!isEmergency })
-    await handleHumanEscalation({
-      tenantId,
-      clinic,
-      aiSettings,
-      contactId,
-      conversationId,
-      userMessage: messageText,
-      intent: isEmergency ? 'emergency' : 'human_handover',
-      reason: isEmergency ? 'Matched emergency keyword.' : 'Matched escalation keyword.',
-      accessToken,
-      phoneNumberId,
-      senderPhone,
-      contextMessageId,
-    })
+  // Emergencies get safety instructions immediately and alert the team.
+  // This is not a transfer: the AI keeps helping in the same chat.
+  const isEmergency = keywordList(aiSettings.emergencyKeywords).some((kw) => matchesKeyword(userQuery, kw))
+  if (isEmergency) {
+    log.info('emergency keyword matched', { conversationId })
+    await alertTeam({ tenantId, clinic, contactId, conversationId, userMessage: messageText, kind: 'emergency', customerLabel: contact?.name || `+${senderPhone}` })
+    const phone = clinic.phone ? `\n📞 ${clinic.clinicName}: ${clinic.phone}` : ''
+    await reply(`${await localizedCanned('emergency', lang)}${phone}`, 'emergency')
     return true
   }
 
   // ─── Step 2.5: Guided step-by-step booking (name → age → department →
   // doctor → date → free slot → confirm). Runs before the fast path / LLM so
   // patients who don't know doctors or departments get lists to choose from.
+  const flowText = normalizeDigits(messageText)
   {
     const wizardActive = isActiveWizard(currentBookingState)
-    const wantsCancel = !wizardActive && isCancelRequest(messageText)
-    const wantsReschedule = !wizardActive && !wantsCancel && isRescheduleRequest(messageText)
-    if (wizardActive || wantsCancel || wantsReschedule || isBookingRequest(messageText)) {
-      const contact = await tenantDb(tenantId).contact.findUnique({ where: { id: contactId }, select: { name: true } })
+    const wantsCancel = !wizardActive && isCancelRequest(flowText)
+    const wantsReschedule = !wizardActive && !wantsCancel && isRescheduleRequest(flowText)
+    if (wizardActive || wantsCancel || wantsReschedule || isBookingRequest(flowText)) {
       const flow = bookingFlowData(tenantId, clinic, contact?.name ?? null, contactId)
       const result = wizardActive
-        ? await advanceBookingFlow(currentBookingState, messageText, flow)
+        ? await advanceBookingFlow(currentBookingState, flowText, flow)
         : wantsCancel
-          ? await startManage(flow, 'cancel', messageText)
+          ? await startManage(flow, 'cancel', flowText)
           : wantsReschedule
-            ? await startManage(flow, 'reschedule', messageText)
-            : await startWizard(flow, messageText)
-      const handled = await applyBookingFlowResult({ result, flow, tenantId, clinic, doctors, timings, contactId, conversationId, senderPhone, messageText, contextMessageId, accessToken, phoneNumberId })
+            ? await startManage(flow, 'reschedule', flowText)
+            : await startWizard(flow, flowText)
+      const handled = await applyBookingFlowResult({ result, flow, tenantId, clinic, doctors, timings, contactId, conversationId, senderPhone, messageText, accessToken, phoneNumberId, lang })
       if (handled) return true
       // Side question: the regular AI answers, the booking resumes on the next reply.
       if (result.kind !== 'release' || !result.state) currentBookingState = {}
     }
   }
 
-  // ─── Step 3: Fast-path responder (SKIP AI for simple queries ~40% of traffic)
-  const fastResult = tryFastPath(messageText, { clinic, aiSettings, timings, doctors, services, faqs, cachedAt: 0 }, !!isFirstInboundMessage)
-  if (fastResult) {
-    log.info('fast-path reply', { intent: fastResult.intent, ms: Date.now() - startTime })
-    await sendReplyAndSave({
-      tenantId,
-      clinicId: clinic.id,
-      contactId,
-      conversationId,
-      responseText: fastResult.response,
-      intent: fastResult.intent,
-      confidence: fastResult.confidence,
-      userMessage: messageText,
-      senderPhone,
-      contextMessageId,
-      accessToken,
-      phoneNumberId,
-    })
-    return true
+  // ─── Step 3: Fast path — instant factual answers for clear English queries
+  if (lang.code === 'en' && lang.confidence === 'strong') {
+    const fastResult = tryFastPath(messageText, { clinic, aiSettings, timings, doctors, services, faqs, cachedAt: 0 }, !!isFirstInboundMessage)
+    if (fastResult) {
+      log.info('fast-path reply', { intent: fastResult.intent, ms: Date.now() - startTime })
+      await reply(fastResult.response, fastResult.intent, fastResult.confidence)
+      return true
+    }
   }
 
-  // ─── Step 4: Fetch dynamic data (appointments + chat history) ──────────────
+  // ─── Step 4: Dynamic data (free slots, departments, this patient's visits) ─
   const now = new Date()
   const todayStr = getLocalDateString(now)
 
   let upcomingAppointments = getCachedAppointments(clinic.id)
-  let pastMessages: any[] = []
-
-  if (upcomingAppointments !== null) {
-    pastMessages = await tenantDb(tenantId).message.findMany({
-      where: { conversationId },
-      orderBy: { createdAt: 'desc' },
-      take: 12
-    })
-  } else {
-    const [msgs, appts] = await Promise.all([
-      tenantDb(tenantId).message.findMany({
-        where: { conversationId },
-        orderBy: { createdAt: 'desc' },
-        take: 12
-      }),
-      tenantDb(tenantId).appointment.findMany({
-        where: {
-          clinicId: clinic.id,
-          status: { not: 'cancelled' },
-          appointmentDate: { gte: new Date(todayStr) }
-        }
+  const [apptsLoaded, departments, patientAppointments] = await Promise.all([
+    upcomingAppointments !== null
+      ? Promise.resolve(null)
+      : db.appointment.findMany({
+          where: { clinicId: clinic.id, status: { not: 'cancelled' }, appointmentDate: { gte: new Date(todayStr) } },
+        }),
+    db.clinicDepartment
+      .findMany({
+        where: { clinicId: clinic.id, isActive: true },
+        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+        select: { name: true, description: true, doctors: { select: { doctor: { select: { doctorName: true } } } } },
       })
-    ])
-    pastMessages = msgs
-    upcomingAppointments = appts
-    setCachedAppointments(clinic.id, upcomingAppointments)
+      .catch(() => [] as any[]),
+    db.appointment
+      .findMany({
+        where: { clinicId: clinic.id, contactId, status: 'scheduled', appointmentDate: { gte: new Date(`${todayStr}T00:00:00Z`) } },
+        include: { doctor: { select: { doctorName: true } } },
+        orderBy: [{ appointmentDate: 'asc' }, { appointmentTime: 'asc' }],
+        take: 5,
+      })
+      .catch(() => [] as any[]),
+  ])
+  if (apptsLoaded) {
+    upcomingAppointments = apptsLoaded
+    setCachedAppointments(clinic.id, apptsLoaded)
   }
 
-  // ── Confirmed booking details context
-  const confirmedCtx = extractBookingContext(pastMessages ?? [], doctors ?? [])
-  
-  // Merge context from chat history regex extraction
+  // ── Booking details already given earlier in the chat
+  const confirmedCtx = extractBookingContext(recentMessages ?? [], doctors ?? [])
   if (confirmedCtx.patient_name) currentBookingState.patient_name = confirmedCtx.patient_name
   if (confirmedCtx.patient_age) currentBookingState.patient_age = confirmedCtx.patient_age
   if (confirmedCtx.reason_for_visit) currentBookingState.reason_for_visit = confirmedCtx.reason_for_visit
@@ -557,415 +543,251 @@ export async function processHealthcareAIMessage(options: {
   if (confirmedCtx.date) currentBookingState.date = confirmedCtx.date
   if (confirmedCtx.time) currentBookingState.time = confirmedCtx.time
 
-  const confirmedBookingSection = (currentBookingState.patient_name || currentBookingState.patient_age || currentBookingState.reason_for_visit || currentBookingState.doctor_name || currentBookingState.date || currentBookingState.time)
-    ? `\n### STRUCTURALLY RECORDED CONVERSATION MEMORY (CONFIRMED):
-These details are already confirmed and saved in the conversation state. Do NOT ask the patient for them again.
-` +
-      (currentBookingState.patient_name ? `- Patient Name: ${currentBookingState.patient_name}\n` : '') +
-      (currentBookingState.patient_age ? `- Patient Age: ${currentBookingState.patient_age}\n` : '') +
-      (currentBookingState.reason_for_visit ? `- Reason for Visit: ${currentBookingState.reason_for_visit}\n` : '') +
-      (currentBookingState.doctor_name ? `- Doctor: ${currentBookingState.doctor_name}\n` : '') +
-      (currentBookingState.date
-        ? `- Date: ${currentBookingState.date} (${WEEKDAYS[new Date(currentBookingState.date + 'T00:00:00').getDay()]})\n`
-        : '') +
-      (currentBookingState.time ? `- Time: ${currentBookingState.time}\n` : '')
-    : ''
+  const memoryLines = [
+    currentBookingState.patient_name ? `- Patient name: ${currentBookingState.patient_name}` : '',
+    currentBookingState.patient_age ? `- Patient age: ${currentBookingState.patient_age}` : '',
+    currentBookingState.reason_for_visit ? `- Reason for visit: ${currentBookingState.reason_for_visit}` : '',
+    currentBookingState.doctor_name ? `- Doctor: ${currentBookingState.doctor_name}` : '',
+    currentBookingState.date ? `- Date: ${currentBookingState.date} (${WEEKDAYS[new Date(currentBookingState.date + 'T00:00:00').getDay()]})` : '',
+    currentBookingState.time ? `- Time: ${currentBookingState.time}` : '',
+  ].filter(Boolean)
 
   const timingsContext = (timings || [])
-    .map(
-      (t) =>
-        `${t.dayName}: ${t.isClosed ? 'Closed' : `${t.openingTime} - ${t.closingTime} (Break: ${t.lunchBreakStart || 'None'} - ${t.lunchBreakEnd || 'None'})`}`
-    )
+    .map((t) => `${t.dayName}: ${t.isClosed ? 'Closed' : `${t.openingTime} - ${t.closingTime}${t.lunchBreakStart ? ` (break ${t.lunchBreakStart} - ${t.lunchBreakEnd})` : ''}`}`)
     .join('\n')
 
-  const clinicExceptionsContext = (clinic.dateExceptions || [])
-    .map(
-      (e: any) => {
-        const weekday = getWeekdayName(e.date)
-        return `- ${e.date} (${weekday}): ${e.is_closed ? 'Closed all day' : `Special timings: ${e.opening_time} - ${e.closing_time}`} (${e.reason || 'Holiday'})`
-      }
-    )
+  const clinicExceptionsContext = (Array.isArray(clinic.dateExceptions) ? clinic.dateExceptions : [])
+    .filter((e: any) => e?.date && e.date >= todayStr)
+    .map((e: any) => `- ${e.date} (${getWeekdayName(e.date)}): ${e.is_closed ? 'Closed all day' : `Special timings: ${e.opening_time} - ${e.closing_time}`} (${e.reason || 'Holiday'})`)
     .join('\n')
 
   const doctorsContext = (doctors || [])
     .map((d) => {
-      const daysWithSlots = Object.entries(d.weeklySlots || {})
-        .map(([day, slots]: [string, any]) => {
-          const activeSlots = (slots || [])
-            .filter((s: any) => s.is_active)
-            .map((s: any) => `${s.start_time}-${s.end_time}`)
-            .join(', ');
-          return activeSlots ? `${day}: [${activeSlots}]` : `${day}: No slots`;
-        })
-        .filter((str) => !str.includes('No slots'))
-        .join('; ');
+      const leave = (Array.isArray(d.dateExceptions) ? d.dateExceptions : [])
+        .filter((e: any) => e?.date && e.date >= todayStr && !e.is_available)
+        .map((e: any) => `${e.date}${e.reason ? ` (${e.reason})` : ''}`)
+        .join(', ')
+      return `- ${formatDocName(d.doctorName)} — ${d.specialization || 'General'}${d.qualification ? `, ${d.qualification}` : ''}${d.experience ? `, ${d.experience} yrs exp` : ''}. Fee ₹${d.consultationFee || 0}. Days: ${d.availableDays?.join(', ') || 'not set'} ${d.availableStartTime || ''}-${d.availableEndTime || ''}.${leave ? ` On leave: ${leave}.` : ''}`
+    })
+    .join('\n')
 
-      const docExceptions = (d.dateExceptions || [])
-        .map((e: any) => {
-          const weekday = getWeekdayName(e.date)
-          return `${e.date} (${weekday}) (${!e.is_available ? 'Leave/Unavailable' : 'Available with custom slots'}): ${e.reason || 'No reason'}`
-        })
-        .join('; ');
-
-      return `- ${formatDocName(d.doctorName)} (${d.specialization || 'General'}). Fee: ₹${d.consultationFee || 0}. Shifts: ${d.availableDays?.join(', ') || 'None'} from ${d.availableStartTime || 'N/A'} to ${d.availableEndTime || 'N/A'}. Weekly Slots: ${daysWithSlots || 'None'}. Exceptions: ${docExceptions || 'None'}.`;
+  const departmentsContext = (departments || [])
+    .map((dep: any) => {
+      const docs = (dep.doctors || []).map((x: any) => formatDocName(x.doctor?.doctorName || '')).filter(Boolean)
+      return `- ${dep.name}${dep.description ? `: ${String(dep.description).slice(0, 160)}` : ''}${docs.length ? ` — ${docs.join(', ')}` : ''}`
     })
     .join('\n')
 
   const servicesContext = (services || [])
-    .map((s) => `- ${s.serviceName}: ${s.description || ''} (Starts at ₹${s.startingPrice || 0}, duration ${s.duration || 30} mins)`)
+    .map((s) => `- ${s.serviceName}: ${s.description || ''} (from ₹${s.startingPrice || 0}, ${s.duration || 30} mins)`)
     .join('\n')
 
   const faqsContext = (faqs || [])
-    .map((f) => `Q: "${f.question}"\nA: "${f.answer}"`)
+    .map((f) => `Q: ${f.question}\nA: ${f.answer}`)
     .join('\n')
 
-  const chatHistoryText = [...pastMessages]
-    .reverse()
-    .filter((m) => m.contentText)
-    .map((m) => {
-      const sender = m.senderType === 'customer' ? 'Patient' : m.senderType === 'bot' ? 'AI Assistant' : 'Agent'
-      return `${sender}: ${m.contentText}`
-    })
-    .join('\n')
-
-  const appointmentsContext = (upcomingAppointments || [])
+  const patientApptsContext = (patientAppointments || [])
     .map((a: any) => {
-      const doc = (doctors || []).find((d) => d.id === a.doctorId)
-      const docName = doc ? formatDocName(doc.doctorName) : 'Unknown Doctor'
-      const formattedDate = a.appointmentDate instanceof Date ? getLocalDateString(a.appointmentDate) : String(a.appointmentDate)
-      const weekday = getWeekdayName(formattedDate)
-      return `- ${docName} is BOOKED on ${formattedDate} (${weekday}) at ${a.appointmentTime}`
+      const d = a.appointmentDate instanceof Date ? a.appointmentDate.toISOString().slice(0, 10) : String(a.appointmentDate)
+      return `- ${d} (${getWeekdayName(d)}) at ${a.appointmentTime} with ${formatDocName(a.doctor?.doctorName || 'doctor')}${a.patientName ? ` for ${a.patientName}` : ''}`
     })
     .join('\n')
 
-  const next3Days = getNext7Days()
-  const freeSlotsContextParts: string[] = []
-
-  for (const doc of doctors || []) {
-    const docName = formatDocName(doc.doctorName)
-    freeSlotsContextParts.push(`- ${docName}:`)
-    let hasAnySlotsForDoctor = false
-
-    for (const d of next3Days) {
-      const dateStr = getLocalDateString(d)
-      const weekday = WEEKDAYS[d.getDay()]
-      const monthName = MONTHS[d.getMonth()]
-      const dayNum = d.getDate()
-      const dateLabel = `${weekday.toUpperCase()} ${monthName} ${dayNum} [${dateStr}]`
-
-      const clinicEx = (clinic.dateExceptions || []).find((e: any) => e.date === dateStr)
-      if (clinicEx && clinicEx.is_closed) continue
-
-      const clinicTiming = (timings || []).find(
-        (t) => t.dayName.toLowerCase() === weekday.toLowerCase()
-      )
-      if (!clinicEx && clinicTiming && clinicTiming.isClosed) continue
-
-      const docEx = (doc.dateExceptions || []).find((e: any) => e.date === dateStr)
-      if (docEx && !docEx.is_available) continue
-
-      if (!docEx) {
-        const isAvailableDay = doc.availableDays?.some(
-          (day: string) => day.toLowerCase() === weekday.toLowerCase()
-        )
-        if (!isAvailableDay) continue
-      }
-
-      let slotsForDay: any[] = []
-      if (docEx && docEx.slots && docEx.slots.length > 0) {
-        slotsForDay = docEx.slots.filter((s: any) => s.is_active)
-      } else if (doc.weeklySlots && doc.weeklySlots[weekday]) {
-        slotsForDay = doc.weeklySlots[weekday].filter((s: any) => s.is_active)
-      }
-
-      let times: string[] = []
-      if (slotsForDay.length > 0) {
-        times = slotsForDay.map((s: any) => s.start_time)
-      } else {
-        const startTimeStr = doc.availableStartTime || '09:00'
-        const endTimeStr = doc.availableEndTime || '17:00'
-        const [startHour] = startTimeStr.split(':').map(Number)
-        const [endHour] = endTimeStr.split(':').map(Number)
-        for (let hour = startHour; hour < endHour; hour++) {
-          times.push(`${String(hour).padStart(2, '0')}:00`)
-        }
-      }
-
-      const activeClinicTiming = clinicTiming || (timings || []).find(
-        (t) => t.dayName.toLowerCase() === weekday.toLowerCase()
-      )
-      const lunchStart = activeClinicTiming?.lunchBreakStart ? Number(activeClinicTiming.lunchBreakStart.replace(':', '')) : null
-      const lunchEnd = activeClinicTiming?.lunchBreakEnd ? Number(activeClinicTiming.lunchBreakEnd.replace(':', '')) : null
-
-      const freeTimes: string[] = []
-      for (const timeStr of times) {
-        const formattedTime = timeStr.substring(0, 5)
-
-        if (dateStr === todayStr) {
-          const [sHour, sMin] = formattedTime.split(':').map(Number)
-          const slotVal = sHour * 100 + sMin
-          const nowObj = new Date()
-          const nowVal = nowObj.getHours() * 100 + nowObj.getMinutes()
-          if (slotVal <= nowVal) continue
-        }
-
-        if (lunchStart !== null && lunchEnd !== null) {
-          const timeVal = Number(formattedTime.replace(':', ''))
-          if (timeVal >= lunchStart && timeVal < lunchEnd) continue
-        }
-
-        const isBooked = (upcomingAppointments || []).some((appt: any) => {
-          const apptDateStr = appt.appointmentDate instanceof Date ? getLocalDateString(appt.appointmentDate) : String(appt.appointmentDate)
-          return (
-            appt.doctorId === doc.id &&
-            apptDateStr === dateStr &&
-            appt.appointmentTime === formattedTime
-          )
-        })
-
-        if (!isBooked) {
-          freeTimes.push(formattedTime)
-        }
-      }
-
-      if (freeTimes.length > 0) {
-        hasAnySlotsForDoctor = true
-        freeSlotsContextParts.push(`  * ${dateLabel}: ${freeTimes.join(', ')}`)
-      }
-    }
-
-    if (!hasAnySlotsForDoctor) {
-      freeSlotsContextParts.push(`  * No slots available for the next 7 days.`)
-    }
-  }
-
-  let freeSlotsContext = freeSlotsContextParts.join('\n')
-  // Prefer the booking engine's own availability (honours leaves, closures,
-  // weekly slots and existing bookings) over the local approximation above.
+  // Free slots from the booking engine (honours leaves, closures, weekly
+  // slots and existing bookings); a local approximation if it is unavailable.
+  const next7Days = getNext7Days()
+  let freeSlotsContext = ''
   try {
-    const svc = AppointmentService.create(tenantDb(tenantId))
-    const blocks: string[] = []
-    for (const d of (doctors || []).slice(0, 25)) {
-      const av = await svc.availability(availabilityQuerySchema.parse({ doctorId: d.id, days: 7 }))
-      const lines = av.days
-        .filter((day) => day.slots.length)
-        .map((day) => `  * ${day.weekday} ${day.date}: ${day.slots.slice(0, 16).join(', ')}${day.slots.length > 16 ? ` (+${day.slots.length - 16} more)` : ''}`)
-      blocks.push(`- ${formatDocName(d.doctorName)} [${d.specialization || 'General'}]:\n${lines.join('\n') || '  * No free slots in the next 7 days.'}`)
-    }
-    if (blocks.length) freeSlotsContext = blocks.join('\n')
+    const svc = AppointmentService.create(db)
+    const blocks = await Promise.all(
+      (doctors || []).slice(0, 25).map(async (d) => {
+        const av = await svc.availability(availabilityQuerySchema.parse({ doctorId: d.id, days: 7 }))
+        const lines = av.days
+          .filter((day) => day.slots.length)
+          .map((day) => `  * ${day.weekday} ${day.date}: ${day.slots.slice(0, 12).join(', ')}${day.slots.length > 12 ? ` (+${day.slots.length - 12} more)` : ''}`)
+        return `- ${formatDocName(d.doctorName)}:\n${lines.join('\n') || '  * No free slots in the next 7 days.'}`
+      }),
+    )
+    freeSlotsContext = blocks.join('\n')
   } catch (err) {
     log.warn('availability engine unavailable, using fallback slot list', { err })
+    freeSlotsContext = localFreeSlots({ doctors, timings, clinic, upcomingAppointments: upcomingAppointments || [], days: next7Days, todayStr })
   }
 
-  const dateReferenceCalendar = next3Days
-    .map((d) => {
-      const wday = WEEKDAYS[d.getDay()]
-      const mon  = MONTHS[d.getMonth()]
-      const day  = d.getDate()
-      const iso  = getLocalDateString(d)
-      return `${wday.toUpperCase()} ${mon} ${day} [${iso}]`
-    })
+  const dateReferenceCalendar = next7Days
+    .map((d, i) => `${WEEKDAYS[d.getDay()]} ${MONTHS[d.getMonth()]} ${d.getDate()} = ${getLocalDateString(d)}${i === 0 ? ' (today)' : i === 1 ? ' (tomorrow)' : ''}`)
     .join('\n')
-
   const todayLabel = `${WEEKDAYS[now.getDay()]}, ${MONTHS[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}`
+  const currentTime = now.toLocaleTimeString('en-IN', { timeZone: CLINIC_TIME_ZONE, hour: '2-digit', minute: '2-digit' })
 
-  const systemPrompt = `You are a professional, polite, and helpful AI assistant for "${clinic.clinicName}" (${clinic.clinicDescription || 'Healthcare clinic'}).
-Your tone is "${aiSettings.aiTone || 'polite'}".
+  const escalationHints = keywordList(aiSettings.escalationKeywords).filter((k) => !/^doctors?$/i.test(k.trim()))
+  const knowledge = String((clinic as any).aiKnowledgeBase || '').trim()
+  const contactName = contact?.name && contact.name !== contact.phone && /\p{L}/u.test(contact.name) ? contact.name : ''
 
-${options.replyContext && options.replyContext.layer !== 'general' ? `${options.replyContext.promptBlock}\n(Medical safety rules below always take priority over campaign or ad context.)\n` : ''}
+  const systemPrompt = `You are the WhatsApp front-desk assistant of "${clinic.clinicName}" (${clinic.clinicDescription || clinic.clinicType || 'healthcare clinic'}). You chat with patients and their families like a caring, experienced receptionist. Tone: ${aiSettings.aiTone || 'polite, warm'}.
 
-### CLINIC INFORMATION:
-Address: ${clinic.address || ''}, ${clinic.city || ''}, ${clinic.state || ''} - ${clinic.pincode || ''}
-Phone: ${clinic.phone || ''}
-WhatsApp: ${clinic.whatsappNumber || ''}
-Email: ${clinic.email || ''}
+${languageInstruction(lang)}
 
-### ONLINE PRESENCE & REFERENCE LINKS (share when the patient wants photos, reviews, directions, or more detail):
+${HUMAN_STYLE_RULES}
+
+### WHERE THIS CHAT CAME FROM
+${options.replyContext?.promptBlock ?? 'Normal WhatsApp message. Work out what they want from their message and the conversation.'}
+(Medical safety rules always take priority over campaign or ad context.)
+
+### CLINIC
+Name: ${clinic.clinicName}
+Address: ${[clinic.address, clinic.city, clinic.state, clinic.pincode].filter(Boolean).join(', ') || 'not provided'}
+Phone: ${clinic.phone || 'not provided'} | WhatsApp: ${clinic.whatsappNumber || 'this number'} | Email: ${clinic.email || 'not provided'}
 ${[
   clinic.website ? `Website: ${clinic.website}` : '',
-  clinic.googleMapLink ? `Google Business / Maps: ${clinic.googleMapLink}` : '',
+  clinic.googleMapLink ? `Google Maps: ${clinic.googleMapLink}` : '',
   (clinic as any).instagramUrl ? `Instagram: ${(clinic as any).instagramUrl}` : '',
   (clinic as any).facebookUrl ? `Facebook: ${(clinic as any).facebookUrl}` : '',
-].filter(Boolean).join('\n') || 'No public links provided.'}
+].filter(Boolean).join('\n')}
+${knowledge ? `\n### CLINIC KNOWLEDGE (authoritative)\n${knowledge.slice(0, 6000)}\n` : ''}
+### WORKING HOURS
+${timingsContext || 'Not configured.'}
+${clinicExceptionsContext ? `Upcoming closures / special days:\n${clinicExceptionsContext}` : ''}
 
-${((clinic as any).aiKnowledgeBase || '').toString().trim() ? `### EXPERT KNOWLEDGE (authoritative — treat as ground truth about this clinic):\n${(clinic as any).aiKnowledgeBase.toString().trim()}\n` : ''}
-### TODAY'S DATE:
-Today is ${todayLabel}.
-You are a 24/7 AI assistant. You are ALWAYS available.
+### DEPARTMENTS
+${departmentsContext || 'No separate departments.'}
 
-${isFirstInboundMessage && aiSettings.greetingMessage ? `
-### FIRST MESSAGE — WELCOME TONE:
-This is the patient's very first message. Warmly welcome them: "${aiSettings.greetingMessage.replace(/"/g, "'")}"
-` : ''}
-
-### 7-DAY DATE REFERENCE:
-${dateReferenceCalendar}
-
-### WORKING HOURS:
-${timingsContext || 'No hours configured.'}
-
-### CLINIC TIMING EXCEPTIONS / HOLIDAYS:
-${clinicExceptionsContext || 'No holiday exceptions.'}
-
-### DOCTORS:
+### DOCTORS
 ${doctorsContext || 'No doctors registered.'}
 
-### CURRENT BOOKINGS / RESERVED SLOTS:
-${appointmentsContext || 'No active bookings registered.'}
-
-### DYNAMICALLY CALCULATED FREE SLOTS FOR THE NEXT 7 DAYS:
+### FREE APPOINTMENT SLOTS — NEXT 7 DAYS (only these can be booked)
 ${freeSlotsContext || 'No free slots available.'}
 
-### SERVICES OFFERED:
-${servicesContext || 'No services configured.'}
+### SERVICES
+${servicesContext || 'Not listed.'}
 
-### FREQUENTLY ASKED QUESTIONS (FAQs):
-${faqsContext || 'No FAQs registered.'}
+### FAQs (use these answers)
+${faqsContext || 'None.'}
 
-### RECENT CONVERSATION HISTORY:
-${chatHistoryText || 'No previous messages.'}
+### DATE & TIME
+Now: ${todayLabel}, ${currentTime} (India time). You reply 24/7 — even outside clinic hours, help fully.
+${dateReferenceCalendar}
 
-### STRUCTURALLY RECOVERED CONVERSATION MEMORY:
-${confirmedBookingSection}
+### THIS PATIENT
+${contactName ? `WhatsApp name: ${contactName}` : 'Name not known yet.'}
+${patientApptsContext ? `Their upcoming appointments:\n${patientApptsContext}` : 'No upcoming appointments.'}
+${memoryLines.length ? `Already given in this chat (do not ask again):\n${memoryLines.join('\n')}` : ''}
+${isFirstInboundMessage ? `\nThis is their first message ever. Welcome them warmly${aiSettings.greetingMessage ? ` in the spirit of: "${String(aiSettings.greetingMessage).replace(/"/g, "'").slice(0, 400)}"` : ''} and answer what they asked.` : ''}
+${handoffPending ? '\nEarlier in this chat the patient asked for a team member and the team has been informed. Keep helping meanwhile; do not repeat the transfer message.' : ''}
 
-### SUPPORTED LANGUAGES:
-${(aiSettings.supportedLanguages || ['English']).join(', ')}
+${HANDOFF_RULES}
+${escalationHints.length ? `- Phrases this clinic treats as "wants a person": ${escalationHints.slice(0, 20).join(', ')} — but only when the patient actually asks for one (watch for "no need", "nako", "nahi").` : ''}
 
-### CRITICAL RULES:
-- ANSWER LIKE A KNOWLEDGEABLE EXPERT: Respond with the confidence of an experienced clinic team member. Use the clinic details, Expert Knowledge, doctors, services, and FAQs above as your source of truth.
-- ALWAYS ANSWER DIRECTLY, INSTANTLY, AND CONCISELY: Provide the direct answer or requested information immediately in the first sentence. Avoid any conversational filler.
-- BE EXTREMELY BRIEF: Keep responses as short as possible. Use simple, direct language.
-- STAY GROUNDED: Only state facts supported by the information above. If a specific detail is not provided, say you'll confirm with the team — never invent prices, availability, or claims.
-- SHARE LINKS WHEN HELPFUL: If the patient wants photos, reviews, directions, or more detail, share the relevant link from the ONLINE PRESENCE section.
-- YOU OPERATE 24/7: Even if the current time is outside clinic working hours, do NOT refuse assistance or tell the patient to contact us during working hours. Answer their questions about doctors, services, or clinic timings immediately. If they want to book an appointment, guide them through the step-by-step booking flow to collect their details (Name, Age, Reason) and let them select from the available free slots in the upcoming days.
-- SMART ACKNOWLEDGMENT HANDLING: If the patient sends a short acknowledgment word (e.g. "ok", "okay", "got it") — continue the conversation naturally from where it left off, referencing the memory context.
-- NEVER diagnoses diseases, prescribe medicines, or provide diagnostic medical advice.
-- IF the patient is in danger or needs human agent, set "is_escalation" to true.
-- NEVER use HTML tags. Use newlines and asterisks (*) for formatting.
+### MEDICAL SAFETY
+- Never diagnose, prescribe, or suggest medicines or doses. For symptoms, show empathy and suggest seeing the right doctor (offer to book).
+- Danger signs (chest pain, breathlessness, heavy bleeding, unconsciousness, stroke signs, poisoning, suicidal thoughts): tell them to call 108/112 or go to the nearest emergency room now, give the clinic phone, and use intent "emergency".
 
-### LANGUAGE — MATCH THE PATIENT EXACTLY
-- Reply in the SAME language and script the patient uses: English → English, Hindi (देवनागरी) → Hindi, Hinglish (Hindi in Roman letters, e.g. "mujhe appointment book karni hai") → Hinglish in Roman letters, Marathi → Marathi, Gujarati → Gujarati, etc. Never switch to English unless they do.
-- Be warm and respectful ("ji", "aap" in Hindi/Hinglish). Keep messages short and WhatsApp-friendly.
+### BOOKINGS
+- If they want to book, the system runs a guided booking. Set detected_intent "appointment_booking" and fill booking_details with whatever is known.
+- Once name, age, doctor, date (YYYY-MM-DD) and time (HH:MM 24h, from FREE SLOTS) are all known, the system books it and sends the confirmation — don't claim it is confirmed yourself.
+- Cancel or move an existing visit → intent "cancel_appointment" / "reschedule_appointment".
 
-### APPOINTMENT BOOKING CONVERSATION (natural, one small step at a time)
-1. Patient wants to book and you don't know their name → reply warmly and ask ONLY for their name.
-   e.g. Hinglish: "Kyun nahi! 😊 Pehle mujhe aap apna naam bataiye."
-2. You have the name → greet by name and ask for the remaining details in ONE short form (omit lines you already know):
-   e.g. Hinglish: "Hello Rahul ji 🙏 Appointment book karne ke liye ye details bhejiye:\nAapki age:\nDepartment:\nDoctor:\nDate:\nTime:"
-   (Translate the form labels into the patient's language.)
-3. Use the DOCTORS and FREE SLOTS sections: if they name a department, suggest its doctors; if a chosen date/time is not in the free slots, say so politely and offer the nearest free times for that doctor (and other doctors in the same department).
-4. As soon as name, age, doctor, date (YYYY-MM-DD) and time (HH:MM, 24h) are known, set detected_intent "appointment_booking" with all booking_details filled — the system checks the slot and books it, then sends the confirmation with the token number. Don't announce the booking as confirmed yourself.
-5. Reason for visit is optional — capture it if mentioned.
-6. If they want to cancel or reschedule an existing booking, set detected_intent "cancel_appointment" or "reschedule_appointment" and acknowledge.
-
-### OUTPUT — return ONLY this JSON object
-{"detected_intent":"greeting|appointment_booking|cancel_appointment|reschedule_appointment|doctor_info|timings|pricing|location|general_query|feedback|emergency|human_handoff","ai_response":"reply text","confidence_score":0.0-1.0,"is_escalation":false,"booking_details":{"patient_name":"","patient_age":"","reason_for_visit":"","department":"","doctor_name":"","date":"YYYY-MM-DD","time":"HH:MM"}}
-Ensure you populate the "booking_details" object of your JSON output with all details captured in memory or newly provided.`
+### OUTPUT
+Return ONLY this JSON object:
+{"detected_intent":"greeting|appointment_booking|cancel_appointment|reschedule_appointment|doctor_info|timings|pricing|location|general_query|feedback|small_talk|emergency|human_handoff|decline_handoff","ai_response":"your WhatsApp reply, in the patient's language","confidence_score":0.0-1.0,"booking_details":{"patient_name":"","patient_age":"","reason_for_visit":"","department":"","doctor_name":"","date":"","time":""}}`
 
   let openAIResult: OpenAIResponse | null = null
-
   try {
-    // Shared caller: current Gemini aliases with thinking headroom and JSON
-    // mode, then the configured fallbacks. The previous direct call used
-    // gemini-2.5-flash (404 for new keys) with a 5s timeout, so most
-    // messages silently got no reply.
-    const llm = await callLLM(
-      `${systemPrompt}\n\nPATIENT'S LATEST MESSAGE:\n${messageText}\n\nReturn ONLY the JSON object.`,
-      { jsonMode: true, maxTokens: 1500, temperature: 0.2, taskCriticality: 'standard', timeoutMs: 25_000 },
-    )
+    const llm = await callLLM(messageText, {
+      systemPrompt,
+      history: memory.history,
+      jsonMode: true,
+      maxTokens: 900,
+      temperature: 0.4,
+      taskCriticality: inferTaskCriticality(messageText),
+      timeoutMs: 20_000,
+      deadlineMs: 45_000,
+    })
     const parsed = llm.success ? parseJSONFromLLM<any>(llm.text) : null
-    if (!parsed) {
+    if (!parsed || typeof parsed.ai_response !== 'string') {
+      log.warn('LLM unavailable or unparseable', { logs: llm.debugLogs.slice(-6) })
       throw new AiUnavailableError('LLM unavailable or unparseable')
     }
+    log.info('ai reply generated', { provider: llm.provider, model: llm.model, tokens: llm.tokensUsed, lang: lang.code, ms: Date.now() - startTime })
     openAIResult = {
-      detected_intent: parsed.detected_intent || 'fallback',
-      ai_response: parsed.ai_response || 'How can I help you today? 😊',
-      confidence_score: parsed.confidence_score !== undefined ? Number(parsed.confidence_score) : 1.0,
-      is_escalation: !!parsed.is_escalation,
-      booking_details: parsed.booking_details || {}
+      detected_intent: String(parsed.detected_intent || 'general_query'),
+      ai_response: parsed.ai_response.trim(),
+      confidence_score: parsed.confidence_score !== undefined ? Number(parsed.confidence_score) || 0 : 1,
+      is_escalation: false,
+      booking_details: parsed.booking_details || {},
     }
   } catch (error) {
     // Nothing has been sent yet, so the router can safely retry and then fall back.
     throw error instanceof AiUnavailableError ? error : new AiUnavailableError('LLM call or parse failed', error)
   }
 
-  if (!openAIResult) throw new AiUnavailableError('LLM returned no result')
+  const intent = openAIResult.detected_intent
+  if (!openAIResult.ai_response && intent !== 'appointment_booking') {
+    throw new AiUnavailableError('LLM returned an empty reply')
+  }
+  const aiText = await ensureLanguage(openAIResult.ai_response, lang)
 
-  // Update structurally recorded memory context from AI response details
+  // Update structured memory from the AI's booking details
   const details = openAIResult.booking_details
-  if (details) {
+  if (details && Object.values(details).some((v) => v)) {
     if (details.patient_name) currentBookingState.patient_name = details.patient_name
-    if (details.patient_age) currentBookingState.patient_age = details.patient_age
+    if (details.patient_age) currentBookingState.patient_age = normalizeDigits(String(details.patient_age))
     if (details.reason_for_visit) currentBookingState.reason_for_visit = details.reason_for_visit
     if ((details as any).department) currentBookingState.department = (details as any).department
     if (details.doctor_name) currentBookingState.doctor_name = details.doctor_name
     if (details.date) currentBookingState.date = details.date
     if (details.time) currentBookingState.time = details.time
-
-    // Save updated memory state to conversation
-    await tenantDb(tenantId).conversation.update({
-      where: { id: conversationId },
-      data: {
-        bookingState: currentBookingState,
-        bookingStage: openAIResult.detected_intent === 'appointment_booking' ? 'collecting_details' : 'idle',
-        updatedAt: new Date()
-      }
-    })
+    await db.conversation
+      .update({
+        where: { id: conversationId },
+        data: {
+          bookingState: currentBookingState,
+          bookingStage: intent === 'appointment_booking' ? 'collecting_details' : handoffPending ? 'human_handoff' : 'idle',
+          updatedAt: new Date(),
+        },
+      })
+      .catch((err: unknown) => log.warn('booking memory not saved', { err }))
   }
 
-  // Handle Escalation / Low Confidence
-  if (openAIResult.is_escalation || openAIResult.confidence_score < 0.7 || openAIResult.detected_intent === 'emergency') {
+  // The customer explicitly asked for (or agreed to) a person.
+  if (intent === 'human_handoff' && handoverEnabled) {
     await handleHumanEscalation({
       tenantId,
       clinic,
-      aiSettings,
       contactId,
       conversationId,
       userMessage: messageText,
-      intent: openAIResult.detected_intent || 'fallback',
-      reason: openAIResult.confidence_score < 0.7 ? 'Low confidence score.' : 'LLM flagged for escalation.',
+      intent: 'human_handover',
+      reason: 'Customer asked for / agreed to a team member.',
+      responseText: aiText || (await localizedCanned('handoff', lang)),
       accessToken,
       phoneNumberId,
       senderPhone,
-      contextMessageId,
-      customResponse: openAIResult.ai_response,
+      customerLabel: contact?.name || `+${senderPhone}`,
     })
     return true
   }
 
-  // Handle Appointment Booking Flow
-  if (openAIResult.detected_intent === 'appointment_booking') {
-    if (
-      !currentBookingState.patient_name ||
-      !currentBookingState.patient_age ||
-      !currentBookingState.doctor_name ||
-      !currentBookingState.date ||
-      !currentBookingState.time
-    ) {
-      // Booking intent the keyword check missed (e.g. other languages):
-      // switch to the guided step-by-step flow instead of a free-form ask.
-      const contact = await tenantDb(tenantId).contact.findUnique({ where: { id: contactId }, select: { name: true } })
+  if (intent === 'decline_handoff' && handoffPending) {
+    await db.conversation.update({ where: { id: conversationId }, data: { bookingStage: 'idle' } }).catch(() => undefined)
+  }
+
+  if (intent === 'emergency') {
+    await alertTeam({ tenantId, clinic, contactId, conversationId, userMessage: messageText, kind: 'emergency', customerLabel: contact?.name || `+${senderPhone}` })
+  }
+
+  // Booking intent → the guided step-by-step flow (or book directly when complete)
+  if (intent === 'appointment_booking') {
+    const complete =
+      currentBookingState.patient_name && currentBookingState.patient_age && currentBookingState.doctor_name && currentBookingState.date && currentBookingState.time
+    if (!complete) {
       const flow = bookingFlowData(tenantId, clinic, contact?.name ?? null, contactId)
-      const started = await applyBookingFlowResult({ result: await startWizard(flow, messageText), flow, tenantId, clinic, doctors, timings, contactId, conversationId, senderPhone, messageText, contextMessageId, accessToken, phoneNumberId })
+      const started = await applyBookingFlowResult({ result: await startWizard(flow, flowText), flow, tenantId, clinic, doctors, timings, contactId, conversationId, senderPhone, messageText, accessToken, phoneNumberId, lang })
       if (started) return true
-      await sendReplyAndSave({
-        tenantId,
-        clinicId: clinic.id,
-        contactId,
-        conversationId,
-        responseText: openAIResult.ai_response,
-        intent: 'appointment_booking',
-        confidence: openAIResult.confidence_score,
-        userMessage: messageText,
-        senderPhone,
-        contextMessageId,
-        accessToken,
-        phoneNumberId,
-      })
+      if (aiText) await reply(aiText, 'appointment_booking', openAIResult.confidence_score)
       return true
     }
 
-    // All details present -> Book slot
     const bookingOutcome = await handleSlotBooking({
       tenantId,
       clinic,
@@ -982,55 +804,67 @@ Ensure you populate the "booking_details" object of your JSON output with all de
       contactId,
       senderPhone,
     })
-
     if (bookingOutcome.success) {
-      // Clear booking memory context on successful booking
-      await tenantDb(tenantId).conversation.update({
+      await db.conversation.update({
         where: { id: conversationId },
-        data: {
-          bookingState: Prisma.DbNull,
-          bookingStage: 'confirmed',
-          updatedAt: new Date()
-        }
+        data: { bookingState: Prisma.DbNull, bookingStage: 'confirmed', updatedAt: new Date() },
       })
     }
-
-    await sendReplyAndSave({
-      tenantId,
-      clinicId: clinic.id,
-      contactId,
-      conversationId,
-      responseText: bookingOutcome.message,
-      intent: 'appointment_booking',
-      confidence: openAIResult.confidence_score,
-      userMessage: messageText,
-      senderPhone,
-      contextMessageId,
-      accessToken,
-      phoneNumberId,
-    })
+    await reply(await localizeText(bookingOutcome.message, lang), 'appointment_booking', openAIResult.confidence_score)
     return true
   }
 
-  // General Intent Response
-  await sendReplyAndSave({
-    tenantId,
-    clinicId: clinic.id,
-    contactId,
-    conversationId,
-    responseText: openAIResult.ai_response,
-    intent: openAIResult.detected_intent,
-    confidence: openAIResult.confidence_score,
-    userMessage: messageText,
-    senderPhone,
-    contextMessageId,
-    accessToken,
-    phoneNumberId,
-  })
-
+  await reply(aiText, intent, openAIResult.confidence_score)
   return true
 }
 
+/** Slot list computed locally when the booking engine cannot be reached. */
+function localFreeSlots(o: { doctors: any[]; timings: any[]; clinic: any; upcomingAppointments: any[]; days: Date[]; todayStr: string }): string {
+  const parts: string[] = []
+  for (const doc of o.doctors || []) {
+    parts.push(`- ${formatDocName(doc.doctorName)}:`)
+    let any = false
+    for (const d of o.days) {
+      const dateStr = getLocalDateString(d)
+      const weekday = WEEKDAYS[d.getDay()]
+      const clinicEx = (Array.isArray(o.clinic.dateExceptions) ? o.clinic.dateExceptions : []).find((e: any) => e.date === dateStr)
+      if (clinicEx?.is_closed) continue
+      const timing = (o.timings || []).find((t) => t.dayName.toLowerCase() === weekday.toLowerCase())
+      if (!clinicEx && timing?.isClosed) continue
+      const docEx = (Array.isArray(doc.dateExceptions) ? doc.dateExceptions : []).find((e: any) => e.date === dateStr)
+      if (docEx && !docEx.is_available) continue
+      if (!docEx && !doc.availableDays?.some((day: string) => day.toLowerCase() === weekday.toLowerCase())) continue
+
+      let slots: any[] = []
+      if (docEx?.slots?.length) slots = docEx.slots.filter((s: any) => s.is_active)
+      else if (doc.weeklySlots?.[weekday]) slots = doc.weeklySlots[weekday].filter((s: any) => s.is_active)
+      let times: string[] = slots.map((s: any) => String(s.start_time).slice(0, 5))
+      if (!times.length) {
+        const [startHour] = String(doc.availableStartTime || '09:00').split(':').map(Number)
+        const [endHour] = String(doc.availableEndTime || '17:00').split(':').map(Number)
+        for (let h = startHour; h < endHour; h++) times.push(`${String(h).padStart(2, '0')}:00`)
+      }
+      const lunchStart = timing?.lunchBreakStart ? Number(timing.lunchBreakStart.replace(':', '')) : null
+      const lunchEnd = timing?.lunchBreakEnd ? Number(timing.lunchBreakEnd.replace(':', '')) : null
+      const nowVal = new Date().getHours() * 100 + new Date().getMinutes()
+      times = times.filter((t) => {
+        const v = Number(t.replace(':', ''))
+        if (dateStr === o.todayStr && v <= nowVal) return false
+        if (lunchStart !== null && lunchEnd !== null && v >= lunchStart && v < lunchEnd) return false
+        return !o.upcomingAppointments.some((a: any) => {
+          const ad = a.appointmentDate instanceof Date ? getLocalDateString(a.appointmentDate) : String(a.appointmentDate)
+          return a.doctorId === doc.id && ad === dateStr && a.appointmentTime === t
+        })
+      })
+      if (times.length) {
+        any = true
+        parts.push(`  * ${weekday} ${dateStr}: ${times.join(', ')}`)
+      }
+    }
+    if (!any) parts.push('  * No slots available for the next 7 days.')
+  }
+  return parts.join('\n')
+}
 
 function normaliseTime(raw: string): string | null {
   const t = String(raw || '').trim().toLowerCase().replace(/\s+/g, '')
@@ -1155,78 +989,82 @@ async function handleSlotBooking(options: {
   }
 }
 
+/**
+ * Hands the chat to the team — only ever called after the customer asked
+ * for a person (or agreed to one). Leaves a note, marks the chat as waiting
+ * for staff, alerts the team, and confirms to the customer. The AI keeps
+ * helping until a team member actually replies.
+ */
 async function handleHumanEscalation(options: {
   tenantId: string
   clinic: any
-  aiSettings: any
   contactId: string
   conversationId: string
   userMessage: string
   intent: string
   reason: string
+  responseText: string
   accessToken: string
   phoneNumberId: string
   senderPhone: string
-  contextMessageId?: string
-  customResponse?: string
+  customerLabel: string
 }) {
-  const {
-    tenantId,
-    clinic,
-    contactId,
-    conversationId,
-    userMessage,
-    intent,
-    reason,
-    accessToken,
-    phoneNumberId,
-    senderPhone,
-    contextMessageId,
-    customResponse,
-  } = options
+  const { tenantId, clinic, contactId, conversationId, userMessage, intent, reason, responseText, accessToken, phoneNumberId, senderPhone } = options
+  log.info('handing chat to the team at the customer\'s request', { conversationId, reason })
+  const db = tenantDb(tenantId)
 
-  log.info('escalating to human', { conversationId, reason })
+  await db.contactNote
+    .create({
+      data: {
+        tenantId,
+        contactId,
+        userId: clinic.userId,
+        noteText: `[AI Handover]\nThe patient asked to talk to a team member.\n- Reason: ${reason}\n- Patient message: "${userMessage.slice(0, 500)}"`,
+      },
+    })
+    .catch((err: unknown) => log.warn('handover note not saved', { err }))
 
-  const transferMessage =
-    customResponse ||
-    'I am connecting you to a team member who will assist you shortly. Please hold on! 🙏'
+  await db.conversation
+    .update({ where: { id: conversationId }, data: { status: 'open', bookingStage: 'human_handoff', bookingState: Prisma.DbNull, updatedAt: new Date() } })
+    .catch((err: unknown) => log.warn('handover state not saved', { err }))
 
-  const noteText = `[AI Healthcare Escalation]\nPatient requested human assistance or emergency detected.\n- Detected Intent: ${intent}\n- Reason: ${reason}\n- Patient Query: "${userMessage}"`
-
-  // Insert Note
-  await tenantDb(tenantId).contactNote.create({
-    data: {
-      tenantId,
-      contactId,
-      userId: clinic.userId,
-      noteText
-    }
+  notifyTenant(tenantId, {
+    type: 'message',
+    title: `${options.customerLabel} wants to talk to the team`,
+    body: userMessage.slice(0, 140),
+    href: `/inbox?c=${conversationId}`,
   })
 
-  // Mark conversation status as open
-  await tenantDb(tenantId).conversation.update({
-    where: { id: conversationId },
-    data: {
-      status: 'open',
-      unreadCount: 1,
-      updatedAt: new Date()
-    }
-  })
-
-  // Send WhatsApp message and log
   await sendReplyAndSave({
     tenantId,
     clinicId: clinic.id,
     contactId,
     conversationId,
-    responseText: transferMessage,
-    intent: intent,
+    responseText,
+    intent,
     confidence: 1.0,
     userMessage,
     senderPhone,
-    contextMessageId,
     accessToken,
     phoneNumberId,
+  })
+}
+
+/** Alerts the team (note + live notification) without taking the chat from the AI. */
+async function alertTeam(o: { tenantId: string; clinic: any; contactId: string; conversationId: string; userMessage: string; kind: 'emergency'; customerLabel: string }) {
+  const db = tenantDb(o.tenantId)
+  await db.contactNote
+    .create({
+      data: { tenantId: o.tenantId, contactId: o.contactId, userId: o.clinic.userId, noteText: `[AI Alert: emergency]\nPossible emergency reported on WhatsApp.\n- Patient message: "${o.userMessage.slice(0, 500)}"` },
+    })
+    .catch((err: unknown) => log.warn('alert note not saved', { err }))
+  // Visible in the inbox's open list; the AI is not silenced by this.
+  await db.conversation.update({ where: { id: o.conversationId }, data: { status: 'open' } }).catch(() => undefined)
+  notifyTenant(o.tenantId, {
+    type: 'message',
+    title: `🚨 Possible emergency: ${o.customerLabel}`,
+    body: o.userMessage.slice(0, 140),
+    href: `/inbox?c=${o.conversationId}`,
   })
 }
 
@@ -1242,9 +1080,10 @@ async function applyBookingFlowResult(o: {
   conversationId: string
   senderPhone: string
   messageText: string
-  contextMessageId?: string
   accessToken: string
   phoneNumberId: string
+  /** Customer's language; fixed English/Hinglish texts are translated into it. */
+  lang: DetectedLanguage
 }): Promise<boolean> {
   let result = o.result
   const save = (state: unknown, stage: string) =>
@@ -1350,12 +1189,11 @@ async function applyBookingFlowResult(o: {
     clinicId: o.clinic.id,
     contactId: o.contactId,
     conversationId: o.conversationId,
-    responseText: text,
+    responseText: await localizeText(text, o.lang),
     intent: 'appointment_booking',
     confidence: 1,
     userMessage: o.messageText,
     senderPhone: o.senderPhone,
-    contextMessageId: o.contextMessageId,
     accessToken: o.accessToken,
     phoneNumberId: o.phoneNumberId,
   })
@@ -1372,7 +1210,6 @@ async function sendReplyAndSave(options: {
   confidence: number
   userMessage: string
   senderPhone: string
-  contextMessageId?: string
   accessToken: string
   phoneNumberId: string
 }) {
@@ -1386,11 +1223,12 @@ async function sendReplyAndSave(options: {
     confidence,
     userMessage,
     senderPhone,
-    contextMessageId,
     accessToken,
     phoneNumberId,
   } = options
 
+  // Replies are sent as normal messages (no quote bubble), the way a person
+  // answers in an ongoing chat.
   let sentMessageId: string | undefined = undefined
   try {
     const result = await sendTextMessage({
@@ -1398,7 +1236,6 @@ async function sendReplyAndSave(options: {
       accessToken,
       to: senderPhone,
       text: responseText,
-      contextMessageId,
     })
     sentMessageId = result.messageId
   } catch (error: any) {

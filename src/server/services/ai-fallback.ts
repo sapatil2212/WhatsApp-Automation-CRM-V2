@@ -1,23 +1,27 @@
 /**
- * What the customer gets when the AI should have answered but could not.
+ * What the customer gets when every AI provider failed (Anthropic, Gemini
+ * and OpenRouter all down or erroring).
  *
- * - Sends one short "our team will reply" notice, at most once per
- *   conversation every 5 minutes, so a model outage does not spam a chat.
- * - Opens the conversation, which hands it to a human: the inbox shows it as
- *   open and the AI stays out while a person owns it.
+ * - Sends one short holding message in the customer's own language, at most
+ *   once per conversation every 5 minutes, so an outage does not spam a chat.
+ * - Marks the conversation open so it shows in the team's inbox. This is not
+ *   a transfer: the AI keeps answering the next messages, and only a team
+ *   member actually replying makes it step back.
  * - Notifies staff in real time.
  *
  * Every step is best-effort and isolated: a failed send still opens the
  * conversation and notifies staff, so nobody is left without an owner.
  */
+import { ALL_FALLBACK_TEXTS, cannedText, FALLBACK_TEXTS } from '@/lib/ai/conversation-kit';
+import { resolveLanguage } from '@/lib/ai/language';
 import { getLogger, type TenantDb } from '../kernel';
 import { notifyTenant } from './booking-notify';
 import { OutboundMessageService, type SystemTransport } from './outbound.service';
 
 const log = getLogger('ai.fallback');
 
-export const AI_FALLBACK_TEXT =
-  "Thanks for your message! Our team will reply shortly. 🙏";
+/** English holding text (kept for callers/tests that need the default). */
+export const AI_FALLBACK_TEXT = FALLBACK_TEXTS.en;
 export const AI_FALLBACK_COOLDOWN_MS = 5 * 60 * 1000;
 
 export async function sendAiFallback(input: {
@@ -28,16 +32,19 @@ export async function sendAiFallback(input: {
   contactId: string;
   conversationId: string;
   customerLabel: string;
+  /** The customer's message, so the notice goes out in their language. */
+  customerText?: string;
   now?: Date;
 }): Promise<{ sent: boolean }> {
   const now = input.now ?? new Date();
+  const text = cannedText('fallback', resolveLanguage(input.customerText ?? ''));
 
   const recent = await input.db.message
     .findFirst({
       where: {
         conversationId: input.conversationId,
         senderType: 'bot',
-        contentText: AI_FALLBACK_TEXT,
+        contentText: { in: ALL_FALLBACK_TEXTS },
         createdAt: { gte: new Date(now.getTime() - AI_FALLBACK_COOLDOWN_MS) },
       },
       select: { id: true },
@@ -49,7 +56,7 @@ export async function sendAiFallback(input: {
     try {
       const outbound = OutboundMessageService.create(input.db, input.userId, input.transport);
       const target = await outbound.resolveTarget({ contactId: input.contactId, conversationId: input.conversationId });
-      await outbound.sendText(target, AI_FALLBACK_TEXT);
+      await outbound.sendText(target, text);
       sent = true;
     } catch (error) {
       log.error('fallback send failed', { conversationId: input.conversationId, err: error });
@@ -66,7 +73,7 @@ export async function sendAiFallback(input: {
       type: 'message',
       title: `AI couldn't reply to ${input.customerLabel}`,
       body: sent
-        ? 'They were told the team will reply shortly. The chat is open for you.'
+        ? 'They got a short holding reply. Please check the chat — the AI will keep answering new messages.'
         : 'No automatic notice could be sent. Please reply from the inbox.',
       href: `/inbox?c=${input.conversationId}`,
     });

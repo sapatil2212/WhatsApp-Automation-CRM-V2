@@ -65,13 +65,11 @@ export class AiAssistantService {
       },
     });
 
-    if (!config) return { provider: 'gemini' };
+    if (!config) return {};
 
     return {
-      // Gemini is the platform default. Keeping its credential and model
-      // selection on the server means GEMINI_API_KEY stays private and the
-      // task router can move basic/standard/critical work between tiers.
-      provider: 'gemini',
+      // Provider keys and model selection stay on the server; the shared
+      // cascade (Anthropic → Gemini → OpenRouter) picks the tier per task.
       temperature: config.aiTemperature ? Number(config.aiTemperature) : undefined,
       systemPrompt: config.aiSystemPrompt || undefined,
     };
