@@ -90,7 +90,7 @@ export default function PricingPage() {
             glowColor={plan.popular ? "rgba(16, 185, 129, 0.15)" : "rgba(148, 163, 184, 0.08)"}
           >
             {plan.badge && (
-              <div className="absolute top-4 right-4 bg-emerald-500 text-slate-950 text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full tracking-wider">
+              <div className="absolute top-4 right-4 bg-emerald-500 !text-white text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full tracking-wider">
                 {plan.badge}
               </div>
             )}
@@ -119,7 +119,7 @@ export default function PricingPage() {
                 {plan.selfServe ? (
                   <Link
                     href={`/signup?plan=${plan.id}`}
-                    className={`w-full py-3 rounded-xl text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 ${plan.popular ? "bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.2)]" : "bg-[var(--m-bg-secondary)] border border-[var(--m-border-primary)] hover:bg-[var(--m-bg-tertiary)] text-[var(--m-text-secondary)]"}`}
+                    className={`w-full py-3 rounded-xl text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 ${plan.popular ? "bg-emerald-500 !text-white hover:bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.2)]" : "bg-[var(--m-bg-secondary)] border border-[var(--m-border-primary)] hover:bg-[var(--m-bg-tertiary)] text-[var(--m-text-secondary)]"}`}
                   >
                     {plan.cta}
                   </Link>

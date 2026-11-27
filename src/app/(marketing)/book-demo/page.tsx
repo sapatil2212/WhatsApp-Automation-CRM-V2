@@ -262,7 +262,7 @@ export default function BookDemoPage() {
             <Button
               type="submit"
               disabled={loading || !selectedDate || !selectedTime}
-              className="w-full h-10 bg-emerald-500 text-slate-950 font-bold text-xs rounded-xl flex items-center justify-center transition-colors hover:bg-emerald-400 cursor-pointer shadow-[0_0_12px_rgba(16,185,129,0.2)] disabled:opacity-60"
+              className="w-full h-10 bg-emerald-500 !text-white font-bold text-xs rounded-xl flex items-center justify-center transition-colors hover:bg-emerald-400 cursor-pointer shadow-[0_0_12px_rgba(16,185,129,0.2)] disabled:opacity-60"
             >
               {loading ? (
                 <>

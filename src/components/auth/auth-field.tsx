@@ -12,7 +12,7 @@ export const authInputClass =
 
 /** Primary action button used across login, signup and password reset. */
 export const authPrimaryButton =
-  "flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#00DF82] text-[13px] font-semibold text-slate-950 transition-colors hover:bg-[#00c673] disabled:cursor-not-allowed disabled:opacity-60";
+  "flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#00DF82] text-[13px] font-semibold !text-white transition-colors hover:bg-[#00c673] disabled:cursor-not-allowed disabled:opacity-60";
 
 /** Secondary (outlined) button. */
 export const authSecondaryButton =

@@ -8,6 +8,16 @@ const prisma = new PrismaClient();
 const dev = process.env.NODE_ENV !== "production";
 const hostname = "localhost";
 const port = process.env.PORT || 3002;
+
+// The in-process tickers below call the cron routes with AUTOMATION_CRON_SECRET.
+// Load .env files first so a configured value wins, then fall back to a random
+// per-process secret. This must happen before `next()` starts: route handlers
+// run in a worker that copies the environment at start-up, so setting it later
+// leaves the routes without a secret (every cron call returned 500).
+require("@next/env").loadEnvConfig(process.cwd(), dev);
+if (!process.env.AUTOMATION_CRON_SECRET && process.env.CAMPAIGN_TICKER !== "off") {
+  process.env.AUTOMATION_CRON_SECRET = require("crypto").randomBytes(24).toString("hex");
+}
 // In development, Turbopack on Windows has a known junction point bug with Prisma (os error 80).
 // Using webpack on Windows avoids junction point collisions and prevents 500/404 HTML errors on API routes.
 const isWindows = process.platform === "win32";
@@ -146,15 +156,12 @@ app.prepare().then(() => {
    * Without this nothing ever advanced a campaign past "scheduled"/"sending"
    * unless an external cron was configured.
    *
-   * Uses AUTOMATION_CRON_SECRET; when it is not configured a random
-   * per-process secret is generated (route handlers share this process's env).
-   * Set CAMPAIGN_TICKER=off when an external scheduler calls the cron instead.
+   * Uses AUTOMATION_CRON_SECRET (set or generated at the top of this file,
+   * before Next starts). Set CAMPAIGN_TICKER=off when an external scheduler
+   * calls the cron instead.
    */
   function startCampaignTicker() {
     if (process.env.CAMPAIGN_TICKER === "off") return;
-    if (!process.env.AUTOMATION_CRON_SECRET) {
-      process.env.AUTOMATION_CRON_SECRET = require("crypto").randomBytes(24).toString("hex");
-    }
     const intervalMs = Number(process.env.CAMPAIGN_TICK_MS) || 15_000;
     let running = false;
     let tick = 0;

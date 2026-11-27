@@ -192,7 +192,7 @@ export default function ContactUsPage() {
                 <Button
                   type="submit"
                   disabled={loading}
-                  className="mt-2 h-10 w-full bg-emerald-500 text-slate-950 hover:bg-emerald-400 font-bold text-xs shadow-[0_0_12px_rgba(16,185,129,0.2)] disabled:opacity-60"
+                  className="mt-2 h-10 w-full bg-emerald-500 !text-white hover:bg-emerald-400 font-bold text-xs shadow-[0_0_12px_rgba(16,185,129,0.2)] disabled:opacity-60"
                 >
                   {loading ? "Submitting..." : "Submit Inquiry"}
                 </Button>

@@ -65,7 +65,7 @@ export default function SecurityPage() {
           <div className="pt-2">
             <a
               href="mailto:support@chatnexgen.online?subject=Security%20Architecture%20Inquiry"
-              className="inline-block bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold px-6 py-3 rounded-xl transition-colors cursor-pointer"
+              className="inline-block bg-emerald-500 hover:bg-emerald-400 !text-white text-xs font-bold px-6 py-3 rounded-xl transition-colors cursor-pointer"
             >
               Contact Security Team
             </a>

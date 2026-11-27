@@ -7,7 +7,6 @@ import { ArrowRight, Menu, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useMarketingTheme } from "@/components/marketing/marketing-theme-provider";
 import { ThemeToggle } from "./theme-toggle";
-import { BookDemoTrigger } from "./book-demo-trigger";
 import { usePublicSettings } from "@/lib/cms/use-public-settings";
 import { cn } from "@/lib/utils";
 
@@ -64,8 +63,8 @@ export function GlassNavbar() {
   // On the home page the bar is fully transparent over the hero until the page scrolls.
   const transparent = pathname === "/" && !scrolled && !isOpen;
   const linkCls = "text-[var(--m-text-secondary)] hover:text-[var(--m-text-heading)]";
-  const ctaHref = isLoggedIn ? "/dashboard" : "/login";
-  const ctaLabel = isLoggedIn ? "Dashboard" : "Sign In";
+  const ctaHref = isLoggedIn ? "/dashboard" : "/signup";
+  const ctaLabel = isLoggedIn ? "Dashboard" : "Start for free";
 
   return (
     <>
@@ -104,14 +103,14 @@ export function GlassNavbar() {
 
           <div className="hidden md:flex items-center gap-3 shrink-0">
             <ThemeToggle />
-            <BookDemoTrigger
-              className={cn("text-xs font-semibold transition-colors px-3 py-1.5 whitespace-nowrap cursor-pointer", linkCls)}
-            >
-              Book Demo
-            </BookDemoTrigger>
+            {!isLoggedIn && (
+              <Link href="/login" className={cn("text-xs font-semibold transition-colors px-3 py-1.5 whitespace-nowrap", linkCls)}>
+                Log in
+              </Link>
+            )}
             <Link
               href={ctaHref}
-              className="group inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-[#00DF82] px-5 py-2.5 text-xs font-semibold text-slate-950 shadow-[0_6px_24px_rgba(0,223,130,0.25)] transition-all duration-300 ease-out hover:-translate-y-px hover:bg-[#00c673]"
+              className="group inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-[#00DF82] px-5 py-2.5 text-xs font-semibold !text-white shadow-[0_6px_24px_rgba(0,223,130,0.25)] transition-all duration-300 ease-out hover:-translate-y-px hover:bg-[#00c673]"
             >
               {ctaLabel}
               <ArrowRight className="size-4 transition-transform duration-300 ease-out group-hover:translate-x-1" />
@@ -170,13 +169,15 @@ export function GlassNavbar() {
             <div className="flex justify-center py-1">
               <ThemeToggle className="w-full justify-around" />
             </div>
-            <BookDemoTrigger className="w-full text-center text-xs font-bold py-3 border border-[var(--m-border-primary)] bg-[var(--m-bg-tertiary)] text-[var(--m-text-primary)]">
-              Book Demo
-            </BookDemoTrigger>
+            {!isLoggedIn && (
+              <Link href="/login" onClick={() => setIsOpen(false)} className="w-full text-center text-xs font-bold py-3 border border-[var(--m-border-primary)] bg-[var(--m-bg-tertiary)] text-[var(--m-text-primary)]">
+                Log in
+              </Link>
+            )}
             <Link
               href={ctaHref}
               onClick={() => setIsOpen(false)}
-              className="group inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#00DF82] py-3 text-xs font-semibold text-slate-950 shadow-[0_6px_24px_rgba(0,223,130,0.25)] transition-all duration-300 ease-out hover:bg-[#00c673]"
+              className="group inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#00DF82] py-3 text-xs font-semibold !text-white shadow-[0_6px_24px_rgba(0,223,130,0.25)] transition-all duration-300 ease-out hover:bg-[#00c673]"
             >
               {ctaLabel}
               <ArrowRight className="size-4 transition-transform duration-300 ease-out group-hover:translate-x-1" />

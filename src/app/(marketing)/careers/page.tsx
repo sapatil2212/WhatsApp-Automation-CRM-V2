@@ -92,7 +92,7 @@ export default function CareersPage() {
           <div className="pt-2">
             <a
               href="mailto:careers@chatnexgen.online?subject=General%20Inquiry%20-%20Brightwave%20Digital%20Products%20LLP"
-              className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold px-6 py-2.5 rounded-lg transition-colors cursor-pointer"
+              className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 !text-white text-xs font-bold px-6 py-2.5 rounded-lg transition-colors cursor-pointer"
             >
               <Send className="size-3.5" /> Send Resume to careers@chatnexgen.online
             </a>

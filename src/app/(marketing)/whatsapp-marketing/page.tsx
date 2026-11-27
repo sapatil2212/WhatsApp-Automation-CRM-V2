@@ -81,7 +81,7 @@ export default function WhatsAppMarketingPage() {
             {/* Simulated actions */}
             <div className="flex items-center justify-between border-t border-[var(--m-border-primary)] pt-4 mt-2">
               <span className="text-[9px] text-[var(--m-text-muted)]">Est. 12,500 recipients</span>
-              <button className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer">
+              <button className="bg-emerald-500 hover:bg-emerald-400 !text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer">
                 <Play className="size-3" /> Dispatch Now
               </button>
             </div>

@@ -105,7 +105,7 @@ export function PopupsTab() {
                         <span className="grid size-12 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground"><ImagePlus className="size-4" /></span>
                       )}
                       <div className="min-w-0 flex-1">
-                        <p className="flex items-center gap-2 truncate text-[13px] font-medium"><span className="truncate">{o.title}</span><Pill tone={st.tone}>{st.text}</Pill></p>
+                        <p className="flex items-center gap-2 truncate text-[13px] font-medium"><span className="truncate">{o.title || (o.imageUrl ? "Image only" : "Untitled pop-up")}</span><Pill tone={st.tone}>{st.text}</Pill></p>
                         <p className="truncate text-[11px] text-muted-foreground">
                           {FREQ[o.frequency]}{kind === "welcome" ? ` · after ${o.delaySeconds}s` : ""}{o.promoCode ? ` · code ${o.promoCode.code}` : ""}{o.endsAt ? ` · until ${fmtDate(o.endsAt)}` : ""}
                         </p>
@@ -141,7 +141,7 @@ export function PopupsTab() {
         onOpenChange={(o) => !o && setDeleting(null)}
         title="Delete this pop-up?"
         description="It is removed from the home page along with its view and click counts."
-        details={deleting ? <span className="font-medium">{deleting.title}</span> : null}
+        details={deleting ? <span className="font-medium">{deleting.title || "Image only"}</span> : null}
         confirmText="Delete"
         variant="destructive"
         onConfirm={async () => {
@@ -183,14 +183,14 @@ function OfferForm({ initial, kind, promos, onClose, onSaved }: { initial: Offer
   const onImage = (file: File | undefined) => {
     if (!file) return;
     if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) return toast.error("Use a PNG, JPEG, WebP or GIF image.");
-    if (file.size > 1_000_000) return toast.error("Image must be under 1 MB.");
+    if (file.size > 5 * 1024 * 1024) return toast.error("Image must be under 5 MB.");
     const r = new FileReader();
     r.onload = () => setF((x) => ({ ...x, imageUrl: String(r.result) }));
     r.readAsDataURL(file);
   };
 
   const save = async () => {
-    if (f.title.trim().length < 2) return toast.error("Add a headline.");
+    if (!f.title.trim() && !f.body.trim() && !f.imageUrl && !f.ctaLabel.trim() && !f.promoCodeId) return toast.error("Add at least an image, headline or message.");
     setSaving(true);
     try {
       const json = {
@@ -234,7 +234,7 @@ function OfferForm({ initial, kind, promos, onClose, onSaved }: { initial: Offer
       }
     >
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Headline *" className="sm:col-span-2"><Input className={inputCls} value={f.title} onChange={set("title")} maxLength={160} autoFocus /></Field>
+        <Field label="Headline" className="sm:col-span-2"><Input className={inputCls} value={f.title} onChange={set("title")} maxLength={160} autoFocus /></Field>
         <Field label="Message" className="sm:col-span-2"><Textarea rows={3} className="text-[13px] md:text-[13px]" value={f.body} onChange={set("body")} maxLength={1000} placeholder="Start automating WhatsApp today. Offer valid till Sunday." /></Field>
         <div className="space-y-1 sm:col-span-2">
           <span className="text-[12px] font-medium">Image</span>
@@ -245,7 +245,7 @@ function OfferForm({ initial, kind, promos, onClose, onSaved }: { initial: Offer
             ) : (
               <span className="grid h-14 w-24 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground"><ImagePlus className="size-4" /></span>
             )}
-            <p className="min-w-0 flex-1 text-[11px] text-muted-foreground">Banner shown at the top of the pop-up. PNG, JPEG, WebP or GIF, up to 1 MB. Wide images (about 16:9) look best.</p>
+            <p className="min-w-0 flex-1 text-[11px] text-muted-foreground">Banner shown at the top of the pop-up. PNG, JPEG, WebP or GIF, up to 5 MB. Wide images (about 16:9) look best.</p>
             <label className="inline-flex h-7 shrink-0 cursor-pointer items-center rounded-md border border-border px-2.5 text-xs font-medium hover:bg-muted">
               {f.imageUrl ? "Replace" : "Upload"}
               <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="sr-only" onChange={(e) => { onImage(e.target.files?.[0]); e.target.value = ""; }} />
@@ -273,7 +273,7 @@ function OfferForm({ initial, kind, promos, onClose, onSaved }: { initial: Offer
 
       {showPreview && (
         <div className="fixed inset-0 z-[310]">
-          <OfferModal preview offer={{ id: "preview", kind, title: f.title || "Headline", body: f.body || null, imageUrl: f.imageUrl, ctaLabel: f.ctaLabel || null, ctaUrl: f.ctaUrl || null, promoCode: promo?.code ?? null }} onClose={() => setShowPreview(false)} />
+          <OfferModal preview offer={{ id: "preview", kind, title: f.title, body: f.body || null, imageUrl: f.imageUrl, ctaLabel: f.ctaLabel || null, ctaUrl: f.ctaUrl || null, promoCode: promo?.code ?? null }} onClose={() => setShowPreview(false)} />
         </div>
       )}
     </AdminModal>

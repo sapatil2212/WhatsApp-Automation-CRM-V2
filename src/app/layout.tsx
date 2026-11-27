@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
 import "./globals.css";
 import { ThemeProvider } from "@/hooks/use-theme";
+import { DEFAULT_DESCRIPTION, DEFAULT_TITLE, KEYWORDS, OG_IMAGE, SITE_NAME, SITE_URL } from "@/lib/seo";
 import { DEFAULT_THEME, STORAGE_KEY, THEME_IDS } from "@/lib/themes";
 
 const inter = Inter({
@@ -11,39 +12,42 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: {
-    default: "ChatNexGen - AI Powered WhatsApp CRM & Automation Platform",
-    template: "%s — ChatNexGen",
+    default: DEFAULT_TITLE,
+    template: "%s | ChatNexGen",
   },
-  description: "Manage leads, automate customer communication, and grow your business with ChatNexGen's AI-powered WhatsApp CRM platform.",
+  description: DEFAULT_DESCRIPTION,
+  keywords: KEYWORDS,
+  applicationName: SITE_NAME,
+  authors: [{ name: "ChatNexGen Technologies", url: SITE_URL }],
+  creator: "ChatNexGen Technologies",
+  publisher: "ChatNexGen Technologies",
+  category: "business software",
+  alternates: { canonical: "/" },
   robots: {
     index: true,
     follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 },
   },
   openGraph: {
-    title: "ChatNexGen - AI Powered WhatsApp CRM & Automation Platform",
-    description: "Manage leads, automate customer communication, and grow your business with ChatNexGen's AI-powered WhatsApp CRM platform.",
-    url: "https://chatnexgen.online",
-    siteName: "ChatNexGen",
-    images: [
-      {
-        url: "https://chatnexgen.online/images/logo/chatnexgen-logo.png",
-        width: 1200,
-        height: 630,
-        alt: "ChatNexGen CRM Logo",
-      },
-    ],
+    title: DEFAULT_TITLE,
+    description: DEFAULT_DESCRIPTION,
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    images: [OG_IMAGE],
     locale: "en_US",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "ChatNexGen - AI Powered WhatsApp CRM & Automation Platform",
-    description: "Manage leads, automate customer communication, and grow your business with ChatNexGen's AI-powered WhatsApp CRM platform.",
-    images: ["https://chatnexgen.online/images/logo/chatnexgen-logo.png"],
+    title: DEFAULT_TITLE,
+    description: DEFAULT_DESCRIPTION,
+    images: [OG_IMAGE.url],
   },
   icons: {
     icon: [{ url: "/favicon.png", type: "image/png" }],
+    apple: [{ url: "/favicon.png" }],
   },
   formatDetection: {
     email: false,
@@ -51,7 +55,6 @@ export const metadata: Metadata = {
     telephone: false,
   },
 };
-
 export const viewport: Viewport = {
   themeColor: "#020617",
   colorScheme: "dark",
@@ -129,6 +132,7 @@ export default function RootLayout({
             __html: JSON.stringify({
               "@context": "https://schema.org",
               "@type": "Organization",
+              "@id": "https://chatnexgen.online/#organization",
               "name": "ChatNexGen Technologies",
               "alternateName": "ChatNexGen",
               "url": "https://chatnexgen.online",
@@ -150,7 +154,37 @@ export default function RootLayout({
             })
           }}
         />
-      </head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@graph": [
+                {
+                  "@type": "WebSite",
+                  "@id": `${SITE_URL}/#website`,
+                  "url": SITE_URL,
+                  "name": SITE_NAME,
+                  "description": DEFAULT_DESCRIPTION,
+                  "inLanguage": "en",
+                  "publisher": { "@id": `${SITE_URL}/#organization` },
+                },
+                {
+                  "@type": "SoftwareApplication",
+                  "name": "ChatNexGen",
+                  "applicationCategory": "BusinessApplication",
+                  "operatingSystem": "Web",
+                  "url": SITE_URL,
+                  "image": OG_IMAGE.url,
+                  "description": DEFAULT_DESCRIPTION,
+                  "featureList": ["WhatsApp bulk campaigns", "Personalized WhatsApp messages", "AI auto-replies", "WhatsApp CRM and pipelines", "Shared team inbox", "Drip sequences", "Campaign analytics"],
+                  "offers": { "@type": "Offer", "url": `${SITE_URL}/pricing`, "priceCurrency": "INR", "availability": "https://schema.org/InStock" },
+                  "publisher": { "@id": `${SITE_URL}/#organization` },
+                },
+              ],
+            }),
+          }}
+        />      </head>
       <body className="min-h-full bg-background text-foreground font-sans" suppressHydrationWarning>
         <ThemeProvider>
           {children}

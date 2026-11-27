@@ -11,6 +11,7 @@ import { AIChatSimulation } from "@/components/marketing/ai-chat-simulation";
 import { SocialProofMetrics } from "@/components/marketing/social-proof-metrics";
 import { BookDemoTrigger } from "@/components/marketing/book-demo-trigger";
 import { WhatWeDoSection } from "@/components/marketing/what-we-do-section";
+import { InboxProblem } from "@/components/marketing/inbox-problem";
 import { WhatsAppStats } from "@/components/marketing/whatsapp-stats";
 
 interface FAQItem {
@@ -102,6 +103,7 @@ export default function HomePage() {
       {/* 1. HERO SECTION */}
       <OfferPopups />
       <InteractiveHero />
+      <InboxProblem />
 
       {/* 2. WHAT WE DO */}
       <WhatWeDoSection />
@@ -343,7 +345,7 @@ export default function HomePage() {
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] uppercase font-bold tracking-widest text-[var(--m-text-muted)]">{plan.name}</span>
                     {plan.primary && (
-                      <span className="bg-emerald-500 text-slate-950 text-[9px] font-bold uppercase px-2 py-0.5 rounded-full tracking-wider">
+                      <span className="bg-emerald-500 !text-white text-[9px] font-bold uppercase px-2 py-0.5 rounded-full tracking-wider">
                         Recommended
                       </span>
                     )}
@@ -375,7 +377,7 @@ export default function HomePage() {
                     href={plan.link || "/pricing"}
                     className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all duration-300 ease-out text-center flex items-center justify-center gap-1.5 ${
                       plan.primary
-                        ? "bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.2)]"
+                        ? "bg-emerald-500 !text-white hover:bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.2)]"
                         : "bg-[var(--m-bg-secondary)] border border-[var(--m-border-primary)] text-[var(--m-text-secondary)] hover:bg-[var(--m-bg-tertiary)]"
                     }`}
                   >
@@ -433,7 +435,7 @@ export default function HomePage() {
             <MagneticButton>
               <Link
                 href="/login"
-                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-6 py-3 rounded-xl text-xs font-semibold transition-all duration-300 ease-out shadow-[0_0_16px_rgba(16,185,129,0.2)] hover:shadow-[0_0_24px_rgba(16,185,129,0.4)] flex items-center gap-1.5"
+                className="bg-emerald-500 hover:bg-emerald-400 !text-white px-6 py-3 rounded-xl text-xs font-semibold transition-all duration-300 ease-out shadow-[0_0_16px_rgba(16,185,129,0.2)] hover:shadow-[0_0_24px_rgba(16,185,129,0.4)] flex items-center gap-1.5"
               >
                 Start Free Trial <ArrowRight className="size-3.5" />
               </Link>

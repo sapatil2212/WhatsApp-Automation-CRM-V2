@@ -114,9 +114,6 @@ export function InteractiveHero() {
               {HERO.titleBefore}{" "}
               <span className="relative inline-block text-emerald-500">
                 {HERO.titleHighlight}
-                <svg className="absolute -bottom-2 left-0 w-full text-emerald-500/40" viewBox="0 0 200 12" fill="none" aria-hidden>
-                  <path d="M2 9.5C50 3.5 150 2 198 8" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
-                </svg>
               </span>{" "}
               {HERO.titleAfter}
             </h1>
@@ -128,7 +125,7 @@ export function InteractiveHero() {
             <div className="mt-5 flex flex-col gap-2.5 sm:flex-row sm:items-center">
               <Link
                 href="/login"
-                className="group inline-flex items-center justify-center gap-2 rounded-lg bg-[#00DF82] px-5 py-2.5 text-xs font-semibold text-slate-950 shadow-[0_6px_24px_rgba(0,223,130,0.25)] transition-all duration-300 ease-out hover:-translate-y-px hover:bg-[#00c673]"
+                className="group inline-flex items-center justify-center gap-2 rounded-lg bg-[#00DF82] px-5 py-2.5 text-xs font-semibold !text-white shadow-[0_6px_24px_rgba(0,223,130,0.25)] transition-all duration-300 ease-out hover:-translate-y-px hover:bg-[#00c673]"
               >
                 Get Started
                 <ArrowRight className="size-4 transition-transform duration-300 ease-out group-hover:translate-x-1" />

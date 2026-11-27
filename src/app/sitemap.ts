@@ -1,7 +1,8 @@
 import { MetadataRoute } from "next";
+import { SITE_URL } from "@/lib/seo";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = "https://chatnexgen.online";
+  const baseUrl = SITE_URL;
   
   const routes = [
     "",
@@ -20,6 +21,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/security",
     "/customer-stories",
     "/data-deletion",
+    "/whatsapp-marketing",
+    "/integrations",
+    "/book-demo",
+    "/blog",
+    "/careers",
+    "/api-docs",
   ];
 
   return routes.map((route) => ({

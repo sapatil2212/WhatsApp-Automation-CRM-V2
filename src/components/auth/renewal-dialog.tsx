@@ -78,7 +78,7 @@ export function RenewalDialog({ info, password, onClose, onRenewed }: {
                     )}
                   >
                     <span className="flex min-w-0 items-center gap-2">
-                      <span className={cn("flex size-4 shrink-0 items-center justify-center rounded-full border", planId === p.id ? "border-emerald-500 bg-emerald-500 text-slate-950" : "border-[var(--m-border-secondary)]")}>
+                      <span className={cn("flex size-4 shrink-0 items-center justify-center rounded-full border", planId === p.id ? "border-emerald-500 bg-emerald-500 !text-white" : "border-[var(--m-border-secondary)]")}>
                         {planId === p.id && <Check className="size-3" />}
                       </span>
                       <span className="min-w-0">

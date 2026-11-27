@@ -260,7 +260,7 @@ export default function FeaturesPage() {
           <div className="pt-2">
             <Link
               href="/pricing"
-              className="inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-6 py-2.5 rounded-xl text-xs font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.2)]"
+              className="inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 !text-white px-6 py-2.5 rounded-xl text-xs font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.2)]"
             >
               View Pricing <ArrowRight className="size-3.5" />
             </Link>

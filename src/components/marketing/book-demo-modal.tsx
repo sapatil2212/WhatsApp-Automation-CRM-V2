@@ -172,7 +172,7 @@ export function BookDemoModal({ open, onClose }: BookDemoModalProps) {
                   </p>
                   <button
                     onClick={handleClose}
-                    className="mt-2 px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition-colors cursor-pointer shadow-[0_2px_12px_rgba(0,223,130,0.2)]"
+                    className="mt-2 px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 !text-white text-xs font-bold transition-colors cursor-pointer shadow-[0_2px_12px_rgba(0,223,130,0.2)]"
                   >
                     Done
                   </button>
@@ -326,7 +326,7 @@ export function BookDemoModal({ open, onClose }: BookDemoModalProps) {
                     <button
                       type="submit"
                       disabled={loading || !isFormComplete}
-                      className="px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 text-xs font-bold transition-all shadow-[0_2px_12px_rgba(0,223,130,0.2)] flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed !text-white text-xs font-bold transition-all shadow-[0_2px_12px_rgba(0,223,130,0.2)] flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       {loading && <Loader2 className="size-3.5 animate-spin" />}
                       Confirm Booking

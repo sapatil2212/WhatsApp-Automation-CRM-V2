@@ -28,7 +28,7 @@ export default function NotFound() {
         <div className="pt-4 flex items-center justify-center gap-3">
           <Link
             href="/"
-            className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold px-5 py-2.5 rounded-xl transition-all shadow-[0_0_12px_rgba(16,185,129,0.2)] flex items-center gap-1.5"
+            className="bg-emerald-500 hover:bg-emerald-400 !text-white text-xs font-bold px-5 py-2.5 rounded-xl transition-all shadow-[0_0_12px_rgba(16,185,129,0.2)] flex items-center gap-1.5"
           >
             <Home className="size-3.5" /> Return Home
           </Link>

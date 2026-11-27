@@ -134,8 +134,22 @@ export function OfferPopups() {
   );
 }
 
-export function OfferModal({ offer, onClose, onCta, preview }: { offer: Pick<Offer, "id" | "kind" | "title" | "body" | "imageUrl" | "ctaLabel" | "ctaUrl" | "promoCode">; onClose: () => void; onCta?: () => void; preview?: boolean }) {
+export function OfferModal({ offer, onClose: onClosed, onCta, preview }: { offer: Pick<Offer, "id" | "kind" | "title" | "body" | "imageUrl" | "ctaLabel" | "ctaUrl" | "promoCode">; onClose: () => void; onCta?: () => void; preview?: boolean }) {
   const [copied, setCopied] = useState(false);
+  // `shown` drives the enter/exit transition; the parent is told only after the exit finishes.
+  const [shown, setShown] = useState(false);
+  const closing = useRef(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => requestAnimationFrame(() => setShown(true)));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  const onClose = useCallback(() => {
+    if (closing.current) return;
+    closing.current = true;
+    setShown(false);
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    setTimeout(onClosed, reduce ? 0 : 280);
+  }, [onClosed]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -156,30 +170,33 @@ export function OfferModal({ offer, onClose, onCta, preview }: { offer: Pick<Off
 
   const href = ctaHref(offer as Offer);
   const external = /^https:\/\//.test(href);
+  const hasText = Boolean(offer.title || offer.body);
+  const hasCta = Boolean(offer.ctaLabel || offer.ctaUrl);
+  const hasContent = hasText || Boolean(offer.promoCode) || hasCta;
 
   return (
     <div
-      className={`${preview ? "absolute" : "fixed"} inset-0 z-[300] flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4`}
+      className={`${preview ? "absolute" : "fixed"} inset-0 z-[300] flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm transition-opacity duration-300 ease-out motion-reduce:transition-none sm:items-center sm:p-4 ${shown ? "opacity-100" : "opacity-0"}`}
       role="dialog"
       aria-modal="true"
-      aria-label={offer.title}
+      aria-label={offer.title || "Offer"}
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="relative w-full max-w-md overflow-hidden rounded-t-2xl bg-white text-slate-900 shadow-2xl sm:rounded-2xl">
+      <div className={`relative w-full max-w-md overflow-hidden rounded-t-2xl bg-white text-slate-900 shadow-2xl transition-all duration-300 ease-out motion-reduce:transition-none sm:rounded-2xl ${shown ? "translate-y-0 scale-100 opacity-100" : "translate-y-6 scale-95 opacity-0"}`}>
         <button type="button" onClick={onClose} aria-label="Close" className="absolute right-2.5 top-2.5 z-10 grid size-8 place-items-center rounded-full bg-white/90 text-slate-600 shadow-sm transition-colors hover:bg-white hover:text-slate-900">
           <X className="size-4" />
         </button>
         {offer.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={offer.imageUrl} alt="" className="max-h-64 w-full object-cover" />
-        ) : (
+        ) : hasContent ? (
           <div className="flex h-24 items-center justify-center bg-gradient-to-br from-emerald-400 to-emerald-600">
             <Gift className="size-10 text-white" />
           </div>
-        )}
-        <div className="space-y-3 p-5 text-center">
-          {offer.kind === "exit_intent" && <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-600">Wait, before you go</p>}
-          <h2 className="text-xl font-bold leading-snug">{offer.title}</h2>
+        ) : null}
+        {hasContent && <div className="space-y-3 p-5 text-center">
+          {offer.kind === "exit_intent" && hasText && <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-600">Wait, before you go</p>}
+          {offer.title && <h2 className="text-xl font-bold leading-snug">{offer.title}</h2>}
           {offer.body && <p className="whitespace-pre-line text-sm text-slate-600">{offer.body}</p>}
           {offer.promoCode && (
             <button type="button" onClick={copy} className="mx-auto flex items-center gap-2 rounded-lg border-2 border-dashed border-emerald-500 bg-emerald-50 px-4 py-2 font-mono text-base font-bold tracking-wider text-emerald-700 transition-colors hover:bg-emerald-100">
@@ -188,7 +205,7 @@ export function OfferModal({ offer, onClose, onCta, preview }: { offer: Pick<Off
             </button>
           )}
           {offer.promoCode && <p className="text-[11px] text-slate-500">{copied ? "Copied. It's applied automatically at signup." : "Tap to copy. It's applied automatically at signup."}</p>}
-          <Link
+          {hasCta && <Link
             href={href}
             target={external ? "_blank" : undefined}
             rel={external ? "noopener noreferrer" : undefined}
@@ -197,12 +214,12 @@ export function OfferModal({ offer, onClose, onCta, preview }: { offer: Pick<Off
               onCta?.();
               if (!external) onClose();
             }}
-            className="flex h-11 w-full items-center justify-center rounded-xl bg-[#00DF82] text-sm font-semibold text-slate-950 shadow-[0_6px_24px_rgba(0,223,130,0.25)] transition-colors hover:bg-[#00c673]"
+            className="flex h-11 w-full items-center justify-center rounded-xl bg-[#00DF82] text-sm font-semibold !text-white shadow-[0_6px_24px_rgba(0,223,130,0.25)] transition-colors hover:bg-[#00c673]"
           >
             {offer.ctaLabel || "Claim offer"}
-          </Link>
+          </Link>}
           <button type="button" onClick={onClose} className="text-xs text-slate-500 hover:text-slate-700">No thanks</button>
-        </div>
+        </div>}
       </div>
     </div>
   );

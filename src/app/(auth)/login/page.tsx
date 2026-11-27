@@ -127,12 +127,6 @@ function LoginPageInner() {
     <>
       <AuthShell
         variant="login"
-        topRight={
-          <p className="text-[var(--m-text-tertiary)]">
-            New to ChatNexGen?{" "}
-            <Link href="/signup" className="font-semibold text-emerald-500 hover:text-emerald-400">Create an account</Link>
-          </p>
-        }
       >
         <div className="mb-6">
           <h1 className="text-2xl font-bold tracking-tight text-[var(--m-text-heading)]">Welcome back</h1>
@@ -149,7 +143,7 @@ function LoginPageInner() {
             <AuthNotice tone="error">
               {error}
               {expired && (
-                <button type="button" onClick={() => setShowRenewal(true)} className="mt-2 flex h-8 w-full items-center justify-center gap-1.5 rounded-md bg-emerald-500 text-[12px] font-semibold text-slate-950 hover:bg-emerald-400">
+                <button type="button" onClick={() => setShowRenewal(true)} className="mt-2 flex h-8 w-full items-center justify-center gap-1.5 rounded-md bg-emerald-500 text-[12px] font-semibold !text-white hover:bg-emerald-400">
                   <CreditCard className="size-3.5" /> Renew subscription
                 </button>
               )}

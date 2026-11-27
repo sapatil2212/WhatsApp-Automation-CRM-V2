@@ -13,7 +13,7 @@ import { SELF_SERVE_PLANS } from '@/lib/billing/plans';
 import { ConflictError, NotFoundError, systemDb, ValidationError } from '../kernel';
 import { toRules } from './billing.service';
 
-const MAX_IMAGE_CHARS = 1_400_000; // ~1 MB image as a data URL
+const MAX_IMAGE_CHARS = 7_000_000; // ~5 MB image as a data URL
 const dt = z.preprocess((v) => (v === '' || v == null ? null : v), z.coerce.date().nullable());
 const optText = (max: number) => z.string().trim().max(max).nullish().transform((v) => (v ? v : null));
 
@@ -24,11 +24,11 @@ export const OFFER_KINDS = ['welcome', 'exit_intent'] as const;
 export const offerSchema = z
   .object({
     kind: z.enum(OFFER_KINDS),
-    title: z.string().trim().min(2, 'Add a headline.').max(160),
+    title: z.string().trim().max(160).nullish().transform((v) => v ?? ''),
     body: optText(1000),
     imageUrl: z
       .string()
-      .max(MAX_IMAGE_CHARS, 'Image is too large (max about 1 MB).')
+      .max(MAX_IMAGE_CHARS, 'Image is too large (max 5 MB).')
       .refine((v) => /^(https:\/\/|data:image\/(png|jpeg|webp|gif);base64,)/i.test(v), 'Use an https image link or upload a PNG, JPEG, WebP or GIF.')
       .nullish()
       .transform((v) => (v ? v : null)),
@@ -47,6 +47,7 @@ export const offerSchema = z
     startsAt: dt.default(null),
     endsAt: dt.default(null),
   })
+  .refine((v) => Boolean(v.title || v.body || v.imageUrl || v.ctaLabel || v.promoCodeId), { message: 'Add at least an image, headline or message.', path: ['title'] })
   .refine((v) => !v.startsAt || !v.endsAt || v.endsAt > v.startsAt, { message: 'The end date must be after the start date.', path: ['endsAt'] });
 
 const offerInclude = { promoCode: { select: { id: true, code: true, isActive: true } } } as const;
